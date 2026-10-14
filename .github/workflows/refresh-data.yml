@@ -114,6 +114,7 @@ jobs:
         if: failure() && github.event_name == 'schedule'
         uses: actions/github-script@v8
         with:
+          retries: 3   # GitHub API 일시 오류(502) 대비
           script: |
             const title = "회의록 자동 수집 실패";
             const url = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
@@ -129,6 +130,7 @@ jobs:
         if: success() && github.event_name == 'schedule'
         uses: actions/github-script@v8
         with:
+          retries: 3   # GitHub API 일시 오류(502) 대비
           script: |
             const { data: open } = await github.rest.issues.listForRepo({ ...context.repo, state: "open", per_page: 50 });
             for (const i of open.filter(i => i.title === "회의록 자동 수집 실패" && !i.pull_request)) {
