@@ -135,3 +135,19 @@ def test_collect_range_survives_a_blocked_day(store, settings, monkeypatch):
     with pytest.raises(AssemblyAPIError):
         pipeline.collect_range(store, settings, "2024-10-08", "2024-10-08", {"DAE_NUM": "22"},
                                progress=lambda _: None)
+
+
+def test_collect_range_stops_early_when_api_is_down(store, settings, monkeypatch):
+    """처음부터 연속으로 막히면(국회 API 전체 장애) 남은 날짜를 기다리지 않고 바로 실패한다."""
+    from agrisea import pipeline
+    calls = []
+
+    def down(self, only_target=True, **q):
+        calls.append(q["CONF_DATE"])
+        raise AssemblyAPIError("HTTP", "Connection timed out")
+
+    monkeypatch.setattr(AssemblyClient, "committee_meetings", down)
+    with pytest.raises(AssemblyAPIError):
+        pipeline.collect_range(store, settings, "2024-10-01", "2024-10-15", {"DAE_NUM": "22"},
+                               progress=lambda _: None)
+    assert len(calls) == pipeline.STOP_AFTER_FAILS

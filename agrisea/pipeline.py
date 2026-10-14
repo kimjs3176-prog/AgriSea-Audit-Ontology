@@ -30,6 +30,9 @@ def collect(store: Store, settings: Settings, params: dict[str, Any],
     return meetings
 
 
+STOP_AFTER_FAILS = 3  # 처음부터 연속으로 이만큼 날짜가 막히면 API 장애로 보고 중단
+
+
 def collect_range(store: Store, settings: Settings, date_from: str, date_to: str,
                   params: dict[str, Any] | None = None, only_target: bool = True,
                   progress: Callable[[str], None] = print) -> list[dict]:
@@ -55,6 +58,11 @@ def collect_range(store: Store, settings: Settings, date_from: str, date_to: str
                 raise
             failed.append(day.isoformat())
             progress(f"[조회 실패] {day.isoformat()}: {e.message}")
+            # 처음부터 연속으로 막히면 국회 API 전체 장애: 남은 날짜도 모두 실패하므로(하루 수 분씩 낭비)
+            # 일찍 멈추고 다음 예약 실행에 맡긴다. 중간에 한두 날만 막힌 경우는 계속해 나머지를 살린다
+            if len(failed) >= STOP_AFTER_FAILS and len(failed) == (day - start).days + 1:
+                progress(f"연속 {STOP_AFTER_FAILS}일 접속 실패: 국회 API가 막힌 것으로 보고 중단(다음 예약 실행에서 재시도)")
+                raise AssemblyAPIError("HTTP", f"국회 API 접속 불가(연속 {STOP_AFTER_FAILS}일 실패)")
         day += timedelta(days=1)
     progress(f"{date_from}~{date_to}: 회의 {len(found)}건 메타데이터 저장"
              + (f" · 조회 실패 {len(failed)}일({', '.join(failed)})" if failed else ""))

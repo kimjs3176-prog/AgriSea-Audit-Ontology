@@ -106,7 +106,7 @@ def is_target_committee(row: dict[str, Any], aliases: tuple[str, ...] = COMMITTE
 
 class AssemblyClient:
     def __init__(self, settings: Settings, session: requests.Session | None = None,
-                 timeout: float = 30.0, sleep: float = 0.2, retries: int = 4):
+                 timeout: float | tuple[float, float] = (10.0, 60.0), sleep: float = 0.2, retries: int = 4):
         if not settings.api_key:
             raise ValueError("ASSEMBLY_API_KEY 환경변수(또는 .env)에 인증키를 설정하세요.")
         self.settings = settings
