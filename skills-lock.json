@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "kling-cli": {
+      "source": "klingai-tech/skills",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "e2121ca5b9a406261651a963108525a0764c49caa82877835647cb99081bc6d6"
+    }
+  }
+}
