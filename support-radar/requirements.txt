@@ -1,0 +1,4 @@
+requests>=2.31
+fastapi>=0.110
+uvicorn>=0.29
+anthropic>=1.0   # 선택: 공고문 자격 조건 구조화(ANTHROPIC_API_KEY 설정 시)
