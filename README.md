@@ -17,6 +17,9 @@ SQLite(FTS5 전문검색) ──► RDF 지식그래프(OWL/SKOS, Turtle) ──
 웹 UI / REST API / CLI : 검색 · 회의 요약 · 쟁점 관계망 · 국감 브리핑(Markdown 내보내기)
 ```
 
+> **관련 서비스: [지원사업 레이더](support-radar/README.md)** — 이 회의록 데이터로 국회 정책 신호(주제별 관심도·정부 약속)를 뽑아
+> K-Startup 지원사업 공고와 연결하고, 기업 프로필로 공고별 신청 자격을 판정하는 별도 서비스(`support-radar/`).
+
 ## 주요 기능
 
 | 기능 | 내용 |

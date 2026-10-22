@@ -1,0 +1,94 @@
+# 지원사업 레이더 데이터 갱신: K-Startup 공고 수집 + 국회 회의록 정책 신호 계산 → support-radar/data 커밋
+#  - 하루 2번(08:47·20:47 KST). 회의록 자동 수집(07:17·13:17·19:17) 뒤에 돌아 최신 회의록을 반영
+#  - 공고: 22대 국회 임기 시작일(2024-05-30) 이후 공고 전체를 다시 받아 접수 상태까지 갱신
+#  - 정책 신호: 저장소의 data/seed.sqlite3.gz(국회 회의록)에서 주제별 언급·질의·정부 약속 추출
+#  - (선택) ANTHROPIC_API_KEY가 있으면 접수 중 공고의 자격 조건을 Claude로 구조화
+#  - 내용이 바뀌었을 때만 커밋. 커밋되면 Vercel(지원사업 레이더 프로젝트)이 새로 배포
+# 저장소 Settings > Secrets and variables > Actions 에 KSTARTUP_API_KEY 를 등록해야 한다.
+# 공공데이터포털이 해외(Actions) 접속을 막으면 Variables 에 RADAR_PROXY(배포주소/api/kstartup)를 지정.
+name: 지원사업 공고 갱신
+
+on:
+  schedule:
+    - cron: "47 23 * * *"   # 08:47 KST
+    - cron: "47 11 * * *"   # 20:47 KST
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/refresh-radar.yml"   # 처음 머지될 때 1회 실행
+      - "support-radar/radar/topics.py"         # 주제 사전이 바뀌면 신호 재계산
+      - "support-radar/radar/policy.py"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh-radar
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      KSTARTUP_API_KEY: ${{ secrets.KSTARTUP_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      RADAR_PROXY: ${{ vars.RADAR_PROXY }}
+      PYTHONPATH: ${{ github.workspace }}/support-radar:${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.ref_name }}
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt -r support-radar/requirements.txt
+
+      - name: 국회 정책 신호 계산
+        run: |
+          mkdir -p var
+          gunzip -c data/seed.sqlite3.gz > var/agrisea.sqlite3
+          python -m radar signals --agrisea-db var/agrisea.sqlite3
+
+      - name: K-Startup 공고 수집
+        id: collect
+        continue-on-error: true   # 공고 수집이 막혀도 정책 신호는 커밋
+        run: |
+          if [ -z "$KSTARTUP_API_KEY" ] && [ -z "$RADAR_PROXY" ]; then
+            echo "::error::KSTARTUP_API_KEY secret이 없습니다."; exit 1
+          fi
+          if ! python -m radar collect; then
+            if [ -n "$RADAR_PROXY" ]; then
+              echo "직접 접속 실패 → 서울 리전 중계($RADAR_PROXY)로 재시도"
+              KSTARTUP_PROXY="$RADAR_PROXY" python -m radar collect
+            else
+              exit 1
+            fi
+          fi
+
+      - name: (선택) 자격 조건 구조화
+        if: steps.collect.outcome == 'success' && env.ANTHROPIC_API_KEY != ''
+        run: python -m radar rules --limit 150
+
+      - name: 커밋
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add support-radar/data
+          if git diff --cached --quiet; then echo "변경 없음"; exit 0; fi
+          git commit -m "chore(radar): 지원사업 공고·정책 신호 자동 갱신"
+          git pull --rebase -X theirs origin "${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+
+      - name: 실행 요약
+        if: always()
+        run: |
+          { echo "### 지원사업 레이더 데이터"; python -m radar stats | sed 's/^/    /'; } >> "$GITHUB_STEP_SUMMARY" || true
+
+      - name: 공고 수집 실패 표시
+        if: steps.collect.outcome == 'failure'
+        run: |
+          echo "::error::K-Startup 공고 수집에 실패했습니다. 인증키(활용신청 승인 여부)와 해외 접속 차단(RADAR_PROXY)을 확인하세요."
+          exit 1
