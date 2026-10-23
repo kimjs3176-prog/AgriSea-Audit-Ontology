@@ -1,7 +1,9 @@
 # 지원사업 레이더 (Support Radar)
 
-**K-Startup 지원사업 공고**(창업진흥원 조회서비스, 공공데이터포털)를 **국회 농해수위 회의록 정책 신호**와 엮은 별도 서비스입니다.
-같은 저장소의 [국회 농해수위 온톨로지](../README.md)가 모은 회의록을 근거로 다음 두 가지를 제공합니다.
+**K-Startup 지원사업 공고**(창업진흥원 조회서비스, 공공데이터포털)를 **국회 위원회 회의록 정책 신호**와 엮은 별도 서비스입니다.
+국회 회의록은 농해수위에 한정하지 않고 **22대 국회 전체 위원회**(산자중기위·과방위·기재위 등, 소위원회 포함)를 모읍니다.
+농해수위는 같은 저장소의 [국회 농해수위 온톨로지](../README.md)가 모은 데이터를 그대로 쓰고, 그 밖의 위원회는 이 서비스가 수집합니다.
+이 회의록을 근거로 다음 두 가지를 제공합니다.
 
 1. **맞춤 매칭 + 자격 자동 판정**: 프로필(예비/창업기업, 개업일, 나이, 소재지, 관심 분야, 사업 키워드)을 넣으면
    공고마다 **신청 가능 / 조건부 / 불가**와 판정 근거, 적합도, 마감 D-day, 신청 가능 공고의 **최대 지원액 합계**를 보여 줍니다.
@@ -11,13 +13,15 @@
    - **정부 약속 추적**: 국회에서 장관·기관장이 한 약속(예: "청년농업인의 기술 창업을 지원하는 사업도 신규 추진하겠습니다")마다
      그 뒤에 같은 주제의 공고가 나왔는지 보여 줍니다.
    - 공고 상세에서는 **이 공고의 정책 배경**(관련 국회 질의·정부 약속)을 함께 보여 줍니다.
+   - 주제마다 어느 위원회에서 논의됐는지(위원회별 언급 수)와, 질의·약속마다 위원회를 함께 표시합니다.
 
 ```
-K-Startup API ─┐                         ┌─► 맞춤 매칭·자격 판정 (eligibility.py)
- (공고·사업소개) ├─► catalog.json.gz ──────┤
-               │                         └─► 정책 레이더: 관심도×공급, 약속→공고 추적 (policy.py)
-국회 회의록 DB ─┴─► policy_signals.json ───┘
- (../data/seed.sqlite3.gz)
+K-Startup API ──────────► catalog.json.gz ────────┐  ┌─► 맞춤 매칭·자격 판정 (eligibility.py)
+ (공고·사업소개)                                      ├──┤
+농해수위 회의록 DB ─────────────┐                     │  └─► 정책 레이더: 관심도×공급, 약속→공고 추적 (policy.py)
+ (../data/seed.sqlite3.gz)      ├─► policy_signals.json┘
+전체 위원회 회의록 ─► assembly_extracts.json.gz ┘
+ (국회 API, assembly.py: 주제 발언만 발췌)
 ```
 
 ## 구성
@@ -26,7 +30,8 @@ K-Startup API ─┐                         ┌─► 맞춤 매칭·자격 판
 |---|---|
 | `radar/kstartup.py` | K-Startup API 클라이언트(JSON/XML, 페이지네이션, 재시도, 인증키 가림, 필드 정규화) |
 | `radar/topics.py` | 국회 발언과 공고를 같은 기준으로 묶는 주제 사전(키워드 추가 시 재계산) |
-| `radar/policy.py` | 회의록 → 주제별 언급·질의·정부 약속(신호), 신호 × 공고 → 공백 판정·약속 추적 |
+| `radar/assembly.py` | 국회 전체 위원회 회의록 수집(월 단위 목록 조회, 본문 PDF 파싱, 주제 발언 발췌·띄어쓰기 교정, 이어 받기) |
+| `radar/policy.py` | 회의록 → 주제별 언급·질의·정부 약속·위원회(신호), 신호 × 공고 → 공백 판정·약속 추적 |
 | `radar/eligibility.py` | 창업기간·연령·지역·신청대상·본문 조건(업력 N년 이내, 만 N세 이하, 여성·재창업 등) 판정, 지원금액 추출, 적합도 |
 | `radar/llm.py` | (선택) Claude로 공고문 자격 조건 구조화 → 판정에 함께 사용 |
 | `radar/catalog.py` | 공고 스냅숏 보관·갱신 |
@@ -41,9 +46,11 @@ pip install -r requirements-dev.txt
 cp .env.example .env              # KSTARTUP_API_KEY=공공데이터포털 일반 인증키
 python -m radar collect           # 2024-05-30 이후 공고 + 사업 소개 수집 → data/catalog.json.gz
 python -m radar collect --open-only   # 접수 중 공고만 빠르게
-# 국회 정책 신호(저장소 루트의 회의록 DB 사용)
+# 국회 정책 신호: 농해수위(저장소 루트의 회의록 DB) + 전체 위원회
 mkdir -p var && gunzip -c ../data/seed.sqlite3.gz > var/agrisea.sqlite3
-PYTHONPATH=.:.. python -m radar signals --agrisea-db var/agrisea.sqlite3
+ASSEMBLY_API_KEY=열린국회정보_인증키 AGRISEA_MINUTES_PROXY=https://ax-rosy-seven.vercel.app/api/minutes-text \
+  python -m radar assembly --agrisea-db var/agrisea.sqlite3 --limit 50   # 최근 회의부터 50건씩 이어서
+python -m radar signals --agrisea-db var/agrisea.sqlite3
 python -m radar serve --port 8100     # http://127.0.0.1:8100
 ```
 
@@ -71,9 +78,16 @@ python -m radar stats
 ## 자동 갱신(GitHub Actions)
 
 `.github/workflows/refresh-radar.yml` 「지원사업 공고 갱신」이 하루 2번(08:47·20:47 KST)
-국회 정책 신호를 다시 계산하고 K-Startup 공고를 수집해 `support-radar/data/`에 커밋합니다.
+국회 전체 위원회 회의록을 이어 받고, 정책 신호를 다시 계산하고, K-Startup 공고를 수집해 `support-radar/data/`에 커밋합니다.
 
-1. 저장소 **Settings → Secrets and variables → Actions**에 `KSTARTUP_API_KEY` 등록 (선택: `ANTHROPIC_API_KEY`)
+- 국회 회의록은 실행마다 최근 회의부터 200건씩(Variables `RADAR_ASSEMBLY_LIMIT` 또는 수동 실행 입력으로 변경) 본문을 받아
+  주제 발언만 발췌합니다. 첫 실행 뒤 며칠에 걸쳐 22대 국회 전체 위원회 회의록이 채워지고, 이후에는 새 회의만 받습니다.
+  본문을 3번 실패한 회의는 건너뜁니다. 20건마다 중간 저장해 작업이 시간 초과로 끊겨도 받은 만큼 남습니다.
+- 회의록 PDF 서버는 해외 접속이 막혀 있어 「회의록 데이터 갱신」과 같은 서울 리전 중계(`MINUTES_PROXY`)를 거칩니다.
+- `radar/topics.py`의 주제 키워드를 바꾸면, 이미 받은 회의의 발췌는 바뀌지 않으므로 수동 실행에서 `refetch=true`로 다시 받습니다.
+
+1. 저장소 **Settings → Secrets and variables → Actions**에 `KSTARTUP_API_KEY`, `ASSEMBLY_API_KEY`(회의록 서비스와 같은 키) 등록
+   (선택: `ANTHROPIC_API_KEY`)
 2. 공공데이터포털이 해외(Actions) 접속을 막으면 **Variables**에 `RADAR_PROXY=https://<배포주소>/api/kstartup` 지정
    → 서울 리전 배포본이 인증키를 붙여 대신 조회합니다(조회 오퍼레이션 두 개만 허용).
 3. 처음 한 번은 워크플로가 `main`에 머지될 때, 또는 **Actions → 지원사업 공고 갱신 → Run workflow**로 실행합니다.

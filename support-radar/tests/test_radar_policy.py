@@ -12,15 +12,16 @@ def agrisea_db(tmp_path):
     path = tmp_path / "agrisea.sqlite3"
     c = sqlite3.connect(path)
     c.executescript("""
-    CREATE TABLE meetings (id TEXT PRIMARY KEY, title TEXT, date TEXT, text_status TEXT, is_sample INTEGER);
+    CREATE TABLE meetings (id TEXT PRIMARY KEY, title TEXT, committee TEXT, date TEXT, text_status TEXT,
+        is_sample INTEGER);
     CREATE TABLE utterances (id INTEGER PRIMARY KEY, meeting_id TEXT, idx INTEGER, speaker_name TEXT,
         speaker_role TEXT, speaker_type TEXT, org TEXT, text TEXT, is_question INTEGER,
         is_commitment INTEGER, orgs_json TEXT);
     """)
-    c.executemany("INSERT INTO meetings VALUES (?,?,?,?,?)", [
-        ("M1", "테스트 회의 1", "2025-03-10", "parsed", 0),
-        ("M2", "테스트 회의 2", "2025-11-05", "parsed", 0),
-        ("S1", "[예시] 회의", "2025-11-05", "parsed", 1),
+    c.executemany("INSERT INTO meetings VALUES (?,?,?,?,?,?)", [
+        ("M1", "테스트 회의 1", "", "2025-03-10", "parsed", 0),
+        ("M2", "테스트 회의 2", "농림축산식품해양수산위원회", "2025-11-05", "parsed", 0),
+        ("S1", "[예시] 회의", "", "2025-11-05", "parsed", 1),
     ])
     rows = [
         ("M1", 1, "가위원", "위원", "member", "", "스마트팜 보급이 왜 이렇게 늦습니까?", 1, 0, "{}"),
@@ -47,6 +48,36 @@ def test_build_signals(agrisea_db):
     assert t["commitments"][0]["org"] == "농림축산식품부"
     assert {m["name"] for m in t["members"]} == {"가위원", "나위원"}
     assert s["topics"]["youthfarm"]["mentions"] == 1
+    assert t["committees"] == [{"name": "농림축산식품해양수산위원회", "count": 3}]
+
+
+def test_build_signals_with_other_committees(agrisea_db):
+    from radar.assembly import Extracts
+    ext = Extracts(meetings={
+        "M2": {"date": "2025-11-05", "title": "중복", "committee": "농림축산식품해양수산위원회", "status": "parsed",
+               "utterances": 5},
+        "X1": {"date": "2025-11-20", "title": "산자중기위 회의", "committee": "산업통상자원중소벤처기업위원회",
+               "status": "pending"},
+    })
+    ext.add_parsed("X1", [
+        {"speaker_name": "마위원", "speaker_role": "위원", "speaker_type": "member", "org": "",
+         "text": "스마트팜 창업기업 지원이 부족하지 않습니까? 다른 이야기입니다.", "is_question": True,
+         "is_commitment": False},
+        {"speaker_name": "바장관", "speaker_role": "중소벤처기업부장관", "speaker_type": "official", "org": "",
+         "text": "푸드테크 스타트업 전용 보증을 내년에 도입하겠습니다.", "is_question": False, "is_commitment": True},
+        {"speaker_name": "사위원", "speaker_role": "위원", "speaker_type": "member", "org": "",
+         "text": "주제와 무관한 발언입니다.", "is_question": False, "is_commitment": False},
+    ])
+    assert len(ext.utterances) == 2 and ext.meetings["X1"]["utterances"] == 3
+    assert ext.utterances[0]["text"] == "스마트팜 창업기업 지원이 부족하지 않습니까?"   # 주제 문장만 발췌
+    s = build_signals(agrisea_db, ext)
+    assert s["source"]["meetings"] == 3 and s["source"]["committees"] == 2
+    sf = s["topics"]["smartfarm"]
+    assert sf["mentions"] == 4 and {c["name"] for c in sf["committees"]} == {
+        "농림축산식품해양수산위원회", "산업통상자원중소벤처기업위원회"}
+    assert s["monthly_total"]["2025-11"] == 2 + 3     # 농해수위 M2 발언 2(예시 제외) + 산자중기위 발언 3
+    ft = s["topics"]["foodtech"]
+    assert ft["commitments"][0]["committee"] == "산업통상자원중소벤처기업위원회"
 
 
 def test_radar_and_tracking(agrisea_db, anns):

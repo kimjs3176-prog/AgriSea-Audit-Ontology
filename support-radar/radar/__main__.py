@@ -1,7 +1,8 @@
 """CLI: python -m radar <명령>
 
   collect   K-Startup 공고·사업 소개 수집 → data/catalog.json.gz
-  signals   국회 회의록 DB(agrisea)에서 정책 신호 계산 → data/policy_signals.json
+  assembly  국회 전체 위원회 회의록 수집·주제 발췌 → data/assembly_extracts.json.gz
+  signals   농해수위 DB(agrisea) + 전체 위원회 발췌에서 정책 신호 계산 → data/policy_signals.json
   rules     (선택) Claude로 접수 중 공고의 자격 조건 구조화
   match     프로필로 맞춤 공고·자격 판정
   radar     주제별 국회 관심도 × 공고 공급
@@ -36,8 +37,16 @@ def main(argv: list[str] | None = None) -> int:
     c.add_argument("--no-programs", action="store_true", help="사업 소개(예산) 수집 생략")
     c.add_argument("--max-pages", type=int, default=400)
 
+    a = sub.add_parser("assembly", help="국회 전체 위원회 회의록 수집(ASSEMBLY_API_KEY 필요)")
+    a.add_argument("--agrisea-db", help="농해수위 회의록 SQLite(agrisea): 이 회의는 다시 받지 않고, 띄어쓰기 교정 학습에 사용")
+    a.add_argument("--limit", type=int, default=200, help="이번에 본문을 받을 회의 수(최근 회의부터)")
+    a.add_argument("--from", dest="date_from", default="", help="회의 목록 조회 시작일(기본: 이어서)")
+    a.add_argument("--to", dest="date_to", default="")
+    a.add_argument("--refetch", action="store_true", help="처리한 회의도 다시 받아 발췌(주제 사전 변경 시)")
+
     s = sub.add_parser("signals", help="국회 정책 신호 계산")
-    s.add_argument("--agrisea-db", required=True, help="국회 회의록 SQLite(agrisea) 경로")
+    s.add_argument("--agrisea-db", help="농해수위 회의록 SQLite(agrisea) 경로")
+    s.add_argument("--no-extracts", action="store_true", help="전체 위원회 발췌를 쓰지 않음(농해수위만)")
     s.add_argument("-o", "--output", default=str(config.SIGNALS_PATH))
 
     r = sub.add_parser("rules", help="(선택) Claude로 자격 조건 구조화")
@@ -68,9 +77,21 @@ def main(argv: list[str] | None = None) -> int:
         cat.write(config.SEED_PATH)
         print(json.dumps(res, ensure_ascii=False))
         print(json.dumps(cat.stats(), ensure_ascii=False, indent=1))
+    elif args.cmd == "assembly":
+        from .assembly import Extracts, update
+        ext = Extracts.load()
+        try:
+            res = update(ext, limit=args.limit, date_from=args.date_from, date_to=args.date_to,
+                         agrisea_db=Path(args.agrisea_db) if args.agrisea_db else None, refetch=args.refetch,
+                         checkpoint=ext.save)
+        finally:
+            ext.save()   # 중간에 실패해도 받은 만큼은 남긴다
+        print(json.dumps(res, ensure_ascii=False, indent=1))
     elif args.cmd == "signals":
+        from .assembly import Extracts
         from .policy import build_signals
-        sig = build_signals(Path(args.agrisea_db))
+        sig = build_signals(Path(args.agrisea_db) if args.agrisea_db else None,
+                            None if args.no_extracts else Extracts.load())
         out = Path(args.output)
         out.parent.mkdir(parents=True, exist_ok=True)
         payload = json.dumps(sig, ensure_ascii=False, indent=1)

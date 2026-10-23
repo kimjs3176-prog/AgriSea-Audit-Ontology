@@ -1,7 +1,8 @@
-"""정책 신호: 국회 농해수위 회의록(agrisea DB)에서 주제별 관심도·질의·정부 약속을 뽑고,
+"""정책 신호: 국회 위원회 회의록에서 주제별 관심도·질의·정부 약속을 뽑고,
 지원사업 공고 공급과 맞대어 '정책 → 공고' 흐름을 보여 준다.
 
-- build_signals(): agrisea SQLite → 주제별 신호(JSON, 자동 수집이 data/policy_signals.json 으로 커밋)
+- build_signals(): 농해수위(agrisea SQLite) + 그 밖의 전체 위원회(assembly 발췌) → 주제별 신호
+  (JSON, 자동 수집이 data/policy_signals.json 으로 커밋)
 - radar(): 신호 × 공고 → 주제별 관심도·공급·공백 판정, 약속별 후속 공고 추적
 """
 from __future__ import annotations
@@ -45,33 +46,58 @@ def _month(d: str) -> str:
     return d[:7]
 
 
-def build_signals(agrisea_db: Path | str) -> dict[str, Any]:
-    conn = sqlite3.connect(f"file:{agrisea_db}?mode=ro", uri=True)
-    conn.row_factory = sqlite3.Row
-    rows = conn.execute(
-        "SELECT u.meeting_id, u.speaker_name, u.speaker_role, u.speaker_type, u.org, u.text, "
-        "u.is_question, u.is_commitment, u.orgs_json, m.date, m.title "
-        "FROM utterances u JOIN meetings m ON m.id = u.meeting_id "
-        "WHERE COALESCE(m.is_sample, 0) = 0 ORDER BY m.date, u.meeting_id, u.idx").fetchall()
-    meetings = conn.execute(
-        "SELECT COUNT(*), MIN(date), MAX(date) FROM meetings WHERE COALESCE(is_sample,0)=0 "
-        "AND text_status='parsed'").fetchone()
-    conn.close()
+AGRISEA_COMMITTEE = "농림축산식품해양수산위원회"
 
+
+def parent_committee(name: str) -> str:
+    """'농림축산식품해양수산위원회 예산결산심사소위원회' → '농림축산식품해양수산위원회'(소위원회는 상위 위원회로)."""
+    name = (name or "").strip()
+    return name.split()[0] if name.split() and name.split()[0].endswith("위원회") else name
+
+
+def build_signals(agrisea_db: Path | str | None, extracts: Any = None) -> dict[str, Any]:
+    """agrisea_db: 농해수위 회의록 DB(전체 발언), extracts: assembly.Extracts(그 밖의 위원회 주제 발언)."""
+    rows: list[dict] = []
     monthly_total: Counter = Counter()
+    meeting_dates: dict[str, str] = {}
+    committees_by_meeting: dict[str, str] = {}
+    if agrisea_db:
+        conn = sqlite3.connect(f"file:{agrisea_db}?mode=ro", uri=True)
+        conn.row_factory = sqlite3.Row
+        rows = [dict(r) for r in conn.execute(
+            "SELECT u.meeting_id, u.idx, u.speaker_name, u.speaker_role, u.speaker_type, u.org, u.text, "
+            "u.is_question, u.is_commitment, u.orgs_json, m.date, m.title, "
+            "COALESCE(NULLIF(m.committee, ''), ?) AS committee "
+            "FROM utterances u JOIN meetings m ON m.id = u.meeting_id "
+            "WHERE COALESCE(m.is_sample, 0) = 0 ORDER BY m.date, u.meeting_id, u.idx", (AGRISEA_COMMITTEE,))]
+        for r in conn.execute("SELECT id, date, COALESCE(NULLIF(committee, ''), ?) FROM meetings "
+                              "WHERE COALESCE(is_sample,0)=0 AND text_status='parsed'", (AGRISEA_COMMITTEE,)):
+            meeting_dates[r[0]], committees_by_meeting[r[0]] = r[1], r[2]
+        conn.close()
+        for r in rows:
+            monthly_total[_month(r["date"])] += 1
+    if extracts is not None:
+        for mid, m in extracts.meetings.items():
+            if m["status"] == "parsed" and mid not in meeting_dates:
+                meeting_dates[mid], committees_by_meeting[mid] = m["date"], m.get("committee", "")
+                monthly_total[_month(m["date"])] += m.get("utterances", 0)
+        rows += [u for u in extracts.utterances if u["meeting_id"] in meeting_dates
+                 and committees_by_meeting[u["meeting_id"]] == u.get("committee", "")]
+        rows.sort(key=lambda r: (r["date"], r["meeting_id"], r.get("idx", 0)))
+
     acc: dict[str, dict[str, Any]] = {
-        t: {"mentions": 0, "questions": 0, "meetings": set(), "monthly": Counter(),
-            "members": Counter(), "orgs": Counter(), "commitments": [], "questions_sample": []}
+        t: {"mentions": 0, "questions": 0, "meetings": set(), "monthly": Counter(), "members": Counter(),
+            "orgs": Counter(), "committees": Counter(), "commitments": [], "questions_sample": []}
         for t in TOPICS
     }
     for r in rows:
-        monthly_total[_month(r["date"])] += 1
         hits = topic_hits(r["text"])
         for tid in hits:
             a = acc[tid]
             a["mentions"] += 1
             a["meetings"].add(r["meeting_id"])
             a["monthly"][_month(r["date"])] += 1
+            a["committees"][parent_committee(r["committee"])] += 1
             for org in json.loads(r["orgs_json"] or "{}"):
                 a["orgs"][org] += 1
             if r["speaker_type"] == "member":
@@ -80,14 +106,16 @@ def build_signals(agrisea_db: Path | str) -> dict[str, Any]:
                 a["questions"] += 1
                 a["questions_sample"].append({
                     "date": r["date"], "meeting_id": r["meeting_id"], "meeting_title": r["title"],
-                    "speaker": r["speaker_name"], "text": _excerpt(r["text"], tid)})
+                    "committee": parent_committee(r["committee"]), "speaker": r["speaker_name"],
+                    "text": _excerpt(r["text"], tid)})
             if r["is_commitment"]:
                 kws = topic_keywords(tid)
                 for s in _commitment_sentences(r["text"]):
                     if any(k in squash(s) for k in kws):
                         a["commitments"].append({
                             "date": r["date"], "meeting_id": r["meeting_id"],
-                            "meeting_title": r["title"], "speaker": r["speaker_name"],
+                            "meeting_title": r["title"], "committee": parent_committee(r["committee"]),
+                            "speaker": r["speaker_name"],
                             "role": r["speaker_role"], "org": r["org"] or "",
                             "text": s if len(s) <= 300 else s[:300] + "…"})
 
@@ -99,14 +127,18 @@ def build_signals(agrisea_db: Path | str) -> dict[str, Any]:
             "monthly": dict(sorted(a["monthly"].items())),
             "members": [{"name": n, "count": c} for n, c in a["members"].most_common(8)],
             "orgs": [{"name": n, "count": c} for n, c in a["orgs"].most_common(6)],
+            "committees": [{"name": n, "count": c} for n, c in a["committees"].most_common(6)],
             "commitments": sorted(a["commitments"], key=lambda c: c["date"], reverse=True)[:40],
             "questions_sample": sorted(a["questions_sample"], key=lambda q: q["date"], reverse=True)[:8],
         }
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "source": {"name": "국회 농림축산식품해양수산위원회 회의록(열린국회정보)",
-                   "meetings": meetings[0], "utterances": len(rows),
-                   "date_min": meetings[1], "date_max": meetings[2]},
+        "source": {"name": "국회 위원회 회의록(열린국회정보)",
+                   "meetings": len(meeting_dates),
+                   "committees": len({parent_committee(c) for c in committees_by_meeting.values()}),
+                   "utterances": sum(monthly_total.values()),
+                   "date_min": min(meeting_dates.values(), default=None),
+                   "date_max": max(meeting_dates.values(), default=None)},
         "monthly_total": dict(sorted(monthly_total.items())),
         "topics": topics,
     }
@@ -188,6 +220,7 @@ def radar(signals: dict[str, Any] | None, announcements: list[dict],
     rows.sort(key=lambda r: (-r["gap"], -r["demand"]))
     return {"topics": rows, "thresholds": {"demand": d_mid, "supply": s_mid},
             "signals_as_of": (signals or {}).get("source", {}).get("date_max"),
+            "signals_source": (signals or {}).get("source"),
             "signals_generated_at": (signals or {}).get("generated_at")}
 
 
@@ -219,7 +252,7 @@ def topic_detail(signals: dict[str, Any] | None, announcements: list[dict], tid:
     row = next((r for r in radar(signals, announcements, today)["topics"] if r["id"] == tid), {})
     return {
         **row,
-        "members": s.get("members", []), "orgs": s.get("orgs", []),
+        "members": s.get("members", []), "orgs": s.get("orgs", []), "committees": s.get("committees", []),
         "questions_sample": s.get("questions_sample", []),
         "tracking": tracking,
         "announcements": [_brief(a, today) for a in anns[:30]],
