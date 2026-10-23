@@ -5,11 +5,15 @@
 from __future__ import annotations
 
 import os
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent          # support-radar/
 REPO_ROOT = ROOT.parent
+# 국회 회의록 수집·파서(agrisea)는 저장소 루트 패키지를 쓴다(배포본에는 없어도 됨: 수집 명령에서만 사용)
+if (REPO_ROOT / "agrisea").is_dir() and str(REPO_ROOT) not in sys.path:
+    sys.path.append(str(REPO_ROOT))
 
 API_URL = "https://apis.data.go.kr/B552735/kisedKstartupService01"
 # 22대 국회 임기 시작일: 국회 회의록 데이터와 같은 기간의 공고부터 모은다

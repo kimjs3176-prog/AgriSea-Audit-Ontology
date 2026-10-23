@@ -1,10 +1,13 @@
-# 지원사업 레이더 데이터 갱신: K-Startup 공고 수집 + 국회 회의록 정책 신호 계산 → support-radar/data 커밋
+# 지원사업 레이더 데이터 갱신: K-Startup 공고 수집 + 국회 전체 위원회 회의록 정책 신호 계산 → support-radar/data 커밋
 #  - 하루 2번(08:47·20:47 KST). 회의록 자동 수집(07:17·13:17·19:17) 뒤에 돌아 최신 회의록을 반영
 #  - 공고: 22대 국회 임기 시작일(2024-05-30) 이후 공고 전체를 다시 받아 접수 상태까지 갱신
-#  - 정책 신호: 저장소의 data/seed.sqlite3.gz(국회 회의록)에서 주제별 언급·질의·정부 약속 추출
+#  - 국회 회의록: 농해수위는 저장소의 data/seed.sqlite3.gz 를 쓰고, 그 밖의 전체 위원회 회의록을
+#    실행마다 최근 회의부터 RADAR_ASSEMBLY_LIMIT(기본 200)건씩 받아 주제 발언만 발췌(assembly_extracts.json.gz)
+#    → 첫 실행 뒤 며칠에 걸쳐 22대 국회 전체 위원회 회의록이 채워짐
+#  - 정책 신호: 두 원천을 합쳐 주제별 언급·질의·정부 약속·위원회 집계
 #  - (선택) ANTHROPIC_API_KEY가 있으면 접수 중 공고의 자격 조건을 Claude로 구조화
 #  - 내용이 바뀌었을 때만 커밋. 커밋되면 Vercel(지원사업 레이더 프로젝트)이 새로 배포
-# 저장소 Settings > Secrets and variables > Actions 에 KSTARTUP_API_KEY 를 등록해야 한다.
+# 저장소 Settings > Secrets and variables > Actions 에 KSTARTUP_API_KEY, ASSEMBLY_API_KEY 를 등록해야 한다.
 # 공공데이터포털이 해외(Actions) 접속을 막으면 Variables 에 RADAR_PROXY(배포주소/api/kstartup)를 지정.
 name: 지원사업 공고 갱신
 
@@ -13,12 +16,21 @@ on:
     - cron: "47 23 * * *"   # 08:47 KST
     - cron: "47 11 * * *"   # 20:47 KST
   workflow_dispatch:
+    inputs:
+      assembly_limit:
+        description: "이번에 본문을 받을 국회 회의 수(기본 200)"
+        required: false
+      refetch:
+        description: "처리한 회의록도 다시 받아 발췌(주제 사전 변경 시) — true/false"
+        required: false
+        default: "false"
   push:
     branches: [main]
     paths:
       - ".github/workflows/refresh-radar.yml"   # 처음 머지될 때 1회 실행
       - "support-radar/radar/topics.py"         # 주제 사전이 바뀌면 신호 재계산
       - "support-radar/radar/policy.py"
+      - "support-radar/radar/assembly.py"
 
 permissions:
   contents: write
@@ -30,11 +42,14 @@ concurrency:
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 150
     env:
       KSTARTUP_API_KEY: ${{ secrets.KSTARTUP_API_KEY }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       RADAR_PROXY: ${{ vars.RADAR_PROXY }}
+      ASSEMBLY_API_KEY: ${{ secrets.ASSEMBLY_API_KEY }}
+      # 회의록 PDF 서버는 해외 접속이 막혀 있어 서울 리전 회의록 서비스 배포본을 거친다(회의록 데이터 갱신과 같음)
+      AGRISEA_MINUTES_PROXY: ${{ vars.MINUTES_PROXY || 'https://ax-rosy-seven.vercel.app/api/minutes-text' }}
       PYTHONPATH: ${{ github.workspace }}/support-radar:${{ github.workspace }}
     steps:
       - uses: actions/checkout@v5
@@ -46,11 +61,25 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt -r support-radar/requirements.txt
 
-      - name: 국회 정책 신호 계산
+      - name: 농해수위 회의록 불러오기
         run: |
           mkdir -p var
           gunzip -c data/seed.sqlite3.gz > var/agrisea.sqlite3
-          python -m radar signals --agrisea-db var/agrisea.sqlite3
+
+      - name: 국회 전체 위원회 회의록 수집
+        id: assembly
+        continue-on-error: true   # 국회 API가 막혀도 공고 수집·신호 계산은 계속
+        timeout-minutes: 100
+        env:
+          LIMIT: ${{ inputs.assembly_limit || vars.RADAR_ASSEMBLY_LIMIT || '200' }}
+          REFETCH: ${{ inputs.refetch }}
+        run: |
+          if [ -z "$ASSEMBLY_API_KEY" ]; then echo "::error::ASSEMBLY_API_KEY secret이 없습니다."; exit 1; fi
+          ARGS=""; if [ "$REFETCH" = "true" ]; then ARGS="--refetch"; fi
+          python -m radar assembly --agrisea-db var/agrisea.sqlite3 --limit "$LIMIT" $ARGS
+
+      - name: 국회 정책 신호 계산
+        run: python -m radar signals --agrisea-db var/agrisea.sqlite3
 
       - name: K-Startup 공고 수집
         id: collect
@@ -85,10 +114,19 @@ jobs:
       - name: 실행 요약
         if: always()
         run: |
-          { echo "### 지원사업 레이더 데이터"; python -m radar stats | sed 's/^/    /'; } >> "$GITHUB_STEP_SUMMARY" || true
+          {
+            echo "### 지원사업 레이더 데이터"; python -m radar stats | sed 's/^/    /'
+            echo; echo "### 국회 회의록 발췌"
+            python -c "from radar.assembly import Extracts; import json; print(json.dumps(Extracts.load().stats(), ensure_ascii=False, indent=1))" | sed 's/^/    /'
+          } >> "$GITHUB_STEP_SUMMARY" || true
 
-      - name: 공고 수집 실패 표시
-        if: steps.collect.outcome == 'failure'
+      - name: 수집 실패 표시
+        if: steps.collect.outcome == 'failure' || steps.assembly.outcome == 'failure'
         run: |
-          echo "::error::K-Startup 공고 수집에 실패했습니다. 인증키(활용신청 승인 여부)와 해외 접속 차단(RADAR_PROXY)을 확인하세요."
+          if [ "${{ steps.assembly.outcome }}" = "failure" ]; then
+            echo "::error::국회 위원회 회의록 수집에 실패했습니다. ASSEMBLY_API_KEY 와 회의록 중계(MINUTES_PROXY)를 확인하세요."
+          fi
+          if [ "${{ steps.collect.outcome }}" = "failure" ]; then
+            echo "::error::K-Startup 공고 수집에 실패했습니다. 인증키(활용신청 승인 여부)와 해외 접속 차단(RADAR_PROXY)을 확인하세요."
+          fi
           exit 1

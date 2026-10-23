@@ -6,6 +6,8 @@ import pytest
 
 # 저장소 루트에서 함께 실행해도 루트 서비스의 api 패키지를 가리지 않도록 뒤에 추가
 sys.path.append(str(Path(__file__).resolve().parent.parent))
+# 국회 회의록 수집·파서(agrisea)는 저장소 루트 패키지를 쓴다
+sys.path.append(str(Path(__file__).resolve().parents[2]))
 
 
 def day(offset: int) -> str:
