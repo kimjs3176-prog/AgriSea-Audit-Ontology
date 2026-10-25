@@ -68,6 +68,8 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("export-seed", help="현재 DB를 배포용 초기 데이터(data/seed.sqlite3)로 내보내기(가상 예시 제외)")
     sub.add_parser("build", help="RDF 지식그래프(TTL) 재생성")
     sub.add_parser("stats", help="적재 현황")
+    gr = sub.add_parser("governance-run", help="운영 관문 G1: 자동 판정 실행 기록을 원장에 남김(자동 수집 직후)")
+    gr.add_argument("--trigger", default="자동 수집")
 
     s = sub.add_parser("search", help="발언 전문검색")
     s.add_argument("query", nargs="+")
@@ -162,6 +164,22 @@ def main(argv: list[str] | None = None) -> int:
         from .pipeline import rebuild_graph
         g = rebuild_graph(store, settings)
         print(f"트리플 {len(g)}개 → {settings.graph_path}")
+    elif args.cmd == "governance-run":
+        from collections import Counter
+
+        from . import governance as gov
+        from .followup import track_all
+        from .pipeline import seed_meta
+        ledger = gov.ledger_from_env(settings.data_dir, serverless=False)
+        pol = gov.active_policy(ledger.events())
+        d = track_all(store, pol)
+        paths = Counter(gov.route(gov.case_id(x), gov.assess(x, pol), pol) for x in d["items"])
+        ev = ledger.append("run", "AI 판정", "system", {
+            "trigger": args.trigger, "data_hash": seed_meta().get("hash") or "local", "as_of": d["as_of"],
+            "policy_version": pol["version"], "cases": len(d["items"]), "vague": d["vague"],
+            "paths": dict(paths), "statuses": d["counts"]})
+        print(json.dumps({"seq": ev["seq"], "hash": ev["hash"][:12], "storage": ledger.sink.kind,
+                          **ev["payload"]}, ensure_ascii=False))
     elif args.cmd == "stats":
         print(json.dumps(store.stats(), ensure_ascii=False, indent=2))
     elif args.cmd == "search":

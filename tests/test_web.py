@@ -63,3 +63,10 @@ def test_index_has_flow_graph_and_transcript_tools(store, settings):
     for marker in ('id="netFlow"', 'id="netMode"', 'id="tSpeaker"', 'id="tAgenda"', 'id="tFlow"',
                    "function flowRender", "function jumpToUtt"):
         assert marker in html, marker
+
+
+def test_index_has_no_governance_menu(store, settings):
+    """운영 관문은 별도 메뉴 없이 API와 이행 추적 화면의 관문 상태 표시로만 제공한다."""
+    html = TestClient(create_app(settings, store)).get("/").text
+    assert 'data-tab="gov"' not in html and 'id="govFlow"' not in html and "function govChip" not in html
+    assert "const govChip" in html

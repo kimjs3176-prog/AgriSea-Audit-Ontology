@@ -471,6 +471,14 @@ h3{font-size:14.5px;color:var(--ink)}
 .tl a,.tl .link{font-size:12.5px}
 .fukind.k-done{background:var(--brand-weak);color:var(--brand)} .fukind.k-progress{background:var(--seq-weak);color:var(--seq)}
 .fukind.k-reraised{background:var(--bad-weak);color:var(--bad)} .fukind.k-related{background:var(--bg);color:var(--muted);border:1px solid var(--line)}
+/* 이행 판정의 운영 관문 상태 */
+.govchip{display:inline-block;border-radius:6px;padding:0 7px;font-size:12px;font-weight:600;line-height:1.6;white-space:nowrap;background:var(--bg);color:var(--ink-2);border:1px solid var(--line)}
+.govchip.gs-pending_review,.govchip.gs-stale{background:var(--warn-weak);color:var(--warn);border-color:transparent}
+.govchip.gs-pending_sample{background:var(--seq-weak);color:var(--seq);border-color:transparent}
+.govchip.gs-approved{background:var(--brand-weak);color:var(--brand);border-color:transparent}
+.govchip.gs-corrected{background:var(--bad-weak);color:var(--bad);border-color:transparent}
+.fugov{font-size:13px;margin-top:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.st-excluded{background:var(--bg);color:var(--muted);border:1px solid var(--line)}
 </style>
 </head>
 <body>
@@ -1778,7 +1786,7 @@ function buildNet3d(THREE, stage, data){
 }
 // ── 정부 약속 이행 추적 ──
 let fuState = {data: null, status: "", sel: null, filled: false};
-const FU_COLOR = {done: "var(--brand)", progress: "var(--seq)", reraised: "var(--bad)", early: "var(--muted)", none: "var(--warn)"};
+const FU_COLOR = {done: "var(--brand)", progress: "var(--seq)", reraised: "var(--bad)", early: "var(--muted)", none: "var(--warn)", excluded: "var(--line)"};
 const FU_SRC = {minutes: "후속 회의록", agenda: "후속 안건", bill: "국회 의안", kstartup: "지원사업 공고"};
 const FU_KIND = {done: "이행", progress: "진행", reraised: "재지적", related: "참고"};
 const fuChip = (st, label) => `<span class="fuchip st-${st}">${esc(label)}</span>`;
@@ -1815,7 +1823,7 @@ function renderFuStatus(){
 function renderFuList(){
   const rows = fuRows();
   $("#fuList").innerHTML = rows.map(x => `<div class="item fuitem ${x.id === fuState.sel ? "sel" : ""}" data-id="${x.id}">
-      <div class="d">${fuChip(x.status, x.status_label)} ${dot(x.date)} · ${esc(x.org || x.speaker)}${x.n_evidence ? ` · 근거 ${x.n_evidence}` : ""}${x.checked ? ' · <span title="외부 근거 확인함">외부 확인✓</span>' : ""}</div>
+      <div class="d">${fuChip(x.status, x.status_label)} ${govChip(x.gov)} ${dot(x.date)} · ${esc(x.org || x.speaker)}${x.n_evidence ? ` · 근거 ${x.n_evidence}` : ""}${x.checked ? ' · <span title="외부 근거 확인함">외부 확인✓</span>' : ""}</div>
       <div class="t fut">${esc(cut(x.text, 110))}</div>
       <div class="h muted" style="font-size:12px">${esc(x.action_label)}${x.laws.length ? " · " + esc(x.laws.join(", ")) : ""}${x.keywords.length ? " · " + esc(x.keywords.slice(0, 3).join(" · ")) : ""}</div></div>`).join("")
     || '<div class="empty">조건에 맞는 약속이 없습니다.</div>';
@@ -1851,6 +1859,8 @@ function renderFollowup(x){
   const ev = x.evidence || [];
   $("#fuDetail").innerHTML = `<div class="card">
     <div class="fubanner st-${x.status}"><b>${esc(x.status_label)}</b><span>${esc(x.status_desc || "")}</span></div>
+    ${x.gov ? `<div class="fugov">${govChip(x.gov)} 위험 ${x.gov.risk.score} · ${esc(x.gov.path_label)}${x.ai_status !== x.status ? ` · AI 판정 「${esc(x.ai_status_label)}」을 숙련자가 정정` : ""}
+</div>` : ""}
     <div class="muted" style="font-size:13px;margin-top:10px">${dot(x.date)} · ${esc(SESS[x.session]?.label || "")} · <button class="link" onclick="gotoUtt('${esc(x.meeting_id)}', ${x.idx})">회의록에서 보기 →</button></div>
     <div class="fugrid">
       <div>
@@ -1883,6 +1893,9 @@ async function checkFollowupExternal(id, refresh){
     if(row){ row.checked = true; row.n_evidence = x.evidence.length; renderFuList() }
   }catch(e){ toast("외부 근거 확인 실패: " + e.message); if(b){ b.disabled = false; b.textContent = "다시 시도" } }
 }
+
+// 이행 판정의 운영 관문 상태(자동 공개·검토 대기·승인·정정 등)
+const govChip = g => g ? `<span class="govchip gs-${g.state}" title="${esc(g.path_label || "")}">${esc(g.state_label)}</span>` : "";
 
 // ── 브리핑 ──
 async function fillBriefSelectors(){

@@ -9,5 +9,10 @@
       "includeFiles": "{radar/**,data/**}",
       "excludeFiles": "{tests/**,var/**,**/__pycache__/**}"
     }
+  },
+  "git": {
+    "deploymentEnabled": {
+      "governance-log": false
+    }
   }
 }

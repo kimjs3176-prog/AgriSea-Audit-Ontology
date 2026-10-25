@@ -207,33 +207,90 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
             raise HTTPException(404, "이 범위에서 해당 위원의 발언을 찾을 수 없습니다.")
         return {"scope": p["scope"], **p["members"][name]}
 
-    # ── 정부 약속 이행 추적 ──
+    # ── 정부 약속 이행 추적 + 운영 관문(G1~G7) ──
+    from .. import governance as gov
+    from ..followup import STATUS as FU_STATUS
+    from ..followup import finalize as fu_finalize
+    from ..followup import track_all
     FOLLOWUP_EXT_TTL = 24 * 3600  # 외부 근거(국회 의안·지원사업 공고)는 하루 동안 다시 묻지 않는다
+    FINAL_STATUSES = {**{k: v[0] for k, v in FU_STATUS.items()}, "excluded": "추적 제외(약속 아님)"}
+    ledger = gov.ledger_from_env(settings.data_dir, settings.serverless)
+    roles = gov.Roles.from_env(settings.serverless)
+    app.state.ledger, app.state.roles = ledger, roles
+    fu_lock = threading.Lock()
+
+    runs_seen: set[tuple] = set()
+
+    def followups_data() -> dict:
+        """이행 판정(G1 산출물). 정책 버전이 바뀌면(G7 제도 반영) 새 정책으로 다시 판정한다.
+        (데이터 버전, 정책 버전)마다 AI 실행 기록이 원장에 없으면 한 번 남긴다(자동 수집이 이미 남겼으면 생략)."""
+        events = ledger.events()
+        pol = gov.active_policy(events)
+        d = store.kv_get("followups")
+        trigger = "판정 불러오기"
+        if d is None or d.get("policy_version", 1) != pol["version"]:
+            with fu_lock:
+                d = store.kv_get("followups")
+                if d is None or d.get("policy_version", 1) != pol["version"]:
+                    trigger = "정책 적용 재판정" if d is not None else "판정"
+                    d = track_all(store, pol)
+                    store.kv_set("followups", d)
+        data_hash = seed_meta().get("hash") or "local"
+        key = (data_hash, pol["version"])
+        if key not in runs_seen:
+            runs_seen.add(key)
+            if not any(e["kind"] == "run" and e["payload"].get("data_hash") == data_hash
+                       and e["payload"].get("policy_version") == pol["version"] for e in events):
+                try:
+                    ledger.append("run", "AI 판정", "system", run_payload(d, pol, data_hash, trigger))
+                except Exception as e:  # 원장 기록이 실패해도 판정은 보여 준다(상태 화면에 오류 표시)
+                    ledger.error = f"{type(e).__name__}: {e}"
+        return d
+
+    def run_payload(d: dict, pol: dict, data_hash: str, trigger: str) -> dict:
+        paths = __import__("collections").Counter(
+            gov.route(gov.case_id(x), gov.assess(x, pol), pol) for x in d["items"])
+        return {"trigger": trigger, "data_hash": data_hash, "as_of": d["as_of"], "policy_version": pol["version"],
+                "cases": len(d["items"]), "vague": d["vague"], "paths": dict(paths), "statuses": d["counts"]}
 
     def followup_item(cid: int) -> dict:
-        d = cached("followups")
-        item = next((x for x in d["items"] if x["id"] == cid), None)
+        item = next((x for x in followups_data()["items"] if x["id"] == cid), None)
         if item is None:
             raise HTTPException(404, "약속을 찾을 수 없습니다.")
         return item
 
     def followup_view(item: dict, ext: dict | None) -> dict:
         """사전 계산한 내부 근거에 외부 근거를 더해 다시 판정."""
-        from ..followup import STATUS, finalize
-        as_of = cached("followups")["as_of"]
-        out = finalize(item, item["evidence"] + (ext or {}).get("evidence", []), as_of) if ext else dict(item)
-        out["status_desc"] = STATUS[out["status"]][1]
+        as_of = followups_data()["as_of"]
+        out = fu_finalize(item, item["evidence"] + (ext or {}).get("evidence", []), as_of) if ext else dict(item)
+        out["status_desc"] = FU_STATUS[out["status"]][1]
         out["external"] = ext
         return out
+
+    def governed(items: list[dict], events: list[dict] | None = None) -> list[dict]:
+        """판정마다 관문 상태를 붙이고, 공개 판정은 숙련자 결정(정정)을 따른다. AI 판정은 ai_status로 남긴다."""
+        events = ledger.events() if events is None else events
+        pol, stacks = gov.active_policy(events), gov.decision_stacks(events)
+        out = []
+        for x in items:
+            v = gov.case_view(x, pol, stacks.get(gov.case_id(x), []))
+            fin = v["final_status"]
+            desc = FU_STATUS[fin][1] if fin in FU_STATUS else "숙련자가 약속이 아니라고 정정해 추적에서 제외"
+            out.append({**x, "ai_status": x["status"], "ai_status_label": x["status_label"],
+                        "status": fin, "status_label": FINAL_STATUSES[fin], "status_desc": desc, "gov": v})
+        return out
+
+    def current_items() -> list[dict]:
+        """외부 근거를 확인한 약속은 그 근거까지 더해 다시 판정한 상태(상세 화면과 같게)."""
+        d = followups_data()
+        return [followup_view(x, store.kv_get(f"followup_ext:{x['id']}")) for x in d["items"]]
 
     @app.get("/api/followups")
     def followup_list(q: str = "", org: str = "", action: str = "", session: int | None = None):
         """약속 목록(최근 순)과 상태별 개수. 상태 거르기는 화면에서(개수는 다른 조건만 반영)."""
         from collections import Counter
-        d = cached("followups")
-        # 외부 근거를 확인한 약속은 그 근거까지 더해 다시 판정한 상태로 거르고 센다(상세 화면과 같게)
-        checked = {x["id"]: store.kv_get(f"followup_ext:{x['id']}") for x in d["items"]}
-        items = [followup_view(x, checked[x["id"]]) if checked[x["id"]] else x for x in d["items"]]
+        d = followups_data()
+        items = governed(current_items())
         if org:
             items = [x for x in items if x["org"] == org]
         if action:
@@ -245,19 +302,24 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
                      or any(q in k for k in x["keywords"] + x["laws"])]
         counts = Counter(x["status"] for x in items)
         orgs = Counter(x["org"] for x in d["items"] if x["org"])
-        keep = ("id", "date", "session", "org", "speaker", "text", "status", "status_label", "action",
+        keep = ("id", "date", "session", "org", "speaker", "text", "status", "status_label", "ai_status", "action",
                 "action_label", "keywords", "laws", "issues")
-        return {"as_of": d["as_of"], "vague": d["vague"], "statuses": d["statuses"], "actions": d["actions"],
-                "counts": {k: counts.get(k, 0) for k in d["statuses"]}, "total": len(items),
+        statuses = {**d["statuses"], **({"excluded": {"label": FINAL_STATUSES["excluded"], "desc": "숙련자가 약속이 아니라고 정정"}}
+                                        if counts.get("excluded") else {})}
+        return {"as_of": d["as_of"], "vague": d["vague"], "statuses": statuses, "actions": d["actions"],
+                "policy_version": d.get("policy_version", 1),
+                "counts": {k: counts.get(k, 0) for k in statuses}, "total": len(items),
                 "orgs": [{"name": n, "count": c} for n, c in orgs.most_common()],
                 "items": [{**{k: x[k] for k in keep}, "n_evidence": len(x["evidence"]),
-                           "checked": checked[x["id"]] is not None} for x in items]}
+                           "checked": x.get("external") is not None,
+                           "gov": {k: x["gov"][k] for k in ("path", "path_label", "state", "state_label")}
+                           | {"risk": x["gov"]["risk"]["score"]}} for x in items]}
 
     @app.get("/api/followups/{cid}")
     def followup_detail(cid: int):
-        """약속 상세: 앞선 질의, 대상어, 근거 타임라인(외부 근거를 확인한 적이 있으면 함께)."""
-        item = followup_item(cid)
-        return followup_view(item, store.kv_get(f"followup_ext:{cid}"))
+        """약속 상세: 앞선 질의, 대상어, 근거 타임라인(외부 근거를 확인한 적이 있으면 함께), 관문 상태."""
+        item = followup_view(followup_item(cid), store.kv_get(f"followup_ext:{cid}"))
+        return governed([item])[0]
 
     @app.get("/api/followups/{cid}/external")
     def followup_external(cid: int, refresh: bool = False):
@@ -271,7 +333,206 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         if refresh or not ext or time.time() - ext.get("_ts", 0) > FOLLOWUP_EXT_TTL:
             ext = {**external_evidence(settings, item), "_ts": time.time()}
             store.kv_set(key, ext)
-        return followup_view(item, ext)
+        return governed([followup_view(item, ext)])[0]
+
+    # ── 운영 관문 API ──
+    def me(request: Request) -> dict:
+        return roles.who(request.headers.get("x-agrisea-token"))
+
+    def require(request: Request, role: str) -> dict:
+        who = me(request)
+        if role == "admin" and who["role"] != "admin" or role == "reviewer" and who["role"] not in ("reviewer", "admin"):
+            need = "관리자(제도 승인권자)" if role == "admin" else "검토자(숙련자)"
+            raise HTTPException(403, f"{need} 권한이 필요합니다. 운영 관문 화면에서 인증 토큰을 입력하세요.")
+        return who
+
+    def gov_status(request: Request | None = None) -> dict:
+        events = ledger.events()
+        return {"storage": ledger.sink.kind, "durable": ledger.sink.durable, "error": ledger.error,
+                "chain": gov.verify_chain(events), "policy": gov.active_policy(events),
+                "roles": {"configured": roles.configured, "open_mode": roles.open_mode},
+                "me": me(request) if request else None, "gates": gov.GATES, "reasons": gov.REASONS,
+                "final_statuses": FINAL_STATUSES, "paths": gov.PATHS, "states": gov.STATES}
+
+    @app.get("/api/governance/status")
+    def governance_status(request: Request):
+        """원장 보관 방식(영구/임시)·해시 연결 검증·현재 정책·내 역할."""
+        return gov_status(request)
+
+    @app.get("/api/governance/overview")
+    def governance_overview(request: Request):
+        """관문별 운영 지표(G1~G7)와 상태."""
+        items = current_items()  # 판정을 먼저(정책이 바뀌었으면 재판정·실행 기록) 한 뒤 원장을 읽는다
+        events = ledger.events()
+        pol = gov.active_policy(events)
+        runs = [e for e in events if e["kind"] == "run"]
+        return {**gov_status(request), "metrics": gov.metrics(items, events, pol),
+                "last_run": runs[-1] if runs else None,
+                "proposals": len(gov.proposals(items, events, pol)),
+                "judged_with_policy": followups_data().get("policy_version", 1)}
+
+    @app.get("/api/governance/queue")
+    def governance_queue(view: str = "pending", org: str = ""):
+        """검토 대기열: 숙련자 이관·표본 검증·재검토 필요 건(위험 높은 순). view=all|reviewed|auto 도 가능."""
+        items = governed(current_items())
+        want = {"pending": ("pending_review", "pending_sample", "stale"), "reviewed": ("approved", "corrected"),
+                "auto": ("auto_published",)}.get(view)
+        rows = [x for x in items if (want is None or x["gov"]["state"] in want) and (not org or x["org"] == org)]
+        order = {"stale": 0, "pending_review": 1, "pending_sample": 2}
+        rows.sort(key=lambda x: (order.get(x["gov"]["state"], 3), -x["gov"]["risk"]["score"], x["date"]), reverse=False)
+        return {"view": view, "count": len(rows), "items": [{
+            "id": x["id"], "date": x["date"], "org": x["org"], "speaker": x["speaker"], "text": x["text"],
+            "ai_status": x["ai_status"], "ai_status_label": x["ai_status_label"], "status": x["status"],
+            "status_label": x["status_label"], "action_label": x["action_label"],
+            "gov": {k: x["gov"][k] for k in ("path", "path_label", "state", "state_label", "risk")}} for x in rows]}
+
+    @app.get("/api/governance/cases/{cid}")
+    def governance_case(cid: int):
+        """건 상세: AI 판정·근거·위험 요인·경로·결정 이력(원장 이벤트)."""
+        x = followup_detail(cid)
+        events = ledger.events()
+        x["history"] = [e for e in events if e.get("case") == gov.case_id(x)]
+        return x
+
+    @app.post("/api/governance/cases/{cid}/decision")
+    def governance_decide(cid: int, request: Request, payload: dict[str, Any] = Body(...)):
+        """G4 숙련자 검토: approve(AI 판정 확정) 또는 reject(정정 판정·사유 코드·문제 대상어)."""
+        who = require(request, "reviewer")
+        x = followup_detail(cid)
+        g = x["gov"]
+        if payload.get("fingerprint") and payload["fingerprint"] != g["fingerprint"]:
+            raise HTTPException(409, "그사이 AI 판정이 바뀌었습니다. 화면을 새로 고친 뒤 다시 검토하세요.")
+        action = payload.get("action")
+        if action not in ("approve", "reject"):
+            raise HTTPException(400, "action은 approve 또는 reject 입니다.")
+        final, reason = x["ai_status"], None
+        kws = []
+        if action == "reject":
+            final, reason = payload.get("final_status"), payload.get("reason")
+            if final not in FINAL_STATUSES or final == x["ai_status"]:
+                raise HTTPException(400, "거부할 때는 AI 판정과 다른 올바른 판정을 고르세요.")
+            if reason not in gov.REASONS:
+                raise HTTPException(400, "거부 사유 코드를 고르세요.")
+            kws = [k for k in payload.get("keywords") or [] if k in x["keywords"]]
+            if reason == "keyword" and not kws:
+                raise HTTPException(400, "대상어 오인이면 잘못 쓰인 대상어를 하나 이상 고르세요.")
+        if g["decision"] and g["state"] != "stale":
+            raise HTTPException(409, "이미 결정된 건입니다. 바꾸려면 먼저 롤백하세요.")
+        pol = gov.active_policy(ledger.events())
+        ev = ledger.append("decision", who["name"], who["role"], {
+            "action": action, "ai_status": x["ai_status"], "final_status": final, "reason": reason,
+            "keywords": kws, "note": str(payload.get("note") or "")[:500], "fingerprint": g["fingerprint"],
+            "path": g["path"], "risk_score": g["risk"]["score"], "risk_factors": [f["code"] for f in g["risk"]["factors"]],
+            "policy_version": pol["version"], "subject": {"org": x["org"], "date": x["date"], "text": x["text"][:120]},
+        }, case=gov.case_id(x))
+        return {"event": ev, "case": governance_case(cid)}
+
+    @app.post("/api/governance/cases/{cid}/rollback")
+    def governance_rollback(cid: int, request: Request, payload: dict[str, Any] = Body(...)):
+        """G5 예외처리: 직전 결정을 취소(사유 필수). 검토자는 자기 결정만, 관리자는 모든 결정을."""
+        who = require(request, "reviewer")
+        reason = str(payload.get("reason") or "").strip()
+        if not reason:
+            raise HTTPException(400, "롤백 사유를 적으세요.")
+        cid_s = f"followup:{cid}"
+        stack = gov.decision_stacks(ledger.events()).get(cid_s, [])
+        if not stack:
+            raise HTTPException(409, "되돌릴 결정이 없습니다.")
+        target = stack[-1]
+        if who["role"] != "admin" and target["actor"] != who["name"]:
+            raise HTTPException(403, "다른 검토자의 결정은 관리자만 롤백할 수 있습니다.")
+        ev = ledger.append("rollback", who["name"], who["role"],
+                           {"target": target["seq"], "target_action": target["payload"]["action"], "reason": reason[:500]},
+                           case=cid_s)
+        return {"event": ev, "case": governance_case(cid)}
+
+    @app.get("/api/governance/ledger")
+    def governance_ledger(kind: str = "", case: str = "", limit: int = Query(200, le=2000)):
+        """운영 증거 원장(최근 순)과 해시 연결 검증."""
+        events = ledger.events()
+        rows = [e for e in events if (not kind or e["kind"] == kind) and (not case or e.get("case") == case)]
+        return {"chain": gov.verify_chain(events), "count": len(rows), "events": list(reversed(rows))[:limit]}
+
+    @app.get("/api/governance/metrics")
+    def governance_metrics():
+        """G6 평가 지표: 자동화율·이관율·AI–숙련자 일치율(경로별·정책 버전별)·혼동 행렬·거부 사유."""
+        items = current_items()
+        events = ledger.events()
+        return gov.metrics(items, events, gov.active_policy(events))
+
+    @app.get("/api/governance/dataset.{fmt}")
+    def governance_dataset(fmt: str):
+        """G6 평가 데이터 내려받기(JSONL·CSV): 유효 결정 한 건이 한 줄."""
+        import csv
+        import io
+        import json as _json
+        items = current_items()
+        events = ledger.events()
+        rows = gov.dataset(items, events, gov.active_policy(events))
+        headers = {"Content-Disposition": f'attachment; filename="governance-dataset.{fmt}"'}
+        if fmt == "jsonl":
+            return PlainTextResponse("".join(_json.dumps(r, ensure_ascii=False) + "\n" for r in rows),
+                                     media_type="application/x-ndjson; charset=utf-8", headers=headers)
+        if fmt == "csv":
+            buf = io.StringIO()
+            cols = ["case", "decision_seq", "decided_at", "reviewer", "path", "risk_score", "policy_version",
+                    "ai_status", "final_status", "agree", "reason", "flagged_keywords", "stale", "org", "action", "promise_date"]
+            w = csv.DictWriter(buf, fieldnames=cols, extrasaction="ignore")
+            w.writeheader()
+            for r in rows:
+                w.writerow({**r, "flagged_keywords": " ".join(r["flagged_keywords"] or [])})
+            return PlainTextResponse("﻿" + buf.getvalue(), media_type="text/csv; charset=utf-8", headers=headers)
+        raise HTTPException(404, "jsonl 또는 csv")
+
+    @app.get("/api/governance/proposals")
+    def governance_proposals():
+        """G7 제도 반영: 예외에서 나온 규칙 개정 제안과 정책 버전 이력."""
+        items = current_items()
+        events = ledger.events()
+        pol = gov.active_policy(events)
+        return {"policy": pol, "proposals": gov.proposals(items, events, pol),
+                "history": gov.policy_history(events),
+                "dismissed": [e for e in events if e["kind"] == "proposal_dismissed"],
+                "judged_with_policy": followups_data().get("policy_version", 1)}
+
+    def find_proposal(pid: str) -> tuple[dict, dict]:
+        items = current_items()
+        events = ledger.events()
+        pol = gov.active_policy(events)
+        p = next((x for x in gov.proposals(items, events, pol) if x["id"] == pid), None)
+        if p is None:
+            raise HTTPException(404, "제안을 찾을 수 없습니다(이미 처리됐거나 근거가 바뀜).")
+        return p, pol
+
+    @app.post("/api/governance/proposals/{pid}/adopt")
+    def governance_adopt(pid: str, request: Request, payload: dict[str, Any] = Body(default={})):
+        """관리자가 개정안을 채택 → 새 정책 버전. 다음 판정(조회)부터 새 정책으로 다시 판정된다."""
+        who = require(request, "admin")
+        p, pol = find_proposal(pid)
+        new = gov.adopt(pol, p)
+        ev = ledger.append("policy", who["name"], who["role"], {
+            "policy": new, "previous_version": pol["version"], "proposal": p["id"], "change": p["title"],
+            "rationale": p["rationale"], "support": p["support"], "note": str(payload.get("note") or "")[:500]})
+        return {"event": ev, "policy": new}
+
+    @app.post("/api/governance/proposals/{pid}/dismiss")
+    def governance_dismiss(pid: str, request: Request, payload: dict[str, Any] = Body(default={})):
+        who = require(request, "admin")
+        p, _ = find_proposal(pid)
+        reason = str(payload.get("reason") or "").strip()
+        if not reason:
+            raise HTTPException(400, "기각 사유를 적으세요.")
+        ev = ledger.append("proposal_dismissed", who["name"], who["role"],
+                           {"proposal": p["id"], "title": p["title"], "reason": reason[:500]})
+        return {"event": ev}
+
+    @app.get("/api/governance/report.md")
+    def governance_report():
+        """모든 관문의 운영 증거 보고서(Markdown)."""
+        items = current_items()
+        events = ledger.events()
+        return PlainTextResponse(gov.evidence_report(items, events, gov_status()),
+                                 media_type="text/markdown; charset=utf-8")
 
     @app.get("/api/orgs")
     def orgs():

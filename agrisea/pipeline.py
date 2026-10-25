@@ -113,9 +113,10 @@ def export_seed(store: Store) -> dict:
 
     from .config import SEED_DB, SEED_META
     from .ontology import KG_PATH
-    from .precompute import PRECOMPUTE_VERSION, precompute
+    from .precompute import PRECOMPUTE_VERSION, current_policy, precompute
 
-    digest = f"v{PRECOMPUTE_VERSION}:{store.content_hash()}"
+    # 정책 버전이 바뀌면(운영 관문 G7 제도 반영) 같은 데이터라도 다시 판정해 싣는다
+    digest = f"v{PRECOMPUTE_VERSION}:p{current_policy()['version']}:{store.content_hash()}"
     old = seed_meta()
     if old.get("hash") == digest and SEED_DB.exists() and KG_PATH.exists():
         return {**old, "changed": False}
