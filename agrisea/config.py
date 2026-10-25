@@ -52,6 +52,8 @@ def _default_data_dir() -> Path:
 @dataclass
 class Settings:
     api_key: str = field(default_factory=lambda: os.environ.get("ASSEMBLY_API_KEY", ""))
+    # 선택: 약속 이행 추적에서 지원사업 공고(K-Startup, 공공데이터포털)를 근거로 찾을 때
+    kstartup_key: str = field(default_factory=lambda: os.environ.get("KSTARTUP_API_KEY", ""))
     api_url: str = field(default_factory=lambda: os.environ.get("ASSEMBLY_API_URL", API_URL))
     data_dir: Path = field(default_factory=_default_data_dir)
     serverless: bool = IS_SERVERLESS

@@ -16,6 +16,7 @@
   --member:#7a3e8e; --member-weak:#f3e9f6;     /* 위원 */
   --gov:#1f5f8b; --gov-weak:#e3eef6;           /* 정부·기관 */
   --warn:#8a5300; --warn-weak:#fbf0dc;         /* 약속 */
+  --bad:#b42318; --bad-weak:#fdecea;           /* 재지적 */
   --radius:10px;
 }
 @media (prefers-color-scheme: dark){
@@ -27,6 +28,7 @@
     --member:#cf9be0; --member-weak:#33253a;
     --gov:#79b4de; --gov-weak:#18293a;
     --warn:#e3b35b; --warn-weak:#3a2e17;
+    --bad:#f4978e; --bad-weak:#3d1f1c;
   }
 }
 :root[data-theme="dark"]{
@@ -37,6 +39,7 @@
   --member:#cf9be0; --member-weak:#33253a;
   --gov:#79b4de; --gov-weak:#18293a;
   --warn:#e3b35b; --warn-weak:#3a2e17;
+  --bad:#f4978e; --bad-weak:#3d1f1c;
 }
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.65 "Noto Sans KR",system-ui,sans-serif}
@@ -437,6 +440,37 @@ h3{font-size:14.5px;color:var(--ink)}
 /* 모바일: 헤더가 화면을 절반 가까이 가리지 않도록 고정하지 않는다 */
 @media (max-width:640px){header{position:static}}
 @media (max-width:640px){.turn{grid-template-columns:28px minmax(0,1fr);gap:9px;padding:12px 2px}.turn .av{width:28px;height:28px;font-size:12px}.turn .tx{font-size:15px}}
+/* 정부 약속 이행 추적 */
+.fustat{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 8px}
+.fustat button{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:5px 12px;font:inherit;font-size:13px;cursor:pointer;color:var(--ink-2)}
+.fustat button b{color:var(--ink);font-variant-numeric:tabular-nums}
+.fustat button i{width:9px;height:9px;border-radius:50%;display:inline-block}
+.fustat button.on{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink);color:var(--ink)}
+.fuchip,.fukind{display:inline-block;border-radius:6px;padding:0 7px;font-size:12px;font-weight:600;line-height:1.6;white-space:nowrap}
+.st-done{background:var(--brand-weak);color:var(--brand)} .st-progress{background:var(--seq-weak);color:var(--seq)}
+.st-reraised{background:var(--bad-weak);color:var(--bad)} .st-early{background:var(--bg);color:var(--muted);border:1px solid var(--line)}
+.st-none{background:var(--warn-weak);color:var(--warn)}
+.fuitem .fut{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:14px;line-height:1.5;margin-top:2px}
+.fubanner{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;border-radius:10px;padding:10px 14px;font-size:13.5px}
+.fubanner b{font-size:16px}
+.fubanner.st-early{border:1px solid var(--line)}
+.fugrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:22px;margin-top:10px;align-items:start}
+@media (max-width:1100px){.fugrid{grid-template-columns:minmax(0,1fr)}}
+.fumeta{margin-top:8px}
+.fuext{border:1px dashed var(--line);border-radius:10px;padding:10px 12px;margin-top:12px;font-size:13.5px}
+.fusrc{margin:8px 0 4px;padding-left:18px;font-size:13px;color:var(--ink-2)}
+.timeline{list-style:none;margin:0;padding:0 4px 0 0}
+.tl{position:relative;padding:0 0 14px 22px;border-left:2px solid var(--line);margin-left:6px}
+.tl:last-child{border-left-color:transparent}
+.tl-dot{position:absolute;left:-7px;top:3px;width:12px;height:12px;border-radius:50%;background:var(--panel);border:3px solid var(--muted)}
+.tl.k-start .tl-dot{border-color:var(--warn)} .tl.k-done .tl-dot{border-color:var(--brand);background:var(--brand)}
+.tl.k-progress .tl-dot{border-color:var(--seq)} .tl.k-reraised .tl-dot{border-color:var(--bad);background:var(--bad)}
+.tl-d{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.tl-h{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13.5px;margin:2px 0}
+.tl-t{font-size:14px;line-height:1.65;color:var(--ink-2)}
+.tl a,.tl .link{font-size:12.5px}
+.fukind.k-done{background:var(--brand-weak);color:var(--brand)} .fukind.k-progress{background:var(--seq-weak);color:var(--seq)}
+.fukind.k-reraised{background:var(--bad-weak);color:var(--bad)} .fukind.k-related{background:var(--bg);color:var(--muted);border:1px solid var(--line)}
 </style>
 </head>
 <body>
@@ -458,6 +492,7 @@ h3{font-size:14.5px;color:var(--ink)}
       <button data-tab="meetings">회의록</button>
       <button data-tab="issues">쟁점 분석</button>
       <button data-tab="members">의원 분석</button>
+      <button data-tab="followups">이행 추적</button>
       <button data-tab="brief">국감 브리핑</button>
     </nav>
   </div>
@@ -507,7 +542,7 @@ h3{font-size:14.5px;color:var(--ink)}
       <div id="recent" class="scrollbox"></div>
     </div>
     <div class="card">
-      <h2>최근 정부 약속</h2>
+      <div class="row" style="justify-content:space-between;align-items:baseline"><h2>최근 정부 약속</h2><button class="link" style="font-size:13px" onclick="openTab('followups')">이행 추적 →</button></div>
       <p class="sub">무엇을 하겠다고 답했는지 · 앞선 위원 질의와 함께 · 국감 사후 점검 대상</p>
       <div id="recentCommit" class="clist scrollbox"></div>
     </div>
@@ -584,6 +619,26 @@ h3{font-size:14.5px;color:var(--ink)}
       <div id="mbList"><div class="empty">불러오는 중…</div></div>
     </div>
     <div id="mbDetail"><div class="card empty">왼쪽에서 의원을 선택하세요.</div></div>
+  </div>
+</section>
+
+<!-- 이행 추적 -->
+<section id="followups">
+  <div class="card">
+    <h2>정부 약속 이행 추적</h2>
+    <p class="sub">회의에서 정부·기관이 "하겠습니다"라고 한 약속마다 <b>무엇을 하겠다는지</b>(앞선 위원 질의·약속 문장의 대상어·법률명)를 뽑고,
+      그 뒤 회의록(같은 기관의 이행 보고·진행 답변, 위원 재지적)과 후속 안건에서 근거를 찾습니다. 약속마다 <b>국회 의안·지원사업 공고 API</b>로 한 번 더 확인할 수 있습니다.
+      판정은 기록에서 찾은 신호이며, 공식 이행 여부는 정부 서면 답변·시정조치 결과로 확인하세요.</p>
+    <div id="fuStatus"></div>
+    <div class="row" style="margin-top:10px">
+      <input type="search" id="fuQ" placeholder="약속·질의·대상어로 찾기 — 예: 축산법, 직불금" style="flex:1 1 240px">
+      <select id="fuOrg" aria-label="기관"><option value="">모든 기관</option></select>
+      <select id="fuAction" aria-label="조치 유형"><option value="">모든 조치 유형</option></select>
+    </div>
+  </div>
+  <div class="two">
+    <div class="card"><div id="fuList"><div class="empty">불러오는 중…</div></div></div>
+    <div id="fuDetail"><div class="card empty">왼쪽에서 약속을 선택하세요.</div></div>
   </div>
 </section>
 
@@ -664,6 +719,7 @@ $("#session").onchange = () => {
   if(t === "issues" && selIssue) showIssue(selIssue);
   if(t === "brief" && $("#bOut").innerHTML) $("#bBtn").click();
   if(t === "members") loadMembers();
+  if(t === "followups") loadFollowups();
 };
 
 // ── 탭 ──
@@ -674,7 +730,8 @@ function routeFromHash(){
   if(tab === "meetings" && id){ gotoMeeting(id); return true }
   if(tab === "issues" && id){ gotoIssue(id); return true }
   if(tab === "members" && id){ gotoMember(id); return true }
-  if(["meetings", "issues", "members", "brief", "sparql"].includes(tab)){ openTab(tab); return true }
+  if(tab === "followups" && id){ openTab("followups", false); fuState.sel = +id; loadFollowups(); return true }
+  if(["meetings", "issues", "members", "followups", "brief", "sparql"].includes(tab)){ openTab(tab); return true }
   return false;
 }
 function openTab(t, load = true){
@@ -684,6 +741,7 @@ function openTab(t, load = true){
   if(t === "issues") loadIssues();
   if(t === "members" && load) loadMembers();
   if(t === "sparql") loadPresets();
+  if(t === "followups" && load) loadFollowups();
   try{ localStorage.setItem("agrisea-tab", t) }catch(e){}
   setHash(t === "dash" ? "" : t);
   scrollTo(0, 0);
@@ -761,6 +819,12 @@ async function loadDash(){
 }
 function gotoIssue(id){ openTab("issues"); showIssue(id) }
 function gotoMeeting(id){ openTab("meetings"); showMeeting(id) }
+// 회의록의 특정 발언으로: 전체 회의록 탭을 열고 그 발언까지 이동
+async function gotoUtt(id, idx){
+  openTab("meetings"); await showMeeting(id);
+  if(idx == null || idx < 0) return;
+  segShow("mTabs", "full"); await loadTranscript(); jumpToUtt(idx);
+}
 
 
 // ── 공통 표시 도구: 카드형 문장, 접기, 구성 막대 ──
@@ -933,8 +997,11 @@ function openInAI(kind){
   window.open(url, "_blank", "noopener");
   copied.then(ok => toast(ok ? "회의록 전문을 복사했습니다. 열린 창에 붙여넣기(Ctrl+V) 하세요" : "분석 요청을 열었습니다. 전문은 링크로 전달됩니다"));
 }
-async function loadTranscript(){
-  const t = transcript; if(!t || t.utts) return;
+function loadTranscript(){
+  const t = transcript; if(!t) return Promise.resolve();
+  return t.loading ||= fetchTranscript(t);
+}
+async function fetchTranscript(t){
   const d = await api(`/api/meetings/${encodeURIComponent(t.id)}`);
   if(transcript !== t) return;
   t.utts = d.utterances;
@@ -1709,6 +1776,114 @@ function buildNet3d(THREE, stage, data){
   document.addEventListener("visibilitychange", () => { if(!document.hidden && visible){ last = performance.now(); requestAnimationFrame(frame) } });
   requestAnimationFrame(frame);
 }
+// ── 정부 약속 이행 추적 ──
+let fuState = {data: null, status: "", sel: null, filled: false};
+const FU_COLOR = {done: "var(--brand)", progress: "var(--seq)", reraised: "var(--bad)", early: "var(--muted)", none: "var(--warn)"};
+const FU_SRC = {minutes: "후속 회의록", agenda: "후속 안건", bill: "국회 의안", kstartup: "지원사업 공고"};
+const FU_KIND = {done: "이행", progress: "진행", reraised: "재지적", related: "참고"};
+const fuChip = (st, label) => `<span class="fuchip st-${st}">${esc(label)}</span>`;
+let fuTimer = null;
+["fuQ", "fuOrg", "fuAction"].forEach(id => $("#" + id).addEventListener(id === "fuQ" ? "input" : "change", () => {
+  clearTimeout(fuTimer); fuTimer = setTimeout(loadFollowups, id === "fuQ" ? 250 : 0) }));
+async function loadFollowups(){
+  const p = new URLSearchParams({q: $("#fuQ").value.trim(), org: $("#fuOrg").value, action: $("#fuAction").value});
+  if(cur()) p.set("session", cur());
+  let d;
+  try{ d = await api("/api/followups?" + p) }
+  catch(e){ $("#fuList").innerHTML = `<div class="empty">오류: ${esc(e.message)}</div>`; return }
+  fuState.data = d;
+  if(!fuState.filled){
+    fuState.filled = true;
+    $("#fuOrg").innerHTML = '<option value="">모든 기관</option>' + d.orgs.map(o => `<option value="${esc(o.name)}">${esc(o.name)} (${fmt(o.count)})</option>`).join("");
+    $("#fuAction").innerHTML = '<option value="">모든 조치 유형</option>' + Object.entries(d.actions).map(([k, l]) => `<option value="${k}">${esc(l)}</option>`).join("");
+  }
+  renderFuStatus(); renderFuList();
+  const rows = fuRows();
+  if(fuState.sel && d.items.some(x => x.id === fuState.sel)) showFollowup(fuState.sel);
+  else if(rows.length) showFollowup(rows[0].id);
+  else $("#fuDetail").innerHTML = '<div class="card empty">조건에 맞는 약속이 없습니다.</div>';
+}
+const fuRows = () => (fuState.data?.items || []).filter(x => !fuState.status || x.status === fuState.status);
+function renderFuStatus(){
+  const d = fuState.data, total = d.total;
+  $("#fuStatus").innerHTML = `<div class="fustat">${[["", "전체", total], ...Object.entries(d.statuses).map(([k, v]) => [k, v.label, d.counts[k]])]
+      .map(([k, l, n]) => `<button class="${fuState.status === k ? "on" : ""}" onclick="fuState.status='${k}';renderFuStatus();renderFuList()" ${k ? `data-tip="${esc(d.statuses[k].desc)}"` : ""}>
+        ${k ? `<i style="background:${FU_COLOR[k]}"></i>` : ""}${esc(l)} <b>${fmt(n)}</b></button>`).join("")}</div>
+    ${total ? stackBar(Object.entries(d.statuses).map(([k, v]) => ({label: v.label, value: d.counts[k], color: FU_COLOR[k]}))) : ""}
+    <p class="muted" style="font-size:12px;margin:6px 0 0">회의록 기준일 ${dot(d.as_of)} · 무엇을 하겠다는지 드러나지 않는 약속("지적사항 반영하겠습니다" 등) ${fmt(d.vague)}건은 제외</p>`;
+}
+function renderFuList(){
+  const rows = fuRows();
+  $("#fuList").innerHTML = rows.map(x => `<div class="item fuitem ${x.id === fuState.sel ? "sel" : ""}" data-id="${x.id}">
+      <div class="d">${fuChip(x.status, x.status_label)} ${dot(x.date)} · ${esc(x.org || x.speaker)}${x.n_evidence ? ` · 근거 ${x.n_evidence}` : ""}${x.checked ? ' · <span title="외부 근거 확인함">외부 확인✓</span>' : ""}</div>
+      <div class="t fut">${esc(cut(x.text, 110))}</div>
+      <div class="h muted" style="font-size:12px">${esc(x.action_label)}${x.laws.length ? " · " + esc(x.laws.join(", ")) : ""}${x.keywords.length ? " · " + esc(x.keywords.slice(0, 3).join(" · ")) : ""}</div></div>`).join("")
+    || '<div class="empty">조건에 맞는 약속이 없습니다.</div>';
+  document.querySelectorAll("#fuList .item").forEach(el => el.onclick = () => showFollowup(+el.dataset.id));
+}
+function fuEvidence(e){
+  const url = /^https?:\/\//.test(e.url || "") ? e.url : "";
+  const link = e.meeting_id ? `<button class="link" onclick="gotoUtt('${esc(e.meeting_id)}', ${e.idx ?? -1})">회의록에서 보기 →</button>`
+    : url ? `<a href="${esc(url)}" target="_blank" rel="noopener">원문 보기 ↗</a>` : "";
+  return `<li class="tl k-${e.kind}"><span class="tl-dot"></span><div class="tl-d">${dot(e.date)}</div>
+    <div class="tl-h"><span class="chip line">${esc(FU_SRC[e.source] || e.source)}</span><span class="fukind k-${e.kind}">${esc(FU_KIND[e.kind] || e.kind)}</span><b>${esc(e.title)}</b></div>
+    <div class="tl-t">${esc(e.text)}</div>${link}</li>`;
+}
+function fuExternal(x){
+  const ext = x.external;
+  const srcs = ext ? ext.sources.map(s => `<li><b>${esc(s.label)}</b> · ${s.status === "ok" ? `근거 ${fmt(s.count)}건` : s.status === "skipped" ? `건너뜀 — ${esc(s.message)}` : `<span style="color:var(--bad)">오류 — ${esc(s.message)}</span>`}</li>`).join("") : "";
+  return `<div class="fuext">
+    <div class="row" style="justify-content:space-between;gap:8px"><b>외부 근거 확인</b>
+      <button class="ghost" id="fuExtBtn" onclick="checkFollowupExternal(${x.id}, ${ext ? "true" : "false"})">${ext ? "다시 확인" : "국회 의안·지원사업 공고에서 확인"}</button></div>
+    <p class="muted" style="font-size:12px;margin:4px 0 0">약속 뒤 발의된 같은 법률의 개정안과 처리 결과(열린국회정보 의안 API), 약속 뒤 게시된 같은 주제의 지원사업 공고(K-Startup API)를 찾습니다.</p>
+    ${ext ? `<ul class="fusrc">${srcs}</ul><p class="muted" style="font-size:12px;margin:0">확인 시각 ${esc((ext.fetched_at || "").replace("T", " ").slice(0, 16))} (UTC)</p>` : ""}</div>`;
+}
+async function showFollowup(id){
+  fuState.sel = id; setHash("followups/" + id);
+  document.querySelectorAll("#fuList .item").forEach(el => el.classList.toggle("sel", +el.dataset.id === id));
+  let x;
+  try{ x = await api(`/api/followups/${id}`) }
+  catch(e){ $("#fuDetail").innerHTML = `<div class="card empty">${esc(e.message)}</div>`; return }
+  if(fuState.sel !== id) return;
+  renderFollowup(x);
+}
+function renderFollowup(x){
+  const ev = x.evidence || [];
+  $("#fuDetail").innerHTML = `<div class="card">
+    <div class="fubanner st-${x.status}"><b>${esc(x.status_label)}</b><span>${esc(x.status_desc || "")}</span></div>
+    <div class="muted" style="font-size:13px;margin-top:10px">${dot(x.date)} · ${esc(SESS[x.session]?.label || "")} · <button class="link" onclick="gotoUtt('${esc(x.meeting_id)}', ${x.idx})">회의록에서 보기 →</button></div>
+    <div class="fugrid">
+      <div>
+        ${x.question ? `<div class="bubble q" style="max-width:100%"><div class="who">${esc(x.question.member)} 위원 질의</div>${esc(x.question.text)}</div>` : ""}
+        <div class="bubble a promise" style="max-width:100%"><div class="who">${esc(x.speaker)} <span class="chip warn">약속</span></div>${esc(x.text)}</div>
+        <div class="fumeta"><span class="chip">${esc(x.action_label)}</span>${x.laws.map(l => `<span class="chip gov">${esc(l)}</span>`).join("")}${chips(x.issues, "member")}</div>
+        <div class="muted" style="font-size:12px;margin-top:6px">근거를 찾은 대상어 · ${esc(x.keywords.join(", ") || "-")}</div>
+        ${fuExternal(x)}
+      </div>
+      <div>
+        <h3 style="margin-top:0">이행 근거 타임라인 <span class="muted" style="font-weight:400;font-size:12px">약속 뒤 기록 · 오래된 순</span></h3>
+        <ol class="timeline scrollbox" style="--box-h:min(64vh,640px)">
+          <li class="tl k-start"><span class="tl-dot"></span><div class="tl-d">${dot(x.date)}</div><div class="tl-h"><b>약속</b></div><div class="tl-t">${esc(cut(x.text, 120))}</div></li>
+          ${ev.map(fuEvidence).join("") || `<li class="tl k-none"><span class="tl-dot"></span><div class="tl-t muted">뒤 회의록·안건에서 같은 일을 가리키는 기록을 찾지 못했습니다. 국감에서 이행 여부를 물어볼 대상입니다.</div></li>`}
+        </ol>
+      </div>
+    </div></div>`;
+}
+async function checkFollowupExternal(id, refresh){
+  const b = $("#fuExtBtn"); if(b){ b.disabled = true; b.textContent = "확인하는 중…" }
+  try{
+    const x = await api(`/api/followups/${id}/external?refresh=${refresh}`);
+    if(fuState.sel !== id) return;
+    renderFollowup(x);
+    const row = fuState.data?.items.find(r => r.id === id);
+    if(row && row.status !== x.status){   // 상태가 바뀌면 위쪽 상태별 개수·막대도 함께 고친다
+      fuState.data.counts[row.status]--; fuState.data.counts[x.status]++;
+      row.status = x.status; row.status_label = x.status_label; renderFuStatus();
+    }
+    if(row){ row.checked = true; row.n_evidence = x.evidence.length; renderFuList() }
+  }catch(e){ toast("외부 근거 확인 실패: " + e.message); if(b){ b.disabled = false; b.textContent = "다시 시도" } }
+}
+
 // ── 브리핑 ──
 async function fillBriefSelectors(){
   const [orgs, tax, sp] = await Promise.all([api("/api/orgs"), api("/api/taxonomy"), api("/api/speakers")]);
