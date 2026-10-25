@@ -471,6 +471,8 @@ h3{font-size:14.5px;color:var(--ink)}
 .tl a,.tl .link{font-size:12.5px}
 .fukind.k-done{background:var(--brand-weak);color:var(--brand)} .fukind.k-progress{background:var(--seq-weak);color:var(--seq)}
 .fukind.k-reraised{background:var(--bad-weak);color:var(--bad)} .fukind.k-related{background:var(--bg);color:var(--muted);border:1px solid var(--line)}
+/* 숙련자가 약속이 아니라고 정정한 판정 */
+.st-excluded{background:var(--bg);color:var(--muted);border:1px solid var(--line)}
 </style>
 </head>
 <body>
@@ -1778,7 +1780,7 @@ function buildNet3d(THREE, stage, data){
 }
 // ── 정부 약속 이행 추적 ──
 let fuState = {data: null, status: "", sel: null, filled: false};
-const FU_COLOR = {done: "var(--brand)", progress: "var(--seq)", reraised: "var(--bad)", early: "var(--muted)", none: "var(--warn)"};
+const FU_COLOR = {done: "var(--brand)", progress: "var(--seq)", reraised: "var(--bad)", early: "var(--muted)", none: "var(--warn)", excluded: "var(--line)"};
 const FU_SRC = {minutes: "후속 회의록", agenda: "후속 안건", bill: "국회 의안", kstartup: "지원사업 공고"};
 const FU_KIND = {done: "이행", progress: "진행", reraised: "재지적", related: "참고"};
 const fuChip = (st, label) => `<span class="fuchip st-${st}">${esc(label)}</span>`;

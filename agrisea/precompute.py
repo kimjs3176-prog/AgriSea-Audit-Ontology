@@ -5,17 +5,23 @@
 """
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Callable
 
-from . import analysis, followup, members
+from . import analysis, followup, governance, members
 from .ontology import build_graph, to_ntriples_gz
 from .store import Store
 
 # 사전 계산 형식이 바뀌면 올린다(초기 데이터를 다시 만들게 함).
 # 2: 발언자 역할 재분류, 회기별 쟁점·개요 집계 / 3: 띄어쓰기 교정 / 4: 요약에서 의안 목록 제외 / 5: 위원별 분석
-# 6: 정부 약속 이행 추적 / 7: 주요 기관 브리핑
-PRECOMPUTE_VERSION = 7
+# 6: 정부 약속 이행 추적 / 7: 운영 관문 정책(차단 대상어) 반영 / 8: 주요 기관 브리핑
+PRECOMPUTE_VERSION = 8
+
+
+def current_policy() -> dict:
+    """자동 수집 단계의 정책: 운영 관문 원장(AGRISEA_GOVERNANCE_LEDGER, governance-log 브랜치에서 받은 파일)의 최신 정책."""
+    return governance.policy_from_file(os.environ.get("AGRISEA_GOVERNANCE_LEDGER"))
 
 CACHED_VIEWS: dict[str, Callable[[Store], object]] = {
     "issues": analysis.issue_overview,
@@ -26,7 +32,7 @@ CACHED_VIEWS: dict[str, Callable[[Store], object]] = {
     "issue_by_session": analysis.issue_by_session,
     "overview": analysis.overview,
     "members_all": members.member_profiles,  # 전체 회기 위원별 분석(가장 무거움: 사전 계산)
-    "followups": followup.track_all,  # 정부 약속 이행 추적(후속 회의록·안건 근거)
+    "followups": lambda s: followup.track_all(s, current_policy()),  # 정부 약속 이행 추적(정책 반영)
 }
 
 # 국감 브리핑 화면의 '기관으로 바로 만들기' 버튼(언급 많은 기관 6곳)과 같은 기관을 전체 회기로 미리 만든다

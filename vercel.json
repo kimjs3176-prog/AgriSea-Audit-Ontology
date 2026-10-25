@@ -1,11 +1,18 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "regions": ["icn1"],
+  "regions": [
+    "icn1"
+  ],
   "functions": {
     "api/index.py": {
       "maxDuration": 60,
       "includeFiles": "{agrisea/**,ontology/**,data/**}",
       "excludeFiles": "{tests/**,var/**,**/__pycache__/**}"
+    }
+  },
+  "git": {
+    "deploymentEnabled": {
+      "governance-log": false
     }
   }
 }
