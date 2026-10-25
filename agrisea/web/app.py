@@ -207,6 +207,70 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
             raise HTTPException(404, "이 범위에서 해당 위원의 발언을 찾을 수 없습니다.")
         return {"scope": p["scope"], **p["members"][name]}
 
+    # ── 정부 약속 이행 추적 ──
+    FOLLOWUP_EXT_TTL = 24 * 3600  # 외부 근거(국회 의안·지원사업 공고)는 하루 동안 다시 묻지 않는다
+
+    def followup_item(cid: int) -> dict:
+        d = cached("followups")
+        item = next((x for x in d["items"] if x["id"] == cid), None)
+        if item is None:
+            raise HTTPException(404, "약속을 찾을 수 없습니다.")
+        return item
+
+    def followup_view(item: dict, ext: dict | None) -> dict:
+        """사전 계산한 내부 근거에 외부 근거를 더해 다시 판정."""
+        from ..followup import STATUS, finalize
+        as_of = cached("followups")["as_of"]
+        out = finalize(item, item["evidence"] + (ext or {}).get("evidence", []), as_of) if ext else dict(item)
+        out["status_desc"] = STATUS[out["status"]][1]
+        out["external"] = ext
+        return out
+
+    @app.get("/api/followups")
+    def followup_list(q: str = "", org: str = "", action: str = "", session: int | None = None):
+        """약속 목록(최근 순)과 상태별 개수. 상태 거르기는 화면에서(개수는 다른 조건만 반영)."""
+        from collections import Counter
+        d = cached("followups")
+        items = d["items"]
+        if org:
+            items = [x for x in items if x["org"] == org]
+        if action:
+            items = [x for x in items if x["action"] == action]
+        if session:
+            items = [x for x in items if x["session"] == session]
+        if q:
+            items = [x for x in items if q in x["text"] or q in ((x["question"] or {}).get("text") or "")
+                     or any(q in k for k in x["keywords"] + x["laws"])]
+        counts = Counter(x["status"] for x in items)
+        orgs = Counter(x["org"] for x in d["items"] if x["org"])
+        keep = ("id", "date", "session", "org", "speaker", "text", "status", "status_label", "action",
+                "action_label", "keywords", "laws", "issues")
+        return {"as_of": d["as_of"], "vague": d["vague"], "statuses": d["statuses"], "actions": d["actions"],
+                "counts": {k: counts.get(k, 0) for k in d["statuses"]}, "total": len(items),
+                "orgs": [{"name": n, "count": c} for n, c in orgs.most_common()],
+                "items": [{**{k: x[k] for k in keep}, "n_evidence": len(x["evidence"]),
+                           "checked": store.kv_get(f"followup_ext:{x['id']}") is not None} for x in items]}
+
+    @app.get("/api/followups/{cid}")
+    def followup_detail(cid: int):
+        """약속 상세: 앞선 질의, 대상어, 근거 타임라인(외부 근거를 확인한 적이 있으면 함께)."""
+        item = followup_item(cid)
+        return followup_view(item, store.kv_get(f"followup_ext:{cid}"))
+
+    @app.get("/api/followups/{cid}/external")
+    def followup_external(cid: int, refresh: bool = False):
+        """국회 의안·지원사업 공고 API로 외부 근거를 찾는다(하루 동안 저장해 재사용)."""
+        import time
+
+        from ..external import external_evidence
+        item = followup_item(cid)
+        key = f"followup_ext:{cid}"
+        ext = store.kv_get(key)
+        if refresh or not ext or time.time() - ext.get("_ts", 0) > FOLLOWUP_EXT_TTL:
+            ext = {**external_evidence(settings, item), "_ts": time.time()}
+            store.kv_set(key, ext)
+        return followup_view(item, ext)
+
     @app.get("/api/orgs")
     def orgs():
         return cached("orgs")
