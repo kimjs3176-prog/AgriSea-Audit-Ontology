@@ -215,8 +215,6 @@ pre{white-space:pre-wrap;font-size:13px}
 .net-legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;box-shadow:0 0 8px currentColor}
 .net-hud{position:absolute;right:12px;bottom:10px;font-size:11px;color:#7f90ad;pointer-events:none}
 .net-loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#8fa3c4;font-size:13px}
-.net-stage svg{width:100%;height:100%}
-.net-stage svg text{fill:#e8eef8}
 @media (max-width:640px){.net-stage{height:440px}.net-hud{display:none}}
 svg text{fill:var(--ink);font-size:11px}
 .empty{color:var(--muted);padding:20px 0;text-align:center}
@@ -364,6 +362,79 @@ h3{font-size:14.5px;color:var(--ink)}
 @media (max-width:640px){.gsearch{order:3;flex-basis:100%;max-width:none}.bubble{max-width:94%}
   .quick{gap:10px}.quick button{flex-direction:column;gap:8px;padding:12px}.quick .ic{width:30px;height:30px;font-size:16px}
   .pagehead h2{font-size:18px}.pagehead p{font-size:13.5px}}
+/* ═══ v4: 관계 흐름도 · 읽기 좋은 회의록 ═══ */
+/* 흐름도(3열 리본): 굵기 = 함께 언급된 횟수 */
+.flow{position:relative;min-width:0}
+.flow svg{display:block;width:100%;height:auto;overflow:visible}
+.flow .fl{opacity:.3;transition:opacity .15s}
+.flow .fl.k-member{fill:var(--member)} .flow .fl.k-issue{fill:var(--brand)} .flow .fl.k-org{fill:var(--gov)}
+.flow .fn.k-member{fill:var(--member)} .flow .fn.k-issue{fill:var(--brand)} .flow .fn.k-org{fill:var(--gov)}
+.flow .fnode{cursor:pointer;transition:opacity .15s}
+.flow .fnode text{font-size:12.5px;fill:var(--ink)}
+.flow .fnode text tspan.c{fill:var(--muted);font-size:11px}
+.flow .fnode:hover text{font-weight:700}
+.flow text.halo{paint-order:stroke;stroke:var(--panel);stroke-width:4px;stroke-linejoin:round}
+.flow text.ctitle{font-size:12px;font-weight:700;fill:var(--muted);letter-spacing:.02em}
+.flow.hl .fl{opacity:.06} .flow.hl .fl.on{opacity:.78}
+.flow.hl .fnode:not(.on){opacity:.28}
+.flowscroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.flowscroll .flow{min-width:640px}
+.netmode{display:flex;gap:4px;margin-left:auto}
+.netmode button{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:4px 12px;font:inherit;font-size:13px;cursor:pointer;color:var(--ink-2)}
+.netmode button.on{background:var(--ink);border-color:var(--ink);color:var(--panel)}
+.netwrap .netmain{min-width:0}
+.netwrap .net-stage[hidden]{display:none}
+/* 히트맵: 칸 안에 숫자 */
+.heat td{font-size:11px;color:var(--ink-2);text-align:center;font-variant-numeric:tabular-nums}
+.heat td.hi{color:#fff}
+.heat td.tot{background:none!important;border:0!important;color:var(--ink);font-weight:700;text-align:right;padding-left:8px}
+.heat tr:hover th.rowh{color:var(--seq)}
+.heat tr:hover td:not(.tot){box-shadow:inset 0 0 0 1px color-mix(in oklab,var(--ink) 25%,transparent)}
+/* 기둥 위 숫자 */
+.cols{padding-top:18px}
+.cols .c{position:relative}
+.cols .c b{position:absolute;bottom:100%;left:50%;transform:translateX(-50%);font-size:10px;font-weight:500;color:var(--ink-2);white-space:nowrap;padding-bottom:1px}
+/* 전체 회의록: 발언 흐름 미니맵 */
+.tools{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:center}
+.tools select{max-width:260px}
+@media (max-width:760px){.tools{grid-template-columns:1fr 1fr}.tools input{grid-column:1/-1}.tools select{max-width:none}}
+.flowbar{display:flex;height:26px;border-radius:6px;overflow:hidden;gap:1px;background:var(--line);cursor:pointer;margin:12px 0 6px}
+.flowbar i{display:block;min-width:1px;background:color-mix(in oklab,var(--muted) 35%,var(--panel))}
+.flowbar i.member{background:var(--member)} .flowbar i.gov{background:var(--gov)}
+.flowbar i.chair{background:color-mix(in oklab,var(--brand) 45%,var(--panel))}
+.flowbar i.promise{background:var(--warn)}
+.flowbar i.ag{flex:0 0 3px!important;background:var(--ink)}
+.flowbar i:hover{filter:brightness(1.25)}
+.flowbar i.dim{opacity:.25}
+.flowlegend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--ink-2);margin-bottom:6px}
+.flowlegend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+/* 전체 회의록: 발언 */
+.turn{display:grid;grid-template-columns:36px minmax(0,1fr);gap:12px;padding:14px 6px;border-bottom:1px solid color-mix(in oklab,var(--line) 70%,transparent);border-radius:8px;scroll-margin-top:calc(var(--hdr,118px) + 56px)}
+.turn .av{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:14px;background:var(--bg);color:var(--ink-2);border:1px solid var(--line)}
+.turn.member .av{background:var(--member-weak);color:var(--member);border-color:transparent}
+.turn.gov .av{background:var(--gov-weak);color:var(--gov);border-color:transparent}
+.turn.chair .av{background:var(--brand-weak);color:var(--brand);border-color:transparent}
+.turn .tw{display:flex;gap:6px;align-items:baseline;flex-wrap:wrap;margin-bottom:3px;font-size:13px}
+.turn .tw b{font-size:15px;letter-spacing:-.01em}
+.turn.member .tw b{color:var(--member)} .turn.gov .tw b{color:var(--gov)} .turn.chair .tw b{color:var(--brand)}
+.turn .tw .role{color:var(--muted)}
+.turn .tw .chip{align-self:center}
+.turn .tx{max-width:44em;font-size:15.5px;line-height:1.82;word-break:keep-all;overflow-wrap:anywhere}
+.turn .tx p{margin:0 0 .6em} .turn .tx p:last-child{margin-bottom:0}
+.turn.chair .tx,.turn.other .tx{font-size:14.5px;color:var(--ink-2)}
+.turn .tx.clamp{max-height:7.4em;overflow:hidden;-webkit-mask-image:linear-gradient(#000 55%,transparent);mask-image:linear-gradient(#000 55%,transparent)}
+.turn .more{font-size:13px;margin-top:4px}
+.turn.promise{background:var(--warn-weak);box-shadow:inset 3px 0 0 var(--warn)}
+.turn.flash{animation:turnflash 1.8s ease-out}
+@keyframes turnflash{0%{background:color-mix(in oklab,var(--seq) 28%,transparent)}100%{background:transparent}}
+.agenda-h{position:sticky;top:var(--hdr,118px);z-index:3;background:var(--panel);margin:18px 0 0;padding:10px 6px 9px;border-bottom:2px solid var(--brand);font-weight:700;font-size:14.5px;display:flex;gap:10px;align-items:baseline;line-height:1.45}
+.agenda-h .no{flex:none;font-size:12px;color:var(--brand);background:var(--brand-weak);border-radius:6px;padding:1px 8px}
+.agenda-h .n{margin-left:auto;flex:none;font-size:12px;font-weight:400;color:var(--muted)}
+.flowhint{display:none;font-size:12px;color:var(--muted);margin:0 0 6px}
+@media (max-width:700px){.flowhint{display:block}}
+/* 모바일: 헤더가 화면을 절반 가까이 가리지 않도록 고정하지 않는다 */
+@media (max-width:640px){header{position:static}}
+@media (max-width:640px){.turn{grid-template-columns:28px minmax(0,1fr);gap:9px;padding:12px 2px}.turn .av{width:28px;height:28px;font-size:12px}.turn .tx{font-size:15px}}
 </style>
 </head>
 <body>
@@ -404,20 +475,24 @@ h3{font-size:14.5px;color:var(--ink)}
   </div>
   <div class="card">
     <h2>회기별 쟁점 흐름</h2>
-    <p class="sub">색이 진할수록 그 회기에 많이 언급된 쟁점 · <span class="reg">파란 굵은 번호</span>는 정기회 · 칸에 마우스를 올리면 횟수 · 쟁점 이름을 누르면 상세</p>
+    <p class="sub">칸의 숫자는 그 회기에 쟁점이 언급된 횟수(색이 진할수록 많음) · <span class="reg">파란 굵은 번호</span>는 정기회 · 쟁점 이름을 누르면 상세</p>
     <div class="heat" id="heat"></div>
     <div class="scale"><span>적음</span><span class="grad"></span><span>많음</span><span>· 점선 칸 = 언급 없음</span></div>
   </div>
   <div class="card">
-    <h2>위원 · 쟁점 · 기관 신경망 <span class="muted" style="font-size:13px;font-weight:400">3D</span></h2>
-    <p class="sub">질의 위원(입력층) → 쟁점(은닉층) → 피감기관(출력층). 선이 밝을수록 함께 언급된 횟수가 많고, 흐르는 빛은 질의가 쟁점을 거쳐 기관으로 향하는 흐름입니다.</p>
+    <div class="row" style="align-items:baseline"><h2>위원 → 쟁점 → 기관 관계 흐름</h2>
+      <div class="netmode" id="netMode"><button class="on" data-k="flow">흐름도</button><button data-k="3d">3D 신경망</button></div></div>
+    <p class="sub" id="netSub">왼쪽 위원이 어떤 쟁점을 따졌고, 그 쟁점이 어느 기관으로 이어졌는지 보여 줍니다. <b>띠가 굵을수록</b> 함께 언급된 발언이 많습니다 · 항목에 마우스를 올리면 연결만 강조 · 누르면 쟁점 분석 / 의원 분석 / 기관 브리핑</p>
     <div class="netwrap">
-    <div id="netStage" class="net-stage" aria-label="위원·쟁점·기관 3D 관계망">
+    <div class="netmain">
+    <p class="flowhint">← 옆으로 밀어서 전체 보기 →</p><div class="flowscroll"><div id="netFlow" class="flow"><div class="empty">흐름도를 불러오는 중…</div></div></div>
+    <div id="netStage" class="net-stage" hidden aria-label="위원·쟁점·기관 3D 관계망">
       <div class="net-labels"></div>
       <div class="net-tip"></div>
       <div class="net-legend"><span><i style="background:#d7a6ea;color:#d7a6ea"></i>위원</span><span><i style="background:#7fd49a;color:#7fd49a"></i>쟁점</span><span><i style="background:#7fc0f0;color:#7fc0f0"></i>기관</span></div>
       <div class="net-hud">드래그 회전 · 휠 확대 · 노드를 누르면 연결 고정 · 쟁점은 쟁점 분석으로</div>
       <div class="net-loading">신경망을 불러오는 중…</div>
+    </div>
     </div>
     <aside class="netside" id="netSide"><div class="muted" style="font-size:13px">연결을 불러오는 중…</div></aside>
     </div>
@@ -670,11 +745,11 @@ async function loadDash(){
   const hmax = Math.max(1, ...rows.flatMap(r => Object.values(r.by_session)));
   $("#heat").innerHTML = rows.length ? `<table><thead><tr><th></th>${cols.map(c => {
       const ss = SESS[c];
-      return `<th class="${ss?.kind === "정기회" ? "reg" : ""}" data-tip="${esc(ss ? ss.label : "제" + c + "회")}">${c}</th>` }).join("")}</tr></thead>
+      return `<th class="${ss?.kind === "정기회" ? "reg" : ""}" data-tip="${esc(ss ? ss.label : "제" + c + "회")}">${c}</th>` }).join("")}<th style="text-align:right">합계</th></tr></thead>
     <tbody>${rows.map(r => `<tr><th class="rowh" onclick="gotoIssue('${r.id}')">${esc(r.label)}</th>${cols.map(c => {
       const v = r.by_session[c] || 0, pct = v ? 8 + 92 * Math.sqrt(v / hmax) : 0;
-      return `<td style="${v ? `background:color-mix(in oklab, var(--seq) ${pct.toFixed(0)}%, var(--panel))` : "border:1px dashed var(--line)"}"
-        data-tip="${esc(SESS[c]?.label || "제" + c + "회")}<br><b>${esc(r.label)}</b> ${fmt(v)}회">${v}</td>` }).join("")}</tr>`).join("")}</tbody></table>`
+      return `<td class="${pct > 58 ? "hi" : ""}" style="${v ? `background:color-mix(in oklab, var(--seq) ${pct.toFixed(0)}%, var(--panel))` : "border:1px dashed var(--line)"}"
+        data-tip="${esc(SESS[c]?.label || "제" + c + "회")}<br><b>${esc(r.label)}</b> ${fmt(v)}회">${v || ""}</td>` }).join("")}<td class="tot">${fmt(r.total)}</td></tr>`).join("")}</tbody></table>`
     : '<div class="empty">데이터 없음</div>';
 
   $("#recentCommit").innerHTML = ov.commitments.slice(0, 8).map(c => `
@@ -743,7 +818,7 @@ async function showMeeting(id, useLlm = false){
   catch(e){ $("#mDetail").innerHTML = `<div class="card">오류: ${esc(e.message)}</div>`; return }
   const m = s.meeting, llm = s.llm, stats = await api("/api/stats");
   const agendas = s.agenda_summaries.filter(a => a.summary.length);
-  transcript = {id, utts: null, agendas: m.agendas, filter: "", find: "", limit: 300};
+  transcript = {id, utts: null, agendas: m.agendas, filter: "", find: "", speaker: "", limit: 300};
   const nMain = m.agendas.filter(a => /^\s*\d+\s*\./.test(a)).length || m.agendas.length;
   $("#mDetail").innerHTML = `
     <div class="card">
@@ -785,10 +860,13 @@ async function showMeeting(id, useLlm = false){
         ${s.qa_highlights.length ? `<h3>대표 질의응답</h3>${qaHtml(s.qa_highlights[0])}<button class="link" style="font-size:13px" onclick="segShow('mTabs','qa')">질의응답 전체 보기 →</button>` : ""}
       </div>
       <div class="segpanel" data-seg="mTabs" data-k="full">
-        <div class="row" style="margin-bottom:8px">
-          <input type="search" id="tFind" placeholder="이 회의록에서 찾기" style="flex:1 1 220px">
-          <div class="filterchips" id="tFilter" style="margin:0"></div>
+        <div class="tools">
+          <input type="search" id="tFind" placeholder="이 회의록에서 찾기">
+          <select id="tSpeaker" aria-label="발언자로 거르기"><option value="">모든 발언자</option></select>
+          <select id="tAgenda" aria-label="안건으로 이동"><option value="">안건으로 이동…</option></select>
         </div>
+        <div class="filterchips" id="tFilter"></div>
+        <div id="tFlow"></div>
         <div id="tBody" class="muted">불러오는 중…</div>
       </div>
       <div class="segpanel" data-seg="mTabs" data-k="qa">
@@ -857,36 +935,95 @@ async function loadTranscript(){
   const d = await api(`/api/meetings/${encodeURIComponent(t.id)}`);
   if(transcript !== t) return;
   t.utts = d.utterances;
+  // 발언자 목록(발언 많은 순)과 안건 바로가기
+  const sp = {};
+  t.utts.forEach(u => { const x = sp[u.speaker_name] ||= {n: 0, role: u.speaker_role, type: u.speaker_type}; x.n++ });
+  $("#tSpeaker").innerHTML = '<option value="">모든 발언자</option>' + Object.entries(sp).sort((a, b) => b[1].n - a[1].n)
+    .map(([name, x]) => `<option value="${esc(name)}">${esc(name)} ${esc(x.type === "member" ? "위원" : x.role)} · ${fmt(x.n)}</option>`).join("");
+  const firstOf = {};
+  t.utts.forEach(u => { if(u.agenda_idx != null && !(u.agenda_idx in firstOf)) firstOf[u.agenda_idx] = u.idx });
+  const ags = Object.keys(firstOf).map(Number).sort((a, b) => a - b).filter(i => t.agendas[i]);
+  $("#tAgenda").innerHTML = '<option value="">안건으로 이동…</option>' + ags.map(i => `<option value="${firstOf[i]}">${esc(cut(t.agendas[i], 46))}</option>`).join("");
+  $("#tAgenda").hidden = !ags.length;
   $("#tFind").oninput = e => { t.find = e.target.value.trim(); t.limit = 300; renderTranscript() };
+  $("#tSpeaker").onchange = e => { t.speaker = e.target.value; t.limit = 300; renderTranscript() };
+  $("#tAgenda").onchange = e => { if(e.target.value !== "") jumpToUtt(+e.target.value); e.target.value = "" };
+  renderFlowbar();
   renderTranscript();
+}
+const whoOf = u => u.speaker_role === "위원" || u.speaker_type === "member" ? `${u.speaker_name} 위원` : `${u.speaker_role} ${u.speaker_name}`;
+// 발언 흐름 미니맵: 회의 전체를 한 줄로(폭 = 발언 길이, 색 = 발언자 유형) · 누르면 그 발언으로
+function renderFlowbar(){
+  const t = transcript; let last = null, html = "";
+  for(const u of t.utts){
+    if(u.agenda_idx != null && u.agenda_idx !== last){ if(last !== null) html += '<i class="ag"></i>'; last = u.agenda_idx }
+    html += `<i class="${u.is_commitment ? "promise" : typeGroup(u.speaker_type)}" style="flex:${Math.sqrt(u.text.length || 1).toFixed(1)}" data-i="${u.idx}" data-tip="<b>${esc(whoOf(u))}</b><br>${esc(cut(u.text, 70))}"></i>`;
+  }
+  $("#tFlow").innerHTML = t.utts.length < 3 ? "" : `<div class="flowbar" id="tFlowbar" role="navigation" aria-label="발언 흐름">${html}</div>
+    <div class="flowlegend"><span><i style="background:var(--member)"></i>위원</span><span><i style="background:var(--gov)"></i>정부·기관</span>
+      <span><i style="background:color-mix(in oklab,var(--brand) 45%,var(--panel))"></i>위원장</span><span><i style="background:var(--warn)"></i>정부 약속</span>
+      <span><i style="background:var(--ink);width:3px"></i>안건 경계</span><span class="muted">막대 폭 = 발언 길이 · 누르면 그 발언으로 이동</span></div>`;
+  const bar = $("#tFlowbar"); if(bar) bar.onclick = e => { const i = e.target.dataset?.i; if(i != null) jumpToUtt(+i) };
+}
+const tRows = () => { const t = transcript; return (t.utts || []).filter(u => (!t.filter || typeGroup(u.speaker_type) === t.filter)
+  && (!t.speaker || u.speaker_name === t.speaker) && (!t.find || u.text.includes(t.find))) };
+function jumpToUtt(idx){
+  const t = transcript; let rows = tRows();
+  if(!rows.some(u => u.idx === idx)){   // 거르기에 가려진 발언이면 거르기를 풀고 이동
+    Object.assign(t, {filter: "", find: "", speaker: ""}); $("#tFind").value = ""; $("#tSpeaker").value = ""; rows = tRows();
+  }
+  const pos = rows.findIndex(u => u.idx === idx);
+  if(pos >= t.limit) t.limit = pos + 100;
+  renderTranscript();
+  const el = document.getElementById("u" + idx);
+  if(el){ el.scrollIntoView({block: "start", behavior: "smooth"}); el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash") }
+}
+// 긴 발언은 문장 경계에서 200자 안팎의 문단으로 나눠 읽기 쉽게
+function paragraphs(text){
+  const out = []; let buf = "";
+  for(const s of String(text || "").split(/(?<=[.?!])\s+(?=\S)/)){
+    buf += (buf ? " " : "") + s;
+    if(buf.length >= 200){ out.push(buf); buf = "" }
+  }
+  if(buf) out.push(buf);
+  return out;
+}
+const markText = (s, hl) => hl ? esc(s).split(esc(hl)).join(`<mark>${esc(hl)}</mark>`) : esc(s);
+function turnHtml(u, hl = ""){
+  const g = typeGroup(u.speaker_type), member = g === "member";
+  const fold = !hl && (g === "chair" || g === "other") && u.text.length > 700;   // 긴 진행·보고 발언은 접어 둔다
+  const flags = (u.is_commitment ? '<span class="chip warn">약속</span>' : "") + (u.is_data_request ? '<span class="chip warn">자료요구</span>' : "");
+  return `<article class="turn ${g}${u.is_commitment ? " promise" : ""}" id="u${u.idx}">
+    <div class="av" aria-hidden="true">${esc((u.speaker_name || "?").slice(0, 1))}</div>
+    <div><div class="tw"><b>${esc(u.speaker_name)}</b><span class="role">${esc(member ? "위원" : u.speaker_role)}</span>${flags}</div>
+      <div class="tx${fold ? " clamp" : ""}">${paragraphs(u.text).map(p => `<p>${markText(p, hl)}</p>`).join("")}</div>
+      ${fold ? `<button class="link more" onclick="this.previousElementSibling.classList.remove('clamp');this.remove()">전체 보기 ▾</button>` : ""}</div></article>`;
 }
 function renderTranscript(){
   const t = transcript, all = t.utts || [];
   const cnt = {}; all.forEach(u => cnt[typeGroup(u.speaker_type)] = (cnt[typeGroup(u.speaker_type)] || 0) + 1);
   $("#tFilter").innerHTML = [["", "전체", all.length], ...Object.keys(TYPE_LABEL).filter(k => cnt[k]).map(k => [k, TYPE_LABEL[k], cnt[k]])]
     .map(([k, l, n]) => `<button class="${t.filter === k ? "on" : ""}" onclick="transcript.filter='${k}';transcript.limit=300;renderTranscript()">${l} ${fmt(n)}</button>`).join("");
-  const rows = all.filter(u => (!t.filter || typeGroup(u.speaker_type) === t.filter) && (!t.find || u.text.includes(t.find)));
+  const rows = tRows(), filtered = !!(t.filter || t.find || t.speaker), shown = new Set(rows.map(u => u.idx));
+  document.querySelectorAll("#tFlowbar i[data-i]").forEach(el => el.classList.toggle("dim", filtered && !shown.has(+el.dataset.i)));
+  const perAgenda = {}; all.forEach(u => perAgenda[u.agenda_idx] = (perAgenda[u.agenda_idx] || 0) + 1);
   let last = -1, html = "";
   for(const u of rows.slice(0, t.limit)){
     if(u.agenda_idx != null && u.agenda_idx !== last && t.agendas[u.agenda_idx]){
-      last = u.agenda_idx; html += `<div class="chat-day"><span>${esc(cut(t.agendas[u.agenda_idx].replace(/^\s*\d+\.\s*/, ""), 60))}</span></div>`;
+      last = u.agenda_idx;
+      const a = t.agendas[u.agenda_idx], no = (a.match(/^\s*(\d+)\s*\./) || [])[1];
+      html += `<div class="agenda-h"><span class="no">안건${no ? " " + no : ""}</span><span>${esc(cut(a.replace(/^\s*\d+\.\s*/, ""), 90))}</span><span class="n">발언 ${fmt(perAgenda[u.agenda_idx])}</span></div>`;
     }
-    html += uttHtml(u, "", t.find);
+    html += turnHtml(u, t.find);
   }
   $("#tBody").classList.remove("muted");
-  $("#tBody").innerHTML = (t.find || t.filter ? `<p class="muted" style="font-size:13px">${fmt(rows.length)}개 발언</p>` : "") + (html || '<div class="empty">해당 발언 없음</div>')
+  $("#tBody").innerHTML = (filtered ? `<p class="muted" style="font-size:13px;margin:4px 0">${fmt(rows.length)}개 발언 · 미니맵에서 흐리게 보이는 칸은 거른 발언</p>` : "") + (html || '<div class="empty">해당 발언 없음</div>')
     + (rows.length > t.limit ? `<button class="ghost" style="width:100%;margin-top:8px" onclick="transcript.limit+=300;renderTranscript()">발언 ${fmt(Math.min(300, rows.length - t.limit))}개 더 보기 (남은 ${fmt(rows.length - t.limit)}개)</button>` : "");
 }
 function copyLink(){
   try{ navigator.clipboard.writeText(location.href); }catch(e){}
   const tip = document.createElement("div"); tip.textContent = "링크를 복사했습니다"; tip.className = "toast";
   document.body.appendChild(tip); setTimeout(() => tip.remove(), 1600);
-}
-function uttHtml(u, q, hl = ""){
-  const cls = u.speaker_type === "member" ? "member" : (["official", "witness"].includes(u.speaker_type) ? "gov" : "");
-  const who = u.speaker_role === "위원" ? `${u.speaker_name} 위원` : `${u.speaker_role} ${u.speaker_name}`;
-  const flags = (u.is_question ? '<span class="chip member">질의</span>' : "") + (u.is_commitment ? '<span class="chip warn">약속</span>' : "") + (u.is_data_request ? '<span class="chip warn">자료요구</span>' : "");
-  return `<div class="quote ${u.is_commitment ? "warn" : cls}"><div class="who">${esc(who)} ${flags}</div>${q ? snippet(u.text, q) : (hl ? esc(u.text).split(esc(hl)).join(`<mark>${esc(hl)}</mark>`) : esc(u.text))}</div>`;
 }
 
 // ── 검색 ──
@@ -974,14 +1111,13 @@ async function showIssue(id){
       <div class="row" style="gap:6px"><span class="chip line">관련 발언 ${fmt(d.count)}건</span><span class="chip line">회의 ${fmt(d.meetings)}건</span>
         ${d.children.map(c => `<button class="chip" style="border:0;cursor:pointer" onclick="showIssue('${c.id}')">${esc(c.label)} ›</button>`).join("")}</div>
       <h3>회기별 언급 추이</h3>
-      <div class="cols">${allSess.map(s => { const v = byS[s] || 0; return `<div class="c ${v ? "" : "zero"}" style="height:${v ? Math.max(3, v / cmax * 100) : 100}%" data-tip="${esc(SESS[s]?.label || "제" + s + "회")}<br>${fmt(v)}건"></div>` }).join("")}</div>
+      <div class="cols">${allSess.map(s => { const v = byS[s] || 0; return `<div class="c ${v ? "" : "zero"}" style="height:${v ? Math.max(3, v / cmax * 100) : 100}%" data-tip="${esc(SESS[s]?.label || "제" + s + "회")}<br>${fmt(v)}건">${v && v >= cmax * .12 ? `<b>${fmt(v)}</b>` : ""}</div>` }).join("")}</div>
       <div class="colx">${allSess.map((s, i) => `<span class="${SESS[s]?.kind === "정기회" ? "reg" : ""}">${i % step ? "" : s}</span>`).join("")}</div>
       <details style="margin-top:10px"><summary>인식 키워드 ${d.keywords.length}개</summary><div>${chips(d.keywords, "line")}</div></details>
     </div>
-    <div class="grid g2">
-      <div class="card"><h2>관련 기관</h2><p class="sub">답변하거나 언급된 발언 수</p>${d.orgs.length ? barsHtml(d.orgs) : '<div class="empty">-</div>'}</div>
-      <div class="card"><h2>질의한 위원</h2><p class="sub">이 쟁점을 언급한 발언 수</p>${d.members.length ? barsHtml(d.members.map(m => ({...m, name: m.name + " 위원"}))) : '<div class="empty">-</div>'}</div>
-    </div>
+    <div class="card"><h2>누가 묻고, 어느 기관으로 이어졌나</h2>
+      <p class="sub">이 쟁점을 언급한 위원(왼쪽) → 쟁점 → 답하거나 언급된 기관(오른쪽) · 띠 굵기와 숫자 = 발언 수 · 누르면 의원 분석 / 기관 브리핑</p>
+      <p class="flowhint">← 옆으로 밀어서 전체 보기 →</p><div class="flowscroll"><div class="flow" id="iFlow"></div></div></div>
     <div class="card"><h2>질의와 정부 답변</h2><p class="sub">한 위원의 질의 순서에서 실제로 이어진 질의(왼쪽)와 정부 답변(오른쪽)입니다. <span class="chip warn">약속</span>은 구체적 조치 약속. 최근 회의 순.</p>
       ${moreList(d.dialogue.map((t, i) => {
         const head = i === 0 || d.dialogue[i - 1].meeting_id !== t.meeting_id;
@@ -990,6 +1126,15 @@ async function showIssue(id){
           ? `<div class="bubble q"><div class="who">${esc(x.speaker)}</div>${esc(x.text)}</div>`
           : `<div class="bubble a${x.commitment ? " promise" : ""}${!x.commitment && isShort(x.text) ? " short" : ""}"><div class="who">${esc(x.speaker)} ${x.commitment ? '<span class="chip warn">약속</span>' : ""}</div>${esc(x.text)}</div>`).join("")}</div>`;
       }), 5, "개 대화") || '<div class="empty">-</div>'}</div>`;
+  const iid = "issue:" + d.id, ms = d.members.slice(0, 8), os = d.orgs.slice(0, 8);
+  flowRender($("#iFlow"), {
+    aria: `${d.label} 관련 위원·기관 흐름도`, unit: "건", height: Math.max(220, 26 * Math.max(ms.length, os.length)), padL: 84, padR: 180,
+    cols: [{kind: "member", title: "질의 위원", nodes: ms.map(m => ({id: "member:" + m.name, label: m.name}))},
+           {kind: "issue", title: "쟁점", nodes: [{id: iid, label: d.label, weight: d.count}]},
+           {kind: "org", title: "기관", nodes: os.map(o => ({id: "org:" + o.name, label: o.name}))}],
+    links: [...ms.map(m => ({s: "member:" + m.name, t: iid, w: m.count})), ...os.map(o => ({s: iid, t: "org:" + o.name, w: o.count}))],
+    onPick: n => n.id !== iid && pickFlowNode(n),
+  });
 }
 // ── 의원 분석: 관심 쟁점·질의 관점·핵심어·예상 질문 ──
 let mbState = {mode: "session", rows: null, sel: null, key: null};
@@ -1126,23 +1271,148 @@ const NET_LAYERS = [
   {kind: "issue", title: "은닉층 · 쟁점", x: 0, top: 16, radius: 190, color: 0x7fd49a},
   {kind: "org", title: "출력층 · 피감기관", x: 360, top: 16, radius: 200, color: 0x7fc0f0},
 ];
-let netStarted = false;
+// ── 흐름도(3열 리본 그래프): 왼쪽 열 → 가운데 열 → 오른쪽 열 ──
+// cols: [{kind, title, nodes:[{id, label, weight}]}] 3개, links: [{s, t, w}] (s는 앞 열, t는 다음 열)
+// 띠 굵기는 링크 수치에 비례(왼쪽 묶음·오른쪽 묶음을 따로 맞춤), 양옆 열은 가운데 열 기준으로 정렬해 엇갈림을 줄인다.
+function flowRender(box, spec){
+  const W = Math.max(640, box.clientWidth || 900), H0 = spec.height || 460;
+  const padL = spec.padL ?? 96, padR = spec.padR ?? 170, top = 30, NW = 10, GAP = 7, SLOT = 15;
+  const xs = [padL, Math.round((padL + W - padR) / 2) - NW / 2, W - padR - NW];
+  const cols = spec.cols.map(c => ({...c, nodes: c.nodes.map(n => ({...n, kind: c.kind}))}));
+  const N = new Map(); cols.forEach((c, ci) => c.nodes.forEach(n => { n.ci = ci; n.inn = 0; n.out = 0; n.ins = []; n.outs = []; N.set(n.id, n) }));
+  const L = spec.links.filter(l => N.has(l.s) && N.has(l.t) && l.w > 0).map(l => ({...l, S: N.get(l.s), T: N.get(l.t)}));
+  L.forEach(l => { l.S.out += l.w; l.T.inn += l.w; l.S.outs.push(l); l.T.ins.push(l) });
+  cols.forEach(c => c.nodes = c.nodes.filter(n => n.inn + n.out > 0));
+  if(!cols[1].nodes.length){ box.innerHTML = '<div class="empty">연결할 자료가 없습니다.</div>'; return }
+  cols[1].nodes.forEach((n, i) => n.order = i);
+  for(const ci of [0, 2]){
+    for(const n of cols[ci].nodes){ const ls = ci ? n.ins : n.outs, s = ls.reduce((a, l) => a + l.w, 0) || 1; n.order = ls.reduce((a, l) => a + (ci ? l.S : l.T).order * l.w, 0) / s }
+    cols[ci].nodes.sort((a, b) => a.order - b.order);
+  }
+  const room = c => H0 - GAP * (c.nodes.length - 1);
+  let kA = room(cols[0]) / (cols[0].nodes.reduce((a, n) => a + n.out, 0) || 1);
+  let kB = room(cols[2]) / (cols[2].nodes.reduce((a, n) => a + n.inn, 0) || 1);
+  const midH = () => cols[1].nodes.reduce((a, n) => a + Math.max(n.inn * kA, n.out * kB), 0);
+  const f = Math.min(1, room(cols[1]) / (midH() || 1)); kA *= f; kB *= f;
+  const k = l => l.S.ci === 0 ? kA : kB;
+  cols.forEach((c, ci) => c.nodes.forEach(n => n.h = Math.max(3, ci === 0 ? n.out * kA : ci === 2 ? n.inn * kB : Math.max(n.inn * kA, n.out * kB))));
+  // 세로 배치: 이름표가 겹치지 않게 칸은 최소 SLOT, 열은 가운데 정렬
+  let H = 0;
+  cols.forEach(c => { c.total = c.nodes.reduce((a, n) => a + Math.max(n.h, SLOT), 0) + GAP * (c.nodes.length - 1); H = Math.max(H, c.total) });
+  cols.forEach((c, ci) => { let y = top + (H - c.total) / 2; c.nodes.forEach(n => { const s = Math.max(n.h, SLOT); n.y = y + (s - n.h) / 2; n.cy = y + s / 2; n.x = xs[ci]; y += s + GAP }) });
+  // 띠 끝점: 노드 안에서 상대편 위치 순서대로 쌓는다
+  for(const n of N.values()){
+    let y = n.y + (n.h - n.outs.reduce((a, l) => a + l.w * k(l), 0)) / 2;
+    n.outs.sort((a, b) => a.T.cy - b.T.cy).forEach(l => { l.y0 = y; y += l.w * k(l) });
+    y = n.y + (n.h - n.ins.reduce((a, l) => a + l.w * k(l), 0)) / 2;
+    n.ins.sort((a, b) => a.S.cy - b.S.cy).forEach(l => { l.y1 = y; y += l.w * k(l) });
+  }
+  const r1 = v => Math.round(v * 10) / 10;
+  const paths = L.sort((a, b) => b.w - a.w).map(l => {
+    const x0 = l.S.x + NW, x1 = l.T.x, xm = (x0 + x1) / 2, t = Math.max(1, l.w * k(l));
+    const [a0, b0, a1, b1] = [l.y0, l.y0 + t, l.y1, l.y1 + t].map(r1);
+    return `<path class="fl k-${l.S.kind}" data-s="${esc(l.S.id)}" data-t="${esc(l.T.id)}" d="M${x0} ${a0}C${xm} ${a0} ${xm} ${a1} ${x1} ${a1}L${x1} ${b1}C${xm} ${b1} ${xm} ${b0} ${x0} ${b0}Z"
+      data-tip="${esc(l.S.label)} → ${esc(l.T.label)}<br><b>${fmt(l.w)}</b>${esc(spec.unit || "회")}"/>`;
+  }).join("");
+  const label = (n, ci) => {
+    const v = ci === 0 ? n.out : ci === 2 ? n.inn : (n.weight ?? Math.max(n.inn, n.out));
+    const x = ci === 0 ? n.x - 7 : n.x + NW + 7, anchor = ci === 0 ? "end" : "start";
+    return `<text class="${ci === 1 ? "halo" : ""}" x="${x}" y="${r1(n.cy)}" dy="0.35em" text-anchor="${anchor}">${esc(n.label)} <tspan class="c">${fmt(v)}</tspan></text>`;
+  };
+  const nodes = cols.map((c, ci) => c.nodes.map(n => `<g class="fnode" data-id="${esc(n.id)}" tabindex="0" role="button" aria-label="${esc(n.label)}">
+      <rect class="fn k-${n.kind}" x="${n.x}" y="${r1(n.y)}" width="${NW}" height="${r1(n.h)}" rx="2"/>
+      <rect x="${ci === 0 ? 4 : n.x}" y="${r1(n.cy - SLOT / 2)}" width="${ci === 0 ? n.x + NW - 4 : padR}" height="${SLOT}" fill="transparent"/>${label(n, ci)}</g>`).join("")).join("");
+  const titles = cols.map((c, ci) => `<text class="ctitle" x="${ci === 0 ? xs[0] + NW : ci === 1 ? xs[1] + NW / 2 : xs[2]}" y="14" text-anchor="${ci === 0 ? "end" : ci === 1 ? "middle" : "start"}">${esc(c.title)}</text>`).join("");
+  box.innerHTML = `<svg viewBox="0 0 ${W} ${Math.ceil(H + top + 8)}" role="img" aria-label="${esc(spec.aria || "관계 흐름도")}">${titles}<g>${paths}</g><g>${nodes}</g></svg>`;
+  // 가리키면 그 항목과 이어진 띠·항목만 강조
+  const svg = box.querySelector("svg");
+  const focus = id => {
+    box.classList.toggle("hl", !!id);
+    const near = new Set([id]);
+    svg.querySelectorAll(".fl").forEach(p => { const on = !!id && (p.dataset.s === id || p.dataset.t === id); p.classList.toggle("on", on); if(on){ near.add(p.dataset.s); near.add(p.dataset.t) } });
+    svg.querySelectorAll(".fnode").forEach(g => g.classList.toggle("on", !!id && near.has(g.dataset.id)));
+  };
+  svg.querySelectorAll(".fnode").forEach(g => {
+    g.onmouseenter = g.onfocus = () => focus(g.dataset.id);
+    g.onmouseleave = g.onblur = () => focus(null);
+    g.onclick = () => spec.onPick && spec.onPick(N.get(g.dataset.id));
+    g.onkeydown = e => { if(e.key === "Enter") g.onclick() };
+  });
+  svg.querySelectorAll(".fl").forEach(p => { p.onmouseenter = () => { focus(null); box.classList.add("hl"); p.classList.add("on") }; p.onmouseleave = () => focus(null) });
+}
+// 크기가 바뀌면 다시 그린다(가로폭에 맞춘 좌표라서)
+function flowMount(box, spec){
+  flowRender(box, spec);
+  let w = box.clientWidth, t = null;
+  new ResizeObserver(() => { if(Math.abs(box.clientWidth - w) < 24) return; w = box.clientWidth; clearTimeout(t); t = setTimeout(() => flowRender(box, spec), 120) }).observe(box);
+}
+function pickFlowNode(n){
+  if(!n) return;
+  const [kind, ...rest] = n.id.split(":"), key = rest.join(":");
+  if(kind === "issue") gotoIssue(key);
+  else if(kind === "member") gotoMember(key);
+  else if(kind === "org") briefOrg(key);
+}
+// 대시보드 관계 흐름: 위원(질의 많은 순 14명) → 쟁점 → 기관(상위 12곳), 위원·기관마다 가장 강한 쟁점 4개만
+function netFlowSpec(data){
+  const by = kind => data.nodes.filter(n => n.kind === kind).sort((a, b) => b.weight - a.weight);
+  const members = by("member").slice(0, 14), orgs = by("org").slice(0, 12);
+  const kindOf = Object.fromEntries(data.nodes.map(n => [n.id, n.kind]));
+  const keep = new Set([...members, ...orgs].map(n => n.id));
+  const strongest = (side) => {
+    const out = [], per = {};
+    data.edges.filter(e => [e.source, e.target].some(x => keep.has(x) && kindOf[x] === side))
+      .map(e => kindOf[e.source] === side ? {n: e.source, i: e.target, w: e.weight} : {n: e.target, i: e.source, w: e.weight})
+      .filter(e => kindOf[e.i] === "issue").sort((a, b) => b.w - a.w)
+      .forEach(e => { if((per[e.n] = (per[e.n] || 0) + 1) <= 4) out.push(e) });
+    return out;
+  };
+  const left = strongest("member"), right = strongest("org");
+  const used = new Set([...left, ...right].map(e => e.i));
+  const issues = by("issue").filter(n => used.has(n.id));
+  return {
+    aria: "위원·쟁점·기관 관계 흐름도", unit: "회 함께 언급",
+    cols: [
+      {kind: "member", title: "질의 위원", nodes: members.map(n => ({id: n.id, label: n.label.replace(/ 위원$/, "")}))},
+      {kind: "issue", title: "쟁점", nodes: issues.map(n => ({id: n.id, label: n.label}))},
+      {kind: "org", title: "기관", nodes: orgs.map(n => ({id: n.id, label: n.label}))},
+    ],
+    links: [...left.map(e => ({s: e.n, t: e.i, w: e.w})), ...right.map(e => ({s: e.i, t: e.n, w: e.w}))],
+    onPick: pickFlowNode,
+  };
+}
+let netStarted = false, netData = null, net3dStarted = false;
 async function loadNet(){
   if(netStarted) return;
   netStarted = true;
-  const stage = $("#netStage");
   try{
-    const data = await api("/api/graph");
-    netSide(data);
-    let THREE = null;
-    try{ THREE = await import(THREE_URL) }catch(e){ /* 오프라인 등: 2D로 대체 */ }
-    stage.querySelector(".net-loading").remove();
-    if(!THREE || !netWebGL()) return loadNet2d(stage, data);
-    buildNet3d(THREE, stage, data);
+    netData = await api("/api/graph");
+    netSide(netData);
+    flowMount($("#netFlow"), netFlowSpec(netData));
   }catch(e){
     netStarted = false;
-    stage.querySelector(".net-loading").textContent = "관계망을 불러오지 못했습니다: " + e.message;
+    $("#netFlow").innerHTML = `<div class="empty">관계 흐름을 불러오지 못했습니다: ${esc(e.message)}</div>`;
   }
+}
+document.querySelectorAll("#netMode button").forEach(b => b.onclick = () => setNetMode(b.dataset.k));
+function setNetMode(k){
+  document.querySelectorAll("#netMode button").forEach(b => b.classList.toggle("on", b.dataset.k === k));
+  const fl = $("#netFlow").parentElement; fl.hidden = fl.previousElementSibling.hidden = k !== "flow";
+  $("#netStage").hidden = k !== "3d";
+  $("#netSub").innerHTML = k === "flow"
+    ? "왼쪽 위원이 어떤 쟁점을 따졌고, 그 쟁점이 어느 기관으로 이어졌는지 보여 줍니다. <b>띠가 굵을수록</b> 함께 언급된 발언이 많습니다 · 항목에 마우스를 올리면 연결만 강조 · 누르면 쟁점 분석 / 의원 분석 / 기관 브리핑"
+    : "질의 위원(입력층) → 쟁점(은닉층) → 피감기관(출력층). 선이 밝을수록 함께 언급된 횟수가 많고, 흐르는 빛은 질의가 쟁점을 거쳐 기관으로 향하는 흐름입니다. 드래그로 회전합니다.";
+  if(k === "3d") loadNet3d();
+}
+async function loadNet3d(){
+  if(net3dStarted || !netData) return;
+  net3dStarted = true;
+  const stage = $("#netStage"), msg = stage.querySelector(".net-loading");
+  let THREE = null;
+  try{ THREE = netWebGL() ? await import(THREE_URL) : null }catch(e){ /* 오프라인 등 */ }
+  if(!THREE){ msg.textContent = "이 환경에서는 3D를 표시할 수 없습니다 — 흐름도를 이용하세요."; net3dStarted = false; return }
+  msg.remove();
+  buildNet3d(THREE, stage, netData);
 }
 function netSide(data){
   // 신경망 옆: 가장 강한 연결(위원→쟁점, 쟁점→기관) — 그림을 읽는 길잡이
@@ -1355,6 +1625,7 @@ function buildNet3d(THREE, stage, data){
   // 크기·가시성
   function resize(){
     const w = stage.clientWidth, h = stage.clientHeight;
+    if(!w || !h) return;   // 흐름도 보기로 바꿔 숨겨진 동안
     renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
     // 화면이 좁으면 세 층이 모두 들어오도록 물러선다
     const fit = 540 / (Math.tan(camera.fov * Math.PI / 360) * camera.aspect);
@@ -1426,27 +1697,6 @@ function buildNet3d(THREE, stage, data){
   document.addEventListener("visibilitychange", () => { if(!document.hidden && visible){ last = performance.now(); requestAnimationFrame(frame) } });
   requestAnimationFrame(frame);
 }
-// WebGL을 쓸 수 없을 때: 2D 관계망
-function loadNet2d(stage, data){
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  stage.prepend(svg);
-  const W = stage.clientWidth || 900, H = stage.clientHeight || 480; svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
-  const top = new Set([...data.nodes].sort((a, b) => b.weight - a.weight).slice(0, 30).map(n => n.id));
-  const nodes = data.nodes.filter(n => top.has(n.id)).map((n, i) => ({...n, x: W/2 + 220*Math.cos(i*2.4)*(0.3 + i/30), y: H/2 + 170*Math.sin(i*2.4)*(0.3 + i/30), vx: 0, vy: 0}));
-  const idx = Object.fromEntries(nodes.map((n, i) => [n.id, i]));
-  const links = data.edges.filter(e => e.source in idx && e.target in idx).sort((a, b) => b.weight - a.weight).slice(0, 80)
-    .map(e => ({s: nodes[idx[e.source]], t: nodes[idx[e.target]], w: e.weight}));
-  for(let it = 0; it < 300; it++){
-    for(const a of nodes) for(const b of nodes){ if(a === b) continue; const dx = a.x-b.x, dy = a.y-b.y, d2 = dx*dx+dy*dy+.01, f = 6000/d2, d = Math.sqrt(d2); a.vx += dx/d*f; a.vy += dy/d*f }
-    for(const l of links){ const dx = l.t.x-l.s.x, dy = l.t.y-l.s.y, f = (Math.sqrt(dx*dx+dy*dy) - 130)*.004; l.s.vx += dx*f; l.s.vy += dy*f; l.t.vx -= dx*f; l.t.vy -= dy*f }
-    for(const n of nodes){ n.vx += (W/2-n.x)*.003; n.vy += (H/2-n.y)*.003; n.x += Math.max(-8, Math.min(8, n.vx*.5)); n.y += Math.max(-8, Math.min(8, n.vy*.5)); n.vx *= .6; n.vy *= .6; n.x = Math.max(40, Math.min(W-100, n.x)); n.y = Math.max(40, Math.min(H-20, n.y)) }
-  }
-  const color = {issue: "#7fd49a", org: "#7fc0f0", member: "#d7a6ea"};
-  const maxW = Math.max(...links.map(l => l.w), 1), maxN = Math.max(...nodes.map(n => n.weight), 1);
-  svg.innerHTML = links.map(l => `<line x1="${l.s.x}" y1="${l.s.y}" x2="${l.t.x}" y2="${l.t.y}" stroke="#3a4d70" stroke-width="${1 + 4*l.w/maxW}" data-tip="${esc(l.s.label)} — ${esc(l.t.label)}<br>${fmt(l.w)}회"/>`).join("")
-    + nodes.map(n => `<g data-tip="${esc(n.label)} · ${fmt(n.weight)}"><circle cx="${n.x}" cy="${n.y}" r="${5 + 10*Math.sqrt(n.weight/maxN)}" fill="${color[n.kind]}"/><text x="${n.x + 12}" y="${n.y + 4}">${esc(n.label)}</text></g>`).join("");
-}
-
 // ── 브리핑 ──
 async function fillBriefSelectors(){
   const [orgs, tax, sp] = await Promise.all([api("/api/orgs"), api("/api/taxonomy"), api("/api/speakers")]);
@@ -1468,6 +1718,11 @@ function briefStarter(orgs, tax, sp){
     <h3>쟁점으로</h3><div class="ex">${leafIssues.map(t => btn(t.label, `quickBrief('bIssue','${esc(t.id)}')`)).join("")}</div>
     <h3>질의 많은 위원으로</h3><div class="ex">${members.map(m => btn(m.speaker_name + " 위원", `quickBrief('bMember','${esc(m.speaker_name)}')`)).join("")}</div>
   </div>`;
+}
+function briefOrg(name){
+  openTab("brief");
+  if(![...$("#bOrg").options].some(o => o.value === name)) $("#bOrg").add(new Option(name, name));
+  quickBrief("bOrg", name);
 }
 function quickBrief(sel, v){
   ["bOrg", "bIssue", "bMember"].forEach(k => $("#" + k).value = k === sel ? v : ""); $("#bKw").value = "";
@@ -1578,6 +1833,9 @@ function globalSearch(){
   const q = $("#gq").value.trim(); if(!q) return;
   openTab("meetings"); $("#q").value = q; doSearch(); $("#gq").blur();
 }
+const setHdr = () => { const h = document.querySelector("header");
+  document.documentElement.style.setProperty("--hdr", (h && getComputedStyle(h).position === "sticky" ? h.offsetHeight : 0) + "px") };
+addEventListener("resize", setHdr); setHdr();
 // ── 시작 ──
 (async () => {
   try{ await loadSessions() }catch(e){}

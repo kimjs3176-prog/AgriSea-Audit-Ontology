@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import threading
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterator
@@ -57,13 +58,62 @@ END;
 """
 
 
+class _Rows(list):
+    """질의 결과(미리 다 읽어 둔 행): 커서처럼 fetchone/fetchall/반복을 지원."""
+
+    def fetchone(self):
+        return self[0] if self else None
+
+    def fetchall(self):
+        return list(self)
+
+
+class SerialConnection:
+    """연결 하나를 여러 스레드(웹 요청 스레드 풀)가 나눠 쓸 때 질의를 한 번에 하나씩 실행한다.
+
+    sqlite3 연결은 동시에 쓰면 'bad parameter or other API misuse'로 깨지므로, 결과를 잠금 안에서
+    모두 읽어 돌려준다. 트랜잭션(with conn: …)은 끝날 때까지 잠금을 쥔다.
+    """
+
+    def __init__(self, conn: sqlite3.Connection):
+        self.raw = conn
+        self.lock = threading.RLock()
+
+    def execute(self, sql: str, args: Any = ()) -> _Rows:
+        with self.lock:
+            return _Rows(self.raw.execute(sql, args).fetchall())
+
+    def executemany(self, sql: str, rows: Any) -> None:
+        with self.lock:
+            self.raw.executemany(sql, rows)
+
+    def executescript(self, sql: str) -> None:
+        with self.lock:
+            self.raw.executescript(sql)
+
+    def __enter__(self):
+        self.lock.acquire()
+        self.raw.__enter__()
+        return self
+
+    def __exit__(self, *exc):
+        try:
+            return self.raw.__exit__(*exc)
+        finally:
+            self.lock.release()
+
+    def __getattr__(self, name: str):  # backup, close 등은 원래 연결로
+        return getattr(self.raw, name)
+
+
 class Store:
     def __init__(self, path: Path | str, fts: bool = True):
         self.path = str(path)
         if self.path != ":memory:":
             Path(self.path).parent.mkdir(parents=True, exist_ok=True)
-        self.conn = sqlite3.connect(self.path, check_same_thread=False)
-        self.conn.row_factory = sqlite3.Row
+        raw = sqlite3.connect(self.path, check_same_thread=False)
+        raw.row_factory = sqlite3.Row
+        self.conn = SerialConnection(raw)
         self.conn.execute("PRAGMA foreign_keys = ON")
         self.conn.executescript(SCHEMA)
         cols = {r[1] for r in self.conn.execute("PRAGMA table_info(utterances)")}
@@ -85,7 +135,7 @@ class Store:
                     self.conn.execute("INSERT INTO utterances_fts(utterances_fts) VALUES('rebuild')")
 
     @contextmanager
-    def tx(self) -> Iterator[sqlite3.Connection]:
+    def tx(self) -> Iterator[SerialConnection]:
         with self.conn:
             yield self.conn
 
