@@ -231,7 +231,9 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         """약속 목록(최근 순)과 상태별 개수. 상태 거르기는 화면에서(개수는 다른 조건만 반영)."""
         from collections import Counter
         d = cached("followups")
-        items = d["items"]
+        # 외부 근거를 확인한 약속은 그 근거까지 더해 다시 판정한 상태로 거르고 센다(상세 화면과 같게)
+        checked = {x["id"]: store.kv_get(f"followup_ext:{x['id']}") for x in d["items"]}
+        items = [followup_view(x, checked[x["id"]]) if checked[x["id"]] else x for x in d["items"]]
         if org:
             items = [x for x in items if x["org"] == org]
         if action:
@@ -249,7 +251,7 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
                 "counts": {k: counts.get(k, 0) for k in d["statuses"]}, "total": len(items),
                 "orgs": [{"name": n, "count": c} for n, c in orgs.most_common()],
                 "items": [{**{k: x[k] for k in keep}, "n_evidence": len(x["evidence"]),
-                           "checked": store.kv_get(f"followup_ext:{x['id']}") is not None} for x in items]}
+                           "checked": checked[x["id"]] is not None} for x in items]}
 
     @app.get("/api/followups/{cid}")
     def followup_detail(cid: int):

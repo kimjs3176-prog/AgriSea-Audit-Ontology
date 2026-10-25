@@ -1,3 +1,6 @@
+import json
+
+import pytest
 from fastapi.testclient import TestClient
 
 from agrisea import external, followup
@@ -81,6 +84,7 @@ def test_track_all_on_sample_data(store):
 class _Resp:
     def __init__(self, data):
         self._data = data
+        self.text = json.dumps(data, ensure_ascii=False)
 
     def raise_for_status(self):
         pass
@@ -130,6 +134,24 @@ def test_external_bills_and_kstartup(tmp_path):
     assert ks_call["cond[pbanc_rcpt_bgng_dt::GTE]"] == "20250110"
 
 
+def test_parse_kstartup_envelopes():
+    row = {"pbanc_sn": "7", "biz_pbanc_nm": "가축분뇨 공고"}
+    assert external.parse_kstartup(json.dumps({"data": [row]})) == [row]
+    # 공공데이터포털 표준 봉투: 한 건이면 item이 객체로 온다
+    one = {"response": {"header": {"resultCode": "00"}, "body": {"items": {"item": row}, "totalCount": 1}}}
+    assert external.parse_kstartup(json.dumps(one)) == [row]
+    many = {"response": {"header": {"resultCode": "00"}, "body": {"items": [row, row]}}}
+    assert len(external.parse_kstartup(json.dumps(many))) == 2
+    xml = '<response><header><resultCode>00</resultCode></header><body><items><item>' \
+          '<col name="pbanc_sn">7</col><col name="biz_pbanc_nm">가축분뇨 공고</col></item></items></body></response>'
+    assert external.parse_kstartup(xml) == [row]
+    with pytest.raises(RuntimeError, match="SERVICE_KEY"):
+        external.parse_kstartup("<OpenAPI_ServiceResponse><cmmMsgHeader><returnAuthMsg>SERVICE_KEY_IS_NOT_REGISTERED_ERROR"
+                                "</returnAuthMsg><returnReasonCode>30</returnReasonCode></cmmMsgHeader></OpenAPI_ServiceResponse>")
+    with pytest.raises(RuntimeError):
+        external.parse_kstartup(json.dumps({"response": {"header": {"resultCode": "30", "resultMsg": "키 오류"}}}))
+
+
 def test_external_skips_and_masks_keys(tmp_path):
     item = {"date": "2025-01-10", "laws": [], "keywords": ["가축분뇨"], "action": "report"}
     out = external.external_evidence(Settings(api_key="", kstartup_key="", data_dir=tmp_path), item)
@@ -174,4 +196,8 @@ def test_followup_endpoints(tmp_path, monkeypatch):
     c.get(f"/api/followups/{manure['id']}/external")
     assert len(calls) == 1
     assert c.get(f"/api/followups/{manure['id']}").json()["status"] == "progress"
-    assert next(x for x in c.get("/api/followups").json()["items"] if x["id"] == manure["id"])["checked"]
+    # 목록도 외부 근거까지 반영한 상태로 세고 거른다
+    d = c.get("/api/followups").json()
+    row = next(x for x in d["items"] if x["id"] == manure["id"])
+    assert row["checked"] and row["status"] == "progress"
+    assert d["counts"]["reraised"] == 0 and d["counts"]["progress"] == 1

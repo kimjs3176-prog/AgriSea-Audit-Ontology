@@ -10,7 +10,9 @@
 """
 from __future__ import annotations
 
+import json
 import re
+import xml.etree.ElementTree as ET
 from dataclasses import replace
 from datetime import datetime, timezone
 from typing import Any
@@ -89,6 +91,49 @@ def bills(settings: Settings, law: str, since: str, http: requests.Session | Non
 
 
 # ── 지원사업 공고(K-Startup) ───────────────────────────────
+def parse_kstartup(text: str) -> list[dict[str, Any]]:
+    """K-Startup 응답의 레코드 목록. 공공데이터포털은 JSON(`data` 또는 `response.body.items.item`)과
+    XML(`<item><col name=…>` 또는 `<item><필드>`)을 섞어 돌려준다(support-radar/radar/kstartup.py와 같은 규칙)."""
+    body = (text or "").strip().lstrip("\ufeff")
+    if not body:
+        raise RuntimeError("K-Startup 빈 응답")
+    if body.startswith("<"):
+        try:
+            root = ET.fromstring(body)
+        except ET.ParseError:
+            raise RuntimeError(f"K-Startup XML 해석 실패: {body[:120]}") from None
+        auth = root.find(".//returnAuthMsg")  # 공공데이터포털 게이트웨이 오류(인증키 등)
+        if auth is not None:
+            raise RuntimeError(f"공공데이터포털 오류 {root.findtext('.//returnReasonCode') or ''}: {auth.text}")
+        code = root.findtext(".//resultCode")
+        if code and code not in ("00", "0", "200", "INFO-000"):
+            raise RuntimeError(f"K-Startup 오류 {code}: {root.findtext('.//resultMsg') or ''}")
+        rows = []
+        for item in root.iter("item"):
+            cols = item.findall("col")
+            rows.append({c.get("name", ""): (c.text or "") for c in cols} if cols
+                        else {child.tag: (child.text or "") for child in item})
+        return rows
+    try:
+        doc = json.loads(body)
+    except ValueError:
+        raise RuntimeError(f"K-Startup 응답 해석 실패: {body[:120]}") from None
+    if isinstance(doc, dict) and "data" in doc:
+        data = doc["data"] or []
+    elif isinstance(doc, dict) and "response" in doc:
+        header = doc["response"].get("header", {})
+        if header.get("resultCode") not in (None, "00", "0"):
+            raise RuntimeError(f"K-Startup 오류 {header.get('resultCode')}: {header.get('resultMsg', '')}")
+        items = doc["response"].get("body", {}).get("items") or {}
+        data = items.get("item", []) if isinstance(items, dict) else items
+        data = [data] if isinstance(data, dict) else data
+    elif isinstance(doc, dict) and "code" in doc and "msg" in doc:
+        raise RuntimeError(f"K-Startup 오류 {doc.get('code')}: {doc.get('msg')}")
+    else:
+        raise RuntimeError(f"K-Startup 응답 형식을 알 수 없음: {body[:120]}")
+    return [d for d in data if isinstance(d, dict)]
+
+
 def kstartup(api_key: str, keyword: str, since: str, http: requests.Session | None = None) -> list[dict]:
     """since 이후 접수를 시작한, 공고명에 keyword가 들어간 공고. 서버가 조건 검색을 무시해도 받은 뒤 다시 거른다."""
     http = http or requests.Session()
@@ -97,13 +142,8 @@ def kstartup(api_key: str, keyword: str, since: str, http: requests.Session | No
               "cond[pbanc_rcpt_bgng_dt::GTE]": since.replace("-", "")}
     resp = http.get(KSTARTUP_URL, params=params, timeout=(5.0, 20.0))
     resp.raise_for_status()
-    try:
-        data = resp.json()
-    except ValueError:
-        raise RuntimeError("K-Startup 응답이 JSON이 아닙니다(인증키·요청 형식 확인)") from None
-    rows = data.get("data") if isinstance(data, dict) else None
     out = []
-    for raw in rows or []:
+    for raw in parse_kstartup(resp.text):
         a = _norm(raw, KSTARTUP_FIELDS)
         a["start"], a["end"] = normalize_date(a["start"]), normalize_date(a["end"])
         if keyword in a["title"] and a["start"] >= since:
