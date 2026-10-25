@@ -210,6 +210,7 @@ def external_evidence(settings: Settings, item: dict, http: requests.Session | N
             src.update(status="error", message=_mask(str(e), settings.kstartup_key))
     sources.append(src)
 
+    # 자르지 않는다: 뒤늦게 가결된 의안처럼 판정을 바꾸는 근거가 잘려 나가면 안 된다(출처별 조회 건수가 이미 상한)
     evidence.sort(key=lambda e: e["date"] or "")
     return {"fetched_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-            "sources": sources, "evidence": evidence[:12]}
+            "sources": sources, "evidence": evidence}

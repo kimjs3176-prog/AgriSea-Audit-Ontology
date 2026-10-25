@@ -57,6 +57,12 @@ def test_verdict_rules():
     assert followup.verdict("2025-01-01", [], "2025-12-01") == "none"
 
 
+def test_started_work_is_progress_not_done():
+    assert not followup.DONE.search("사육밀도 기준 개정 작업에 착수했습니다")
+    assert followup.PROGRESS.search("사육밀도 기준 개정 작업에 착수했습니다")
+    assert followup.DONE.search("사육밀도 기준 개정을 완료했습니다")
+
+
 def test_track_all_finds_done_progress_and_reraised(tmp_path):
     r = followup.track_all(_tracked_store(tmp_path))
     by = {x["laws"][0] if x["laws"] else x["keywords"][0]: x for x in r["items"]}
@@ -132,6 +138,22 @@ def test_external_bills_and_kstartup(tmp_path):
     assert bill_call["BILL_NAME"] == "축산법" and bill_call["AGE"] == "22"
     ks_call = next(p for u, p in http.calls if "data.go.kr" in u)
     assert ks_call["cond[pbanc_rcpt_bgng_dt::GTE]"] == "20250110"
+
+
+def test_external_keeps_late_completion_beyond_many_records(tmp_path):
+    """앞선 계류 의안이 많아도 뒤늦게 가결된 의안(판정을 바꾸는 근거)을 잘라 내지 않는다."""
+    rows = [{"BILL_NO": str(i), "BILL_NAME": "축산법 일부개정법률안", "PROPOSE_DT": f"2025-02-{i + 1:02d}",
+             "PROC_RESULT": None} for i in range(14)]
+    rows.append({"BILL_NO": "99", "BILL_NAME": "축산법 일부개정법률안", "PROPOSE_DT": "2025-09-01", "PROC_RESULT": "원안가결"})
+
+    class Http:
+        def get(self, url, params=None, timeout=None):
+            return _Resp({"nzmimeepazxkubdpn": [{"head": [{"list_total_count": len(rows)}]}, {"row": rows}]})
+
+    item = {"id": 1, "date": "2025-01-10", "laws": ["축산법"], "keywords": [], "action": "law"}
+    out = external.external_evidence(Settings(api_key="K", data_dir=tmp_path), item, Http())
+    assert len(out["evidence"]) == 15
+    assert followup.verdict(item["date"], out["evidence"], "2025-12-01") == "done"
 
 
 def test_parse_kstartup_envelopes():

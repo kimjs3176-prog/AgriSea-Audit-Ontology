@@ -1876,7 +1876,10 @@ async function checkFollowupExternal(id, refresh){
     if(fuState.sel !== id) return;
     renderFollowup(x);
     const row = fuState.data?.items.find(r => r.id === id);
-    if(row && row.status !== x.status){ row.status = x.status; row.status_label = x.status_label }
+    if(row && row.status !== x.status){   // 상태가 바뀌면 위쪽 상태별 개수·막대도 함께 고친다
+      fuState.data.counts[row.status]--; fuState.data.counts[x.status]++;
+      row.status = x.status; row.status_label = x.status_label; renderFuStatus();
+    }
     if(row){ row.checked = true; row.n_evidence = x.evidence.length; renderFuList() }
   }catch(e){ toast("외부 근거 확인 실패: " + e.message); if(b){ b.disabled = false; b.textContent = "다시 시도" } }
 }
