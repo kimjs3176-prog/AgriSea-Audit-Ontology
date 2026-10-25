@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# 기관망 서버용 GitLab 미러: GitHub 원본의 main·governance-log 를 기관 GitLab 으로 밀어 넣는다.
-# GitHub 호스트 러너는 gitlab.aigov.go.kr 에 접속하지 못하므로, 두 곳 모두 접속되는 기관망 서버에서 cron 으로 돌린다.
+# GitLab 미러: GitHub 원본의 main·governance-log 를 기관 GitLab 으로 밀어 넣는다.
+# GitHub 호스트 러너(해외)는 gitlab.aigov.go.kr 에 접속하지 못하므로, 두 곳 모두 접속되는 국내 PC·서버에서 cron 으로 돌린다.
 #   GITLAB_TOKEN=... scripts/mirror-gitlab.sh
 #   */30 * * * * GITLAB_TOKEN=... /path/to/mirror-gitlab.sh >> /var/log/ax-mirror.log 2>&1
 # 원본 저장소가 비공개면 GITHUB_TOKEN(contents 읽기)도 지정한다.
