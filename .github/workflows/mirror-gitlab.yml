@@ -1,3 +1,8 @@
+# GitLab 미러: main·governance-log 를 기관 GitLab(gitlab.aigov.go.kr)에 그대로 밀어 넣는다(GitHub가 원본).
+# 기관 GitLab은 GitHub 호스트 러너(해외)에서 접속되지 않는다(443 연결 시간 초과).
+# 기관망 안 서버에 self-hosted 러너를 등록하고, 저장소 Variables 에 MIRROR_RUNNER 를 그 러너 라벨(예: self-hosted)로 지정한다.
+# 러너를 둘 수 없으면 기관망 서버에서 scripts/mirror-gitlab.sh 를 cron 으로 돌린다.
+# 저장소 Settings > Secrets and variables > Actions 에 GITLAB_TOKEN(write_repository) 을 등록해야 한다.
 name: GitLab 미러
 on:
   push:
@@ -10,10 +15,20 @@ on:
 concurrency: gitlab-mirror
 jobs:
   mirror:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.MIRROR_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
+      - name: GitLab 접속 확인
+        env:
+          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+        run: |
+          if [ -z "$GITLAB_TOKEN" ]; then echo "::error::GITLAB_TOKEN secret이 없습니다."; exit 1; fi
+          if ! curl -sS -o /dev/null --connect-timeout 15 https://gitlab.aigov.go.kr/; then
+            echo "::error::이 러너(${RUNNER_NAME})에서 gitlab.aigov.go.kr 에 접속할 수 없습니다. 기관망 안 self-hosted 러너를 Variables 의 MIRROR_RUNNER 로 지정하세요."
+            exit 1
+          fi
       - name: GitLab으로 푸시
         env:
           GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
