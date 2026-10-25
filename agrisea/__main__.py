@@ -70,6 +70,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("stats", help="적재 현황")
     gr = sub.add_parser("governance-run", help="운영 관문 G1: 자동 판정 실행 기록을 원장에 남김(자동 수집 직후)")
     gr.add_argument("--trigger", default="자동 수집")
+    gr.add_argument("--force", action="store_true", help="같은 판정 결과·정책이어도 다시 기록")
 
     s = sub.add_parser("search", help="발언 전문검색")
     s.add_argument("query", nargs="+")
@@ -165,21 +166,19 @@ def main(argv: list[str] | None = None) -> int:
         g = rebuild_graph(store, settings)
         print(f"트리플 {len(g)}개 → {settings.graph_path}")
     elif args.cmd == "governance-run":
-        from collections import Counter
-
         from . import governance as gov
         from .followup import track_all
         from .pipeline import seed_meta
         ledger = gov.ledger_from_env(settings.data_dir, serverless=False)
         pol = gov.active_policy(ledger.events())
         d = track_all(store, pol)
-        paths = Counter(gov.route(gov.case_id(x), gov.assess(x, pol), pol) for x in d["items"])
-        ev = ledger.append("run", "AI 판정", "system", {
-            "trigger": args.trigger, "data_hash": seed_meta().get("hash") or "local", "as_of": d["as_of"],
-            "policy_version": pol["version"], "cases": len(d["items"]), "vague": d["vague"],
-            "paths": dict(paths), "statuses": d["counts"]})
-        print(json.dumps({"seq": ev["seq"], "hash": ev["hash"][:12], "storage": ledger.sink.kind,
-                          **ev["payload"]}, ensure_ascii=False))
+        payload = gov.run_payload(d, pol, seed_meta().get("hash") or "local", args.trigger)
+        if gov.has_run(ledger.events(), payload["output_hash"], pol["version"]) and not args.force:
+            print(json.dumps({"skipped": "같은 판정 결과·정책의 실행 기록이 이미 있음", **payload}, ensure_ascii=False))
+        else:
+            ev = ledger.append("run", "AI 판정", "system", payload)
+            print(json.dumps({"seq": ev["seq"], "hash": ev["hash"][:12], "storage": ledger.sink.kind,
+                              **ev["payload"]}, ensure_ascii=False))
     elif args.cmd == "stats":
         print(json.dumps(store.stats(), ensure_ascii=False, indent=2))
     elif args.cmd == "search":

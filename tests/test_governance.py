@@ -150,6 +150,10 @@ def client(tmp_path, monkeypatch):
 H = lambda tok: {"X-Agrisea-Token": tok}
 
 
+def fp_of(c, cid):
+    return c.get(f"/api/governance/cases/{cid}").json()["gov"]["fingerprint"]
+
+
 def test_gate_flow_review_rollback_evaluation_institution(client, monkeypatch):
     c = client
     st = c.get("/api/governance/status").json()
@@ -180,23 +184,28 @@ def test_gate_flow_review_rollback_evaluation_institution(client, monkeypatch):
     from agrisea.followup import STATUS
     assert c.get(f"/api/followups/{manure['id']}").json()["status_desc"] == STATUS["none"][1]  # 설명도 정정 판정 기준
     assert c.post(f"/api/governance/cases/{manure['id']}/decision", headers=H("r1"),
-                  json={"action": "approve"}).status_code == 409  # 이미 결정됨
-
-    c.post(f"/api/governance/cases/{hen['id']}/decision", headers=H("r2"), json={"action": "approve"})
+                  json={"action": "approve", "fingerprint": fp}).status_code == 409  # 이미 결정됨
+    assert c.post(f"/api/governance/cases/{hen['id']}/decision", headers=H("r2"),
+                  json={"action": "approve"}).status_code == 400  # 검토한 판정의 지문 없이 결정 불가
+    hen_fp = fp_of(c, hen["id"])
+    c.post(f"/api/governance/cases/{hen['id']}/decision", headers=H("r2"), json={"action": "approve", "fingerprint": hen_fp})
 
     # G5: 롤백 — 남의 결정은 관리자만, 사유 필수
     assert c.post(f"/api/governance/cases/{hen['id']}/rollback", headers=H("r1"), json={"reason": "x"}).status_code == 403
     assert c.post(f"/api/governance/cases/{hen['id']}/rollback", headers=H("a1"), json={}).status_code == 400
     rb = c.post(f"/api/governance/cases/{hen['id']}/rollback", headers=H("a1"), json={"reason": "근거 재확인"})
     assert rb.json()["case"]["gov"]["state"] == "pending_review"
-    c.post(f"/api/governance/cases/{hen['id']}/decision", headers=H("r2"), json={"action": "approve"})
+    c.post(f"/api/governance/cases/{hen['id']}/decision", headers=H("r2"), json={"action": "approve", "fingerprint": hen_fp})
 
     # G6: 평가 데이터
     m = c.get("/api/governance/metrics").json()
     assert m["reviewed"] == 2 and m["agreement"]["rate"] == 0.5 and m["rollbacks"] == 1
     assert m["confusion"] == {"reraised": {"none": 1}, "done": {"done": 1}} and m["reasons"] == {"keyword": 1}
-    lines = c.get("/api/governance/dataset.jsonl").text.strip().splitlines()
-    assert len(lines) == 2 and {json.loads(x)["agree"] for x in lines} == {True, False}
+    assert m["exceptions"] == {"rolled_back": 1}
+    rows = [json.loads(x) for x in c.get("/api/governance/dataset.jsonl").text.strip().splitlines()]
+    # 롤백된 결정도 예외 기록으로 남는다(사유 포함), 지표에는 유효 결정만
+    assert [r["outcome"] for r in rows] == ["active", "rolled_back", "active"]
+    assert rows[1]["rollback_reason"] == "근거 재확인" and {r["agree"] for r in rows} == {True, False}
     csv = c.get("/api/governance/dataset.csv").text
     assert csv.startswith("﻿case,") and "퇴비화" in csv
 
@@ -212,6 +221,8 @@ def test_gate_flow_review_rollback_evaluation_institution(client, monkeypatch):
     # 차단된 대상어를 빼면 그 약속은 대상이 드러나지 않아 추적에서 빠진다(정책 효과)
     assert fu["policy_version"] == 2 and fu["total"] == 1 and fu["vague"] == 1
     assert c.get(f"/api/followups/{manure['id']}").status_code == 404
+    m = c.get("/api/governance/metrics").json()  # 판정 대상에서 빠진 건의 결정은 일치율에서 뺀다
+    assert m["reviewed"] == 1 and m["removed"] == 1 and m["agreement"]["n"] == 1
     runs = c.get("/api/governance/ledger", params={"kind": "run"}).json()["events"]
     assert runs[0]["payload"]["policy_version"] == 2 and runs[0]["payload"]["trigger"] == "정책 적용 재판정"
 
@@ -237,6 +248,10 @@ def test_governance_cli_records_run(tmp_path, monkeypatch, settings):
     events = gov.FileSink(tmp_path / "gov.jsonl").load()
     assert events[-1]["kind"] == "run" and events[-1]["payload"]["trigger"] == "테스트"
     assert sum(events[-1]["payload"]["paths"].values()) == events[-1]["payload"]["cases"]
+    assert main(["governance-run"]) == 0  # 같은 판정 결과·정책이면 다시 기록하지 않음
+    assert len(gov.FileSink(tmp_path / "gov.jsonl").load()) == len(events)
+    assert main(["governance-run", "--force"]) == 0
+    assert len(gov.FileSink(tmp_path / "gov.jsonl").load()) == len(events) + 1
 
 
 def test_two_instances_cannot_double_decide_or_overwrite_policy(tmp_path, monkeypatch):
@@ -253,15 +268,17 @@ def test_two_instances_cannot_double_decide_or_overwrite_policy(tmp_path, monkey
     b.get("/api/governance/queue")  # B가 지금 원장을 읽어 캐시
     hen = next(x for x in q["items"] if x["ai_status"] == "done")
     manure = next(x for x in q["items"] if x["ai_status"] == "reraised")
+    ok = {"action": "approve", "fingerprint": fp_of(a, hen["id"])}
 
-    assert a.post(f"/api/governance/cases/{hen['id']}/decision", headers=H("r1"), json={"action": "approve"}).status_code == 200
-    late = b.post(f"/api/governance/cases/{hen['id']}/decision", headers=H("r2"), json={"action": "approve"})
+    assert a.post(f"/api/governance/cases/{hen['id']}/decision", headers=H("r1"), json=ok).status_code == 200
+    late = b.post(f"/api/governance/cases/{hen['id']}/decision", headers=H("r2"), json=ok)
     assert late.status_code == 409  # B의 낡은 캐시로는 통과했지만 기록 직전 최신 원장에서 막힘
     led = gov.FileSink(tmp_path / "run" / "governance.jsonl").load()
     assert sum(1 for e in led if e["kind"] == "decision") == 1 and gov.verify_chain(led)["ok"]
 
     a.post(f"/api/governance/cases/{manure['id']}/decision", headers=H("r1"), json={
-        "action": "reject", "final_status": "none", "reason": "keyword", "keywords": ["가축분뇨", "퇴비화"]})
+        "action": "reject", "final_status": "none", "reason": "keyword", "keywords": ["가축분뇨", "퇴비화"],
+        "fingerprint": fp_of(a, manure["id"])})
     b.app.state.ledger._loaded = 0  # B도 제안 두 개를 봄
     props = {p["value"]: p["id"] for p in b.get("/api/governance/proposals").json()["proposals"]}
     assert set(props) == {"가축분뇨", "퇴비화"}
@@ -273,3 +290,93 @@ def test_two_instances_cannot_double_decide_or_overwrite_policy(tmp_path, monkey
     b.app.state.ledger._loaded = 0
     again = b.post(f"/api/governance/proposals/{props['퇴비화']}/adopt", headers=H("a2"), json={})
     assert again.status_code in (404, 409)  # 이미 채택된 제안은 다시 채택하지 않음
+
+
+# ── 검증에서 드러난 결함의 회귀 테스트 ─────────────────────────
+def test_assertive_verdicts_always_escalate_and_sampling_survives_unrelated_revisions():
+    pol = dict(gov.DEFAULT_POLICY)
+    strong = [{"source": "minutes", "kind": "reraised", "score": 5, "date": "2025-01-01"},
+              {"source": "minutes", "kind": "reraised", "score": 6, "date": "2025-02-01"}]
+    reraised = {"id": 44333, "status": "reraised", "action": "review", "evidence": strong}
+    r = gov.assess(reraised, pol)
+    assert r["score"] < pol["risk_threshold"] and r["tier"] == "high" and "assertive" in {f["code"] for f in r["factors"]}
+    for i in range(50):  # 표본 추출 운과 무관하게 언제나 숙련자에게
+        assert gov.route(f"followup:{i}", r, {**pol, "version": i}) == "escalated"
+    quiet = gov.assess({"id": 1, "status": "none", "evidence": []}, pol)
+    v2 = {**pol, "version": 2, "keyword_block": ["시스템"]}
+    assert [gov.route(f"followup:{i}", quiet, pol) for i in range(300)] == \
+           [gov.route(f"followup:{i}", quiet, v2) for i in range(300)]  # 표본 무관 개정으로 표본이 섞이지 않음
+
+
+def test_repeated_overclaims_propose_escalating_that_verdict():
+    items = [{"id": i, "status": "progress", "evidence": [], "keywords": []} for i in range(2)]
+    led = gov.Ledger(gov.MemorySink())
+    for x in items:
+        led.append("decision", "검토자", "reviewer", {
+            "action": "reject", "ai_status": "progress", "final_status": "none", "reason": "overclaim",
+            "keywords": [], "fingerprint": gov.fingerprint(x), "path": "sampled", "policy_version": 1}, case=gov.case_id(x))
+    events = led.events()
+    p = next(p for p in gov.proposals(items, events, gov.active_policy(events)) if p["type"] == "escalate_status")
+    assert p["value"] == "progress" and len(p["support"]) == 2
+    new = gov.adopt(gov.active_policy(events), p)
+    assert new["escalate_statuses"] == ["done", "reraised", "progress"]
+    assert gov.assess(items[0], new)["tier"] == "high"
+    with pytest.raises(gov.LedgerConflict):
+        gov.adopt(new, p)
+
+
+def test_tampered_ledger_is_not_trusted_and_stops_writes(client, tmp_path):
+    c = client
+    manure = next(x for x in c.get("/api/governance/queue").json()["items"] if x["ai_status"] == "reraised")
+    assert c.post(f"/api/governance/cases/{manure['id']}/decision", headers=H("r1"), json={
+        "action": "reject", "final_status": "none", "reason": "keyword", "keywords": ["퇴비화"],
+        "fingerprint": fp_of(c, manure["id"])}).status_code == 200
+    path = tmp_path / "run" / "governance.jsonl"
+    events = gov.FileSink(path).load()
+    events[-1]["payload"]["final_status"] = "done"  # 결정 내용 바꿔치기
+    path.write_text("".join(json.dumps(e, ensure_ascii=False) + "\n" for e in events), encoding="utf-8")
+    c.app.state.ledger._loaded = 0
+
+    st = c.get("/api/governance/status").json()
+    assert st["chain"]["ok"] is False
+    row = c.get(f"/api/followups/{manure['id']}").json()
+    assert row["status"] == "reraised" and row["gov"]["state"] == "pending_review"  # 변조된 결정은 반영 안 함
+    hen = next(x for x in c.get("/api/governance/queue").json()["items"] if x["ai_status"] == "done")
+    r = c.post(f"/api/governance/cases/{hen['id']}/decision", headers=H("r1"),
+               json={"action": "approve", "fingerprint": fp_of(c, hen["id"])})
+    assert r.status_code == 503 and "깨져" in r.json()["detail"]
+    assert len(gov.FileSink(path).load()) == len(events)  # 깨진 원장에 덧붙이지 않음
+
+
+def test_decisions_need_durable_ledger_and_open_mode_is_local_only(tmp_path, monkeypatch):
+    monkeypatch.setenv("AGRISEA_REVIEWERS", "홍검토:r1")
+    monkeypatch.delenv("AGRISEA_ADMINS", raising=False)
+    monkeypatch.delenv("AGRISEA_GOV_GITHUB_REPO", raising=False)
+    s = _tracked_store(tmp_path)
+    c = TestClient(create_app(Settings(api_key="K", data_dir=tmp_path / "srv", serverless=True), s))
+    assert c.get("/api/governance/status").json()["durable"] is False
+    hen = next(x for x in c.get("/api/governance/queue").json()["items"] if x["ai_status"] == "done")
+    r = c.post(f"/api/governance/cases/{hen['id']}/decision", headers=H("r1"),
+               json={"action": "approve", "fingerprint": fp_of(c, hen["id"])})
+    assert r.status_code == 503 and "임시 저장소" in r.json()["detail"]  # 사라질 증거로 결정하지 않음
+
+    monkeypatch.delenv("AGRISEA_REVIEWERS")
+    app = create_app(Settings(api_key="K", data_dir=tmp_path / "local"), s)  # 토큰 없는 로컬 개발 모드
+    assert TestClient(app).get("/api/governance/status").json()["me"]["role"] == "admin"
+    remote = TestClient(app, client=("10.0.0.5", 50000))  # 0.0.0.0 으로 열었을 때 다른 컴퓨터
+    assert remote.get("/api/governance/status").json()["me"]["role"] == "viewer"
+
+
+def test_run_is_recorded_when_ai_output_changes(client):
+    c = client
+    c.get("/api/followups")
+    app = c.app
+    runs = lambda: [e for e in app.state.ledger.events() if e["kind"] == "run"]
+    assert len(runs()) == 1 and runs()[0]["payload"]["output_hash"]
+    st = app.state.store
+    d = st.kv_get("followups")
+    st.kv_set("followups", {**d, "items": d["items"][:1]})  # 화면 수집 등으로 판정 결과가 바뀜
+    c.get("/api/followups")
+    assert len(runs()) == 2 and runs()[-1]["payload"]["cases"] == 1
+    c.get("/api/followups")
+    assert len(runs()) == 2  # 같은 결과면 다시 기록하지 않음
