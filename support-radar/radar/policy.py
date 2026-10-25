@@ -77,12 +77,14 @@ def build_signals(agrisea_db: Path | str | None, extracts: Any = None) -> dict[s
         for r in rows:
             monthly_total[_month(r["date"])] += 1
     if extracts is not None:
+        # 회의록 서비스 DB에 있는 회의는 그쪽 전체 발언을 쓰고, 발췌는 그 밖의 회의만(중복 집계 방지)
+        from_extracts = set()
         for mid, m in extracts.meetings.items():
             if m["status"] == "parsed" and mid not in meeting_dates:
                 meeting_dates[mid], committees_by_meeting[mid] = m["date"], m.get("committee", "")
                 monthly_total[_month(m["date"])] += m.get("utterances", 0)
-        rows += [u for u in extracts.utterances if u["meeting_id"] in meeting_dates
-                 and committees_by_meeting[u["meeting_id"]] == u.get("committee", "")]
+                from_extracts.add(mid)
+        rows += [u for u in extracts.utterances if u["meeting_id"] in from_extracts]
         rows.sort(key=lambda r: (r["date"], r["meeting_id"], r.get("idx", 0)))
 
     acc: dict[str, dict[str, Any]] = {

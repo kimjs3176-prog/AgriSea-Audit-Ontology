@@ -113,3 +113,25 @@ def test_update_resumes_and_refetches(monkeypatch):
     assert client.calls[0] == "2025-10" and client.calls[-1] == date.today().isoformat()[:7]
     assert assembly.update(ext, limit=5, date_from="2025-10-01", date_to="2025-10-31",
                            refetch=True, progress=lambda _: None)["parsed"] == 1
+
+
+def test_failed_month_is_retried_later():
+    client = FakeClient({"2025-10": [meeting("A", "2025-10-01", "기획재정위원회")],
+                         "2025-11": [meeting("C", "2025-11-03", "정무위원회")]}, fail={"2025-10"})
+    ext = Extracts()
+    collect_meetings(ext, client, "2025-10-01", "2025-11-30", progress=lambda _: None)
+    assert "A" not in ext.meetings and ext.meta["failed_months"] == ["2025-10"]
+    # 다음 실행의 조회 기간이 뒤로 넘어가도 실패한 달을 다시 조회한다
+    client.fail.clear()
+    client.calls.clear()
+    collect_meetings(ext, client, "2025-11-20", "2025-12-05", progress=lambda _: None)
+    assert client.calls == ["2025-10", "2025-11", "2025-12"]
+    assert "A" in ext.meetings and ext.meta["failed_months"] == []
+
+
+def test_existing_meeting_gets_new_link():
+    ext = Extracts(meetings={"A": {"date": "2025-10-01", "title": "회의", "committee": "기획재정위원회",
+                                   "pdf_url": "", "link_url": "", "status": "metadata_only", "attempts": 0}})
+    client = FakeClient({"2025-10": [meeting("A", "2025-10-01", "기획재정위원회", url="https://record.assembly.go.kr/p?id=9")]})
+    assert collect_meetings(ext, client, "2025-10-01", "2025-10-31", progress=lambda _: None) == 0
+    assert ext.meetings["A"]["status"] == "pending" and ext.meetings["A"]["pdf_url"].endswith("id=9")

@@ -54,11 +54,13 @@ def test_build_signals(agrisea_db):
 def test_build_signals_with_other_committees(agrisea_db):
     from radar.assembly import Extracts
     ext = Extracts(meetings={
-        "M2": {"date": "2025-11-05", "title": "중복", "committee": "농림축산식품해양수산위원회", "status": "parsed",
-               "utterances": 5},
+        "M2": {"date": "2025-11-05", "title": "중복", "committee": "농림축산식품해양수산위원회", "status": "pending"},
         "X1": {"date": "2025-11-20", "title": "산자중기위 회의", "committee": "산업통상자원중소벤처기업위원회",
                "status": "pending"},
     })
+    # 회의록 서비스 DB에도 있는 회의(M2)가 발췌에도 들어 있어도 두 번 세지 않는다
+    ext.add_parsed("M2", [{"speaker_name": "가위원", "speaker_role": "위원", "speaker_type": "member", "org": "",
+                           "text": "스마트팜 질의입니까?", "is_question": True, "is_commitment": False}])
     ext.add_parsed("X1", [
         {"speaker_name": "마위원", "speaker_role": "위원", "speaker_type": "member", "org": "",
          "text": "스마트팜 창업기업 지원이 부족하지 않습니까? 다른 이야기입니다.", "is_question": True,
@@ -68,8 +70,9 @@ def test_build_signals_with_other_committees(agrisea_db):
         {"speaker_name": "사위원", "speaker_role": "위원", "speaker_type": "member", "org": "",
          "text": "주제와 무관한 발언입니다.", "is_question": False, "is_commitment": False},
     ])
-    assert len(ext.utterances) == 2 and ext.meetings["X1"]["utterances"] == 3
-    assert ext.utterances[0]["text"] == "스마트팜 창업기업 지원이 부족하지 않습니까?"   # 주제 문장만 발췌
+    assert len(ext.utterances) == 3 and ext.meetings["X1"]["utterances"] == 3
+    x1 = [u for u in ext.utterances if u["meeting_id"] == "X1"]
+    assert x1[0]["text"] == "스마트팜 창업기업 지원이 부족하지 않습니까?"   # 주제 문장만 발췌
     s = build_signals(agrisea_db, ext)
     assert s["source"]["meetings"] == 3 and s["source"]["committees"] == 2
     sf = s["topics"]["smartfarm"]

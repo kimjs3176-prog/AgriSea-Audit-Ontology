@@ -123,12 +123,18 @@ def _agrisea_ids(agrisea_db: Path | None) -> set[str]:
 
 def collect_meetings(ext: Extracts, client: Any, date_from: str, date_to: str, dae: str = "22",
                      skip_ids: set[str] = frozenset(), progress: Callable[[str], None] = print) -> int:
-    """회의 목록(전체 위원회)을 월 단위로 조회해 새 회의를 대기(pending)로 등록. 새로 등록한 건수."""
+    """회의 목록(전체 위원회)을 월 단위로 조회해 새 회의를 대기(pending)로 등록. 새로 등록한 건수.
+
+    조회에 실패한 달은 meta["failed_months"]에 남겨 다음 실행에서 다시 조회한다(조회 기간이 앞으로
+    넘어가도 빠지지 않게). 이미 등록된 회의는 목록 정보를 갱신하고, 회의록 링크가 없어 건너뛴 회의에
+    링크가 생기면 다시 받도록 대기로 돌린다.
+    """
     from agrisea.api_client import AssemblyAPIError
 
+    in_range = _months(date_from, date_to)
+    retry = [ym for ym in ext.meta.get("failed_months", []) if ym not in in_range]
     new, failed = 0, []
-    months = _months(date_from, date_to)
-    for ym in months:
+    for ym in sorted(retry) + in_range:
         try:
             meetings = client.committee_meetings(only_target=False, DAE_NUM=dae, CONF_DATE=ym)
         except AssemblyAPIError as e:
@@ -138,20 +144,26 @@ def collect_meetings(ext: Extracts, client: Any, date_from: str, date_to: str, d
             progress(f"[조회 실패] {ym}: {e.message}")
             continue
         for m in meetings:
-            if not (date_from <= m["date"] <= date_to):
+            if ym in in_range and not (date_from <= m["date"] <= date_to):
                 continue
             mid = m["meeting_id"]
-            if mid in ext.meetings:
+            links = {k: m.get(k, "") for k in ("pdf_url", "link_url")}
+            old = ext.meetings.get(mid)
+            if old:
+                old.update({k: v for k, v in links.items() if v},
+                           title=m["title"] or old["title"], committee=m.get("committee") or old.get("committee", ""))
+                if old["status"] == "metadata_only" and (old.get("pdf_url") or old.get("link_url")):
+                    old.update(status="pending", attempts=0)
                 continue
             ext.meetings[mid] = {
-                "date": m["date"], "title": m["title"], "committee": m.get("committee", ""),
-                "pdf_url": m.get("pdf_url", ""), "link_url": m.get("link_url", ""),
+                "date": m["date"], "title": m["title"], "committee": m.get("committee", ""), **links,
                 # 농해수위 회의는 회의록 서비스 데이터를 쓰므로 받지 않는다
                 "status": "agrisea" if mid in skip_ids else "pending", "attempts": 0,
             }
             new += 1
         progress(f"{ym}: 회의 {len(meetings)}건 조회")
-    if failed and len(failed) == len(months):
+    ext.meta["failed_months"] = failed
+    if failed and len(failed) == len(retry) + len(in_range):
         raise AssemblyAPIError("HTTP", "모든 달 조회 실패: 국회 API에 접속할 수 없습니다.")
     return new
 
