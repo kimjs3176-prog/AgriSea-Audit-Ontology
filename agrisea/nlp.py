@@ -4,6 +4,7 @@ from __future__ import annotations
 import math
 import re
 from collections import Counter
+from functools import lru_cache
 from typing import Iterable
 
 from .lexicon import ISSUES, match_issues
@@ -26,6 +27,8 @@ STOPWORDS = set("""
 않습니까 아닙니까 없습니까 있습니까 됩니까 무엇 어디 언제 왜 주십시오 바랍니다 국정감사 실시 다음 이상 올해 내년 이후 수준 대상 여쭙겠습니다 공감합니다
 대해서 관련해서 관련된 페이지 저희들 저희가 하고 하는데 해서 되는 있고 있는데 있다 같습니다 겁니다 거고요 그다음 그래서요
 하겠 위원님들 일부개정법률안 내용 의견 필요 사항 부분들 그렇지요 그렇죠 이게 그건 이건 뭐 여러 가지 거기에 여기에 위원님께서 차관님 차관 보고 설명
+제가 저는 저도 제는 가지고 있도록 그렇 그렇지 그러니까 그러니 그렇게요 것으 것이고 것이죠 위해서 주신 주시 주셔서 알기로는 이야기 이야기합니다
+말씀하신 말씀을 말씀드린 드린 드리 해요 하죠 거죠 거예요 건데 거든요 그래요 그러면은 아까 지금은 이번에 그때 그동안 얼마나 굉장히
 """.split())
 SENT_SPLIT = re.compile(r"(?<=[.?!])\s+")
 WORD = re.compile(r"[가-힣]{2,}|[A-Za-z][A-Za-z0-9]+|\d+(?:\.\d+)?%?")
@@ -33,6 +36,7 @@ WORD = re.compile(r"[가-힣]{2,}|[A-Za-z][A-Za-z0-9]+|\d+(?:\.\d+)?%?")
 _DOMAIN_TERMS = sorted({k for _, _, kws in ISSUES.values() for k in kws}, key=len, reverse=True)
 
 
+@lru_cache(maxsize=200_000)
 def strip_josa(tok: str) -> str:
     for e in ENDINGS:
         if tok.endswith(e) and len(tok) - len(e) >= 2:
@@ -111,7 +115,7 @@ def extractive_summary(text: str, n: int = 3, focus: Iterable[str] = ()) -> list
     scores = []
     for i, s in enumerate(sents):
         toks = tokenize(s)
-        if not toks:
+        if len(toks) < 3:  # '그래서 저는 제가 알기로는 그렇습니다' 같은 내용 없는 문장
             scores.append((0.0, i))
             continue
         base = sum(freq[t] for t in toks) / (len(toks) ** 0.6)

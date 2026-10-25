@@ -181,7 +181,7 @@ def external_evidence(settings: Settings, item: dict, http: requests.Session | N
     if not item.get("laws"):
         src.update(status="skipped", message="약속에 법률 이름이 없어 찾지 않음")
     elif not settings.api_key:
-        src.update(status="skipped", message="ASSEMBLY_API_KEY가 설정되지 않음")
+        src.update(status="skipped", message="이 서비스에서는 국회 의안 조회를 쓸 수 없음(인증키 미설정)")
     else:
         try:
             seen = set()
@@ -205,7 +205,7 @@ def external_evidence(settings: Settings, item: dict, http: requests.Session | N
     if item.get("action") not in ("budget", "improve", "review"):
         src.update(status="skipped", message="예산·지원·사업 약속이 아니어서 찾지 않음")
     elif not settings.kstartup_key:
-        src.update(status="skipped", message="KSTARTUP_API_KEY가 설정되지 않음")
+        src.update(status="skipped", message="이 서비스에서는 지원사업 공고 조회를 쓸 수 없음(인증키 미설정)")
     elif not terms:
         src.update(status="skipped", message="검색할 대상어가 없음")
     else:

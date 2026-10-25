@@ -40,3 +40,9 @@ def test_parse_minutes_structure():
     assert doc.utterances[5].org == "농촌진흥청"
     # 페이지 번호/시간 표기 제거
     assert "3" not in a.text.split() and "산회" not in doc.utterances[-1].text
+
+
+def test_clean_utterance_text_drops_pdf_glyph_residue():
+    from agrisea.parser import clean_utterance_text
+    raw = "지원 부탁드립니다. ਘ\x13\x11ੌ \x01 \x01 \x14 감사합니다. 민간단체에 ਘ\x13\x11ੌ 대한 지원\x07"
+    assert clean_utterance_text(raw) == "지원 부탁드립니다. 감사합니다. 민간단체에 대한 지원"

@@ -137,3 +137,13 @@ def test_fetch_minutes_uses_proxy(settings, monkeypatch):
     assert pipeline.fetch_minutes(s, settings, progress=lambda m: None) == 1
     assert calls == [("https://proxy.example/api/minutes-text", {"id": "52457"})]
     assert len(s.utterances(meeting_id="52457")) == 2
+
+
+def test_sample_data_never_mixes_into_real_minutes(tmp_path):
+    s = Store(":memory:")
+    c = TestClient(create_app(Settings(api_key="K", data_dir=tmp_path, serverless=True), s))
+    assert c.post("/api/admin/sample").status_code == 200       # 빈 환경의 시연용은 허용
+    s.conn.execute("UPDATE meetings SET is_sample=0 WHERE id=(SELECT MIN(id) FROM meetings)")
+    before = c.get("/api/stats").json()
+    r = c.post("/api/admin/sample")                              # 실제 회의록이 있으면 거부
+    assert r.status_code == 409 and c.get("/api/stats").json() == before

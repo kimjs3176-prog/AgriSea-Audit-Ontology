@@ -183,16 +183,27 @@ def summarize_meeting(store: Store, meeting_id: str) -> dict[str, Any]:
     }
 
 
+SUMMARY_POOL = 600  # 브리핑 요약 후보 발언 수 상한(응답 시간)
+
+
+def briefing_cache_key(org: str = "", issue: str = "", keyword: str = "", member: str = "",
+                       date_from: str = "", date_to: str = "", session: int | None = None) -> str:
+    """브리핑 결과 저장 키(kv). 조건 없는 전체 브리핑은 사전 계산해 seed에 싣는다."""
+    return "briefing:" + json.dumps([org, issue, keyword, member, date_from, date_to, session], ensure_ascii=False)
+
+
 def briefing(store: Store, org: str = "", issue: str = "", keyword: str = "",
              member: str = "", date_from: str = "", date_to: str = "",
              top: int = 10, session: int | None = None) -> dict[str, Any]:
     """국정감사 대비 브리핑: 대상(기관/쟁점/키워드/위원) 관련 과거 회의록을 모아 정리."""
-    utts = store.utterances(session=session)
     issue_ids = set()
     if issue:
         issue_ids = {iid for iid, (label, parent, _) in ISSUES.items()
                      if iid == issue or label == issue or parent == issue
                      or (parent and ISSUES[parent][0] == issue)}
+        if not issue_ids:
+            raise KeyError(f"쟁점 '{issue}'을(를) 찾을 수 없습니다.")
+    utts = store.utterances(session=session)
 
     def keep(u: dict) -> bool:
         if date_from and (u["meeting_date"] or "") < date_from:
@@ -221,10 +232,14 @@ def briefing(store: Store, org: str = "", issue: str = "", keyword: str = "",
         selected.extend(u for u in mu if u["speaker_type"] != "chair" and keep(u))
 
     commitments = [u for u in utts if u["is_commitment"] and keep(u)]
+    seen = {u["id"] for u in commitments}
     for p in selected_pairs:
         for a in p["answers"]:
-            if a["is_commitment"] and a not in commitments:
+            if a["is_commitment"] and a["id"] not in seen:
+                seen.add(a["id"])
                 commitments.append(a)
+    if org:  # 기관 브리핑의 약속 추적표는 그 기관이 한 약속만(다른 기관 답변이 섞이지 않게)
+        commitments = [u for u in commitments if u["org"] == org]
 
     timeline = Counter(u["meeting_date"] for u in selected)
     meetings_idx = {m["id"]: m for m in store.meetings(session=session)}
@@ -234,6 +249,12 @@ def briefing(store: Store, org: str = "", issue: str = "", keyword: str = "",
     members = Counter(p["question"]["speaker_name"] for p in selected_pairs)
     pairs_sorted = sorted(selected_pairs, key=_pair_score, reverse=True)
     all_text = " ".join(u["text"] for u in selected)
+    # 국감 준비에는 위원 질의·정부 답변이 핵심: 전문위원 보고보다 이들 발언에서 뽑는다.
+    # 조건이 넓으면(전체·대형 기관) 발언이 수만 건이라, 쟁점을 많이 다룬 발언 위주로 후보를 줄여 요약한다.
+    speakers = [u for u in selected if u["speaker_type"] in ("member", "official", "witness")] or selected
+    pool = sorted(speakers, key=lambda u: (len(u["issues"]), min(len(u["text"]), 1500)), reverse=True)[:SUMMARY_POOL]
+    pool.sort(key=lambda u: (u["meeting_date"] or "", u["meeting_id"], u["idx"]))
+    points = key_point_items(pool, 6) if all_text else []
 
     target = " / ".join(x for x in (org, issue and next(
         (ISSUES[i][0] for i in ISSUES if i == issue), issue), keyword, member) if x) or "전체"
@@ -246,11 +267,8 @@ def briefing(store: Store, org: str = "", issue: str = "", keyword: str = "",
         "key_issues": _issue_rank(selected),
         "keywords": [w for w, _ in keywords([all_text], 20, exclude=_names(utts))]
                     if all_text else [],
-        "key_points": extractive_summary(all_text, 6) if all_text else [],
-        # 국감 준비에는 위원 질의·정부 답변이 핵심: 전문위원 보고보다 이들 발언에서 뽑는다
-        "key_point_items": key_point_items(
-            [u for u in selected if u["speaker_type"] in ("member", "official", "witness")]
-            or selected, 6) if all_text else [],
+        "key_points": [p["text"] for p in points],
+        "key_point_items": points,
         "top_questions": [_pair_view(p) for p in pairs_sorted[:top]],
         # 추적표에는 무엇을 하겠다는지 드러나는 약속만('지적하신 취지에 공감합니다' 류 제외)
         "commitments": [v for v in (commitment_view(u) for u in
@@ -361,14 +379,15 @@ def issue_network(store: Store, min_weight: int = 1) -> dict:
 
 
 def issue_by_session(store: Store) -> dict:
-    """회기 × 쟁점 언급량(히트맵용). 하위 쟁점만 집계."""
+    """회기 × 쟁점 언급량(히트맵용). 가장 아래 단계 쟁점만 집계(하위가 없는 최상위 쟁점 포함)."""
+    parents = {p for _, p, _ in ISSUES.values() if p}
     rows = store.conn.execute(
         "SELECT m.session_no, u.issues_json FROM utterances u JOIN meetings m ON m.id=u.meeting_id "
         "WHERE m.session_no IS NOT NULL AND u.issues_json != '{}'").fetchall()
     matrix: dict[str, Counter] = defaultdict(Counter)
     for r in rows:
         for iid, n in json.loads(r["issues_json"]).items():
-            if ISSUES[iid][1]:
+            if iid not in parents:
                 matrix[iid][r["session_no"]] += n
     sessions = sorted({sn for c in matrix.values() for sn in c})
     order = sorted(matrix, key=lambda i: -sum(matrix[i].values()))

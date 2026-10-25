@@ -246,6 +246,8 @@ nav button.on{background:none;color:#fff;border-bottom-color:#7fd49a;font-weight
 main.wrap{padding-top:22px;padding-bottom:28px}
 .heat table{width:100%;min-width:640px}
 @media (min-width:861px){.two>.card:first-child{position:sticky;top:132px;max-height:calc(100vh - 150px);overflow:auto}}
+/* 좁은 화면: 목록은 상자 안에서 스크롤(수백 건 목록이 페이지를 끝없이 늘이지 않게), 상세는 그 아래 */
+@media (max-width:860px){.two>.card:first-child{max-height:45vh;overflow:auto}}
 .heat td{min-width:20px;height:26px}
 .card{border:1px solid color-mix(in oklab,var(--line) 70%,transparent);box-shadow:var(--shadow);padding:18px 20px;margin-bottom:16px}
 .grid{gap:16px}
@@ -403,8 +405,9 @@ h3{font-size:14.5px;color:var(--ink)}
 .tools{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:center}
 .tools select{max-width:260px}
 @media (max-width:760px){.tools{grid-template-columns:1fr 1fr}.tools input{grid-column:1/-1}.tools select{max-width:none}}
-.flowbar{display:flex;height:26px;border-radius:6px;overflow:hidden;gap:1px;background:var(--line);cursor:pointer;margin:12px 0 6px}
-.flowbar i{display:block;min-width:1px;background:color-mix(in oklab,var(--muted) 35%,var(--panel))}
+/* 발언이 수천 개여도 회의 전체가 한 줄에 들어가도록 간격·최소 폭 없이(있으면 넘친 뒷부분이 잘림) */
+.flowbar{display:flex;height:26px;border-radius:6px;overflow:hidden;background:var(--line);cursor:pointer;margin:12px 0 6px}
+.flowbar i{display:block;min-width:0;background:color-mix(in oklab,var(--muted) 35%,var(--panel))}
 .flowbar i.member{background:var(--member)} .flowbar i.gov{background:var(--gov)}
 .flowbar i.chair{background:color-mix(in oklab,var(--brand) 45%,var(--panel))}
 .flowbar i.promise{background:var(--warn)}
@@ -727,12 +730,14 @@ $("#session").onchange = () => {
 // ── 탭 ──
 // ── 주소(해시)로 화면 공유: #/meetings/회의ID, #/issues/쟁점ID, #/brief ──
 function setHash(h){ try{ history.replaceState(null, "", "#/" + h) }catch(e){} }
+// 좁은 화면에서는 목록 아래에 상세가 있으므로, 고르면 상세로 내려가 보여 준다
+function toDetail(sel){ if(matchMedia("(max-width:860px)").matches) $(sel)?.scrollIntoView({block: "start", behavior: "smooth"}) }
 function routeFromHash(){
   const [tab, id] = decodeURIComponent(location.hash.replace(/^#\/?/, "")).split("/");
-  if(tab === "meetings" && id){ gotoMeeting(id); return true }
-  if(tab === "issues" && id){ gotoIssue(id); return true }
+  if(tab === "meetings" && id){ gotoMeeting(id).then(() => toDetail("#mDetail")); return true }
+  if(tab === "issues" && id){ gotoIssue(id).then(() => toDetail("#iDetail")); return true }
   if(tab === "members" && id){ gotoMember(id); return true }
-  if(tab === "followups" && id){ openTab("followups", false); fuState.sel = +id; loadFollowups(); return true }
+  if(tab === "followups" && id){ openTab("followups", false); fuState.sel = +id; loadFollowups().then(() => toDetail("#fuDetail")); return true }
   if(["meetings", "issues", "members", "followups", "brief", "sparql"].includes(tab)){ openTab(tab); return true }
   return false;
 }
@@ -770,12 +775,13 @@ async function loadDash(){
   const kst = iso => { const d = new Date(iso); return isNaN(d) ? iso : new Date(d.getTime() + 9 * 3600e3).toISOString().slice(0, 16).replace("T", " ") };
   const upd = s.data_updated ? `데이터 갱신 ${esc(kst(s.data_updated))} (한국시간) · 자동 수집 하루 3회` : "자동 수집 데이터 없음";
   $("#noticeArea").innerHTML = s.samples ? `<div class="notice">가상 예시 회의록 ${s.samples}건이 포함되어 있습니다.</div>` : "";
+  $("#sampleBtn").hidden = s.meetings - s.samples > 0;  // 실제 회의록이 있으면 예시 데이터를 섞지 않는다
   const latest = SESSIONS[0];
   const renderHero = (topIssue, recentN) => { $("#kpis").innerHTML = `
     <div>
-      <div class="eyebrow">${latest ? esc(latest.label) : "회의록 현황"}</div>
+      <div class="eyebrow">회의록 현황 · 전체 회기</div>
       <div class="headline">${topIssue ? `가장 많이 다룬 쟁점은<br><em>${esc(topIssue)}</em>` : "농해수위 회의록 분석"}</div>
-      <div class="meta">${dot(s.date_min)} ~ ${dot(s.date_max)} · 회기 ${SESSIONS.length}개${recentN ? ` · 최근 회기 회의 ${recentN}건` : ""}<br>${upd}</div>
+      <div class="meta">${dot(s.date_min)} ~ ${dot(s.date_max)} · 회기 ${SESSIONS.length}개${recentN ? ` · 최근 회기(${esc(latest.label)}) 회의 ${recentN}건` : ""}<br>${upd}</div>
       <div class="qlinks">${[["meetings", "📄 회의록"], ["issues", "🧭 쟁점"], ["members", "👤 의원"], ["brief", "📋 국감 브리핑"]]
         .map(([t, l]) => `<button onclick="openTab('${t}')">${l}</button>`).join("")}</div>
     </div>
@@ -788,9 +794,11 @@ async function loadDash(){
   renderHero(null, 0);
 
   const [issues, trend, ov] = await Promise.all([api("/api/issues"), api("/api/issue-trend"), api("/api/overview")]);
-  const leaf = issues.filter(i => i.parent && i.count).sort((a, b) => b.count - a.count);
+  // 가장 아래 단계 쟁점끼리 비교(하위 쟁점이 없는 최상위 쟁점도 포함: '공공기관·예산·조직운영' 등)
+  const parents = new Set(issues.map(i => i.parent).filter(Boolean));
+  const leaf = issues.filter(i => i.count && !parents.has(i.id)).sort((a, b) => b.count - a.count);
   $("#rank").innerHTML = leaf.length ? barsHtml(leaf, {onclick: "gotoIssue"}) : '<div class="empty">데이터 없음</div>';
-  renderHero(leaf[0]?.label, latest ? ov.meetings.filter(m => m.session_no === latest.session_no).length : 0);
+  renderHero(leaf[0]?.label, latest?.meetings || 0);
   loadNet();
 
   $("#recent").innerHTML = ov.meetings.map(m => `
@@ -813,14 +821,15 @@ async function loadDash(){
       return `<td class="${pct > 58 ? "hi" : ""}" style="${v ? `background:color-mix(in oklab, var(--seq) ${pct.toFixed(0)}%, var(--panel))` : "border:1px dashed var(--line)"}"
         data-tip="${esc(SESS[c]?.label || "제" + c + "회")}<br><b>${esc(r.label)}</b> ${fmt(v)}회">${v || ""}</td>` }).join("")}<td class="tot">${fmt(r.recent)}</td></tr>`).join("")}</tbody></table>`
     : '<div class="empty">데이터 없음</div>';
+  $("#heat").scrollLeft = $("#heat").scrollWidth;  // 좁은 화면에서도 최근 회기(오른쪽)부터 보이게
 
   $("#recentCommit").innerHTML = ov.commitments.slice(0, 12).map(c => `
     <div class="ci"><div class="who"><b>${esc(c.speaker)}</b> · ${dot(c.date)} · <button class="link" onclick="gotoMeeting('${esc(c.meeting_id)}')">회의 보기</button></div>
       <div class="t">${esc(cut(c.text, 90))}</div>
       ${c.question ? `<div class="q">↳ ${esc(c.question.member)} 위원: ${esc(c.question.text)}</div>` : ""}</div>`).join("") || '<div class="empty">데이터 없음</div>';
 }
-function gotoIssue(id){ openTab("issues"); showIssue(id) }
-function gotoMeeting(id){ openTab("meetings"); showMeeting(id) }
+function gotoIssue(id){ openTab("issues"); return showIssue(id) }
+function gotoMeeting(id){ openTab("meetings"); return showMeeting(id) }
 // 회의록의 특정 발언으로: 전체 회의록 탭을 열고 그 발언까지 이동
 async function gotoUtt(id, idx){
   openTab("meetings"); await showMeeting(id);
@@ -867,7 +876,7 @@ function renderMeetingList(){
       <div class="t">${esc(meetingShort(m))}</div></div>`;
   }
   $("#mList").innerHTML = html || '<div class="empty">회의가 없습니다.</div>';
-  document.querySelectorAll("#mList .item").forEach(el => el.onclick = () => showMeeting(el.dataset.id));
+  document.querySelectorAll("#mList .item").forEach(el => el.onclick = () => showMeeting(el.dataset.id).then(() => toDetail("#mDetail")));
 }
 $("#mq").oninput = renderMeetingList;
 // '예.', '그렇습니다' 같은 짧은 맞장구 답변은 작게(대화 흐름은 보이되 눈길은 실질 답변으로)
@@ -1124,7 +1133,7 @@ function renderSearch(){
   const {r, q, filter} = searchState;
   const rows = r.results.filter(u => !filter || typeGroup(u.speaker_type) === filter);
   const byType = {}; r.results.forEach(u => byType[typeGroup(u.speaker_type)] = (byType[typeGroup(u.speaker_type)] || 0) + 1);
-  const bySess = {}; r.results.forEach(u => { if(u.session_no) bySess[u.session_no] = (bySess[u.session_no] || 0) + 1 });
+  const bySess = r.by_session || {};  // 일치하는 발언 전체 기준(목록은 관련도 상위만)
   const sessRows = Object.keys(bySess).map(Number).sort((a, b) => a - b).map(k => ({session: k, count: bySess[k]}));
   const byMeeting = {};
   rows.forEach(u => (byMeeting[u.meeting_id] ||= {date: u.meeting_date, title: u.meeting_title, session: u.session_no, items: []}).items.push(u));
@@ -1134,7 +1143,7 @@ function renderSearch(){
       <div class="points">${moreList(g.items.map(u => hitCard(u, q)), 3, "건", "points")}</div></div>`);
   selMeeting = null; document.querySelectorAll("#mList .item").forEach(el => el.classList.remove("sel"));
   $("#mDetail").innerHTML = `<div class="card">
-      <div><b>「${esc(q)}」</b> · ${scopeLabel()}에서 <b>${fmt(r.count)}</b>건 · 회의 ${Object.keys(byMeeting).length}건${r.count >= 100 ? " (관련도 상위 100건)" : ""}</div>
+      <div><b>「${esc(q)}」</b> · ${scopeLabel()}에서 <b>${fmt(r.total ?? r.count)}</b>건${(r.total ?? r.count) > r.count ? ` · 관련도 상위 ${fmt(r.count)}건 표시` : ""} · 회의 ${Object.keys(byMeeting).length}건</div>
       <div class="filterchips">${[["", "전체", r.results.length], ...Object.keys(TYPE_LABEL).filter(k => byType[k]).map(k => [k, TYPE_LABEL[k], byType[k]])]
         .map(([k, l, n]) => `<button class="${(filter || "") === k ? "on" : ""}" onclick="searchState.filter='${k}';renderSearch()">${l} ${fmt(n)}</button>`).join("")}</div>
       <div class="grid g2" style="margin-top:10px">
@@ -1148,7 +1157,8 @@ async function doSearch(){
   const p = new URLSearchParams({q, speaker_type: $("#qType").value, limit: 100});
   if(cur()) p.set("session", cur());
   $("#mDetail").innerHTML = '<div class="card empty">검색 중…</div>';
-  searchState = {r: await api("/api/search?" + p), q, filter: ""};
+  try{ searchState = {r: await api("/api/search?" + p), q, filter: ""} }
+  catch(e){ $("#mDetail").innerHTML = `<div class="card">검색 오류: ${esc(e.message)}</div>`; return }
   renderSearch();
 }
 $("#qBtn").onclick = doSearch; $("#q").onkeydown = e => { if(e.key === "Enter") doSearch() };
@@ -1166,15 +1176,18 @@ async function loadIssues(){
     tax.filter(t => t.parent === r.id).sort((a, b) => cnt(b.id) - cnt(a.id))
        .forEach(c => rows.push({id: c.id, label: c.label, count: cnt(c.id), indent: true}));
   }
-  $("#tree").innerHTML = barsHtml(rows, {onclick: "showIssue"});
+  $("#tree").innerHTML = barsHtml(rows, {onclick: "pickIssue"});
   markSelected();
   if(!selIssue){ const first = rows.find(r => r.indent && r.count); if(first) showIssue(first.id) }
 }
+function pickIssue(id){ return showIssue(id).then(() => toDetail("#iDetail")) }
 function markSelected(){ document.querySelectorAll("#tree .hit").forEach(el => el.classList.toggle("sel", el.dataset.key === selIssue)) }
 async function showIssue(id){
   selIssue = id; markSelected(); setHash("issues/" + id);
   $("#iDetail").innerHTML = '<div class="card empty">불러오는 중…</div>';
-  const d = await api(`/api/issues/${encodeURIComponent(id)}?` + sessParam());
+  let d;
+  try{ d = await api(`/api/issues/${encodeURIComponent(id)}?` + sessParam()) }
+  catch(e){ $("#iDetail").innerHTML = `<div class="card">오류: ${esc(e.message)}</div>`; return }
   const allSess = SESSIONS.map(s => s.session_no).sort((a, b) => a - b);
   const byS = Object.fromEntries(d.by_session.map(x => [x.session, x.count]));
   const cmax = Math.max(1, ...d.by_session.map(x => x.count));
@@ -1252,7 +1265,7 @@ function renderMemberList(){
       <div class="h">${chips(r.top_issues.slice(0, 2).map(i => i.label), "member")}${r.perspectives[0] ? `<span class="chip line">${esc(r.perspectives[0].label)}</span>` : ""}</div>
       ${r.keywords.length ? `<div class="h muted" style="font-size:12px">${esc(r.keywords.slice(0, 4).join(" · "))}</div>` : ""}</div>`).join("")
     || '<div class="empty">해당 의원이 없습니다.</div>';
-  document.querySelectorAll("#mbList .item").forEach(el => el.onclick = () => showMember(el.dataset.name));
+  document.querySelectorAll("#mbList .item").forEach(el => el.onclick = () => showMember(el.dataset.name).then(() => toDetail("#mbDetail")));
 }
 $("#mbq").oninput = renderMemberList;
 function gotoMember(name){ openTab("members", false); mbState.sel = name; loadMembers() }
@@ -1809,10 +1822,18 @@ const fuRows = () => (fuState.data?.items || []).filter(x => !fuState.status || 
 function renderFuStatus(){
   const d = fuState.data, total = d.total;
   $("#fuStatus").innerHTML = `<div class="fustat">${[["", "전체", total], ...Object.entries(d.statuses).map(([k, v]) => [k, v.label, d.counts[k]])]
-      .map(([k, l, n]) => `<button class="${fuState.status === k ? "on" : ""}" onclick="fuState.status='${k}';renderFuStatus();renderFuList()" ${k ? `data-tip="${esc(d.statuses[k].desc)}"` : ""}>
+      .map(([k, l, n]) => `<button class="${fuState.status === k ? "on" : ""}" onclick="fuState.status='${k}';renderFuStatus();renderFuList();fuKeepSelection()" ${k ? `data-tip="${esc(d.statuses[k].desc)}"` : ""}>
         ${k ? `<i style="background:${FU_COLOR[k]}"></i>` : ""}${esc(l)} <b>${fmt(n)}</b></button>`).join("")}</div>
     ${total ? stackBar(Object.entries(d.statuses).map(([k, v]) => ({label: v.label, value: d.counts[k], color: FU_COLOR[k]}))) : ""}
     <p class="muted" style="font-size:12px;margin:6px 0 0">회의록 기준일 ${dot(d.as_of)} · 무엇을 하겠다는지 드러나지 않는 약속("지적사항 반영하겠습니다" 등) ${fmt(d.vague)}건은 제외</p>`;
+}
+// 상태를 거른 뒤 보고 있던 약속이 목록에서 빠졌으면, 걸러진 목록의 첫 약속을 보여 준다(목록과 상세가 어긋나지 않게)
+function fuKeepSelection(){
+  const rows = fuRows();
+  if(!rows.some(x => x.id === fuState.sel)){
+    if(rows.length) showFollowup(rows[0].id);
+    else $("#fuDetail").innerHTML = '<div class="card empty">조건에 맞는 약속이 없습니다.</div>';
+  }
 }
 function renderFuList(){
   const rows = fuRows();
@@ -1821,7 +1842,7 @@ function renderFuList(){
       <div class="t fut">${esc(cut(x.text, 110))}</div>
       <div class="h muted" style="font-size:12px">${esc(x.action_label)}${x.laws.length ? " · " + esc(x.laws.join(", ")) : ""}${x.keywords.length ? " · " + esc(x.keywords.slice(0, 3).join(" · ")) : ""}</div></div>`).join("")
     || '<div class="empty">조건에 맞는 약속이 없습니다.</div>';
-  document.querySelectorAll("#fuList .item").forEach(el => el.onclick = () => showFollowup(+el.dataset.id));
+  document.querySelectorAll("#fuList .item").forEach(el => el.onclick = () => showFollowup(+el.dataset.id).then(() => toDetail("#fuDetail")));
 }
 function fuEvidence(e){
   const url = /^https?:\/\//.test(e.url || "") ? e.url : "";
@@ -1933,7 +1954,12 @@ function segShow(id, k){
 }
 $("#bBtn").onclick = async () => {
   $("#bOut").innerHTML = '<div class="card empty">만드는 중…</div>';
-  const b = await api("/api/briefing?" + briefParams()), c = b.counts;
+  let b;
+  $("#bBtn").disabled = true;
+  try{ b = await api("/api/briefing?" + briefParams()) }
+  catch(e){ $("#bOut").innerHTML = `<div class="card empty">브리핑을 만들지 못했습니다: ${esc(e.message)}</div>`; return }
+  finally{ $("#bBtn").disabled = false }
+  const c = b.counts;
   const orgs = {}; b.commitments.forEach(x => (orgs[x.org || "기타"] ||= []).push(x));
   $("#bOut").innerHTML = `
   <div class="grid kpis">${[["관련 회의", c.meetings], ["관련 발언", c.utterances], ["질의·답변", c.qa_pairs], ["구체적 정부 약속", b.commitments.length]].map(([l, v]) => `<div class="card stat"><span class="l">${l}</span><span class="v">${fmt(v)}</span></div>`).join("")}</div>
@@ -1966,8 +1992,13 @@ $("#bBtn").onclick = async () => {
   </div>`;
 };
 $("#bMd").onclick = async () => {
-  const md = await api("/api/briefing?format=md&" + briefParams());
-  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([md], {type: "text/markdown"})); a.download = "국감브리핑.md"; a.click();
+  const btn = $("#bMd"), label = btn.textContent;
+  btn.disabled = true; btn.textContent = "내려받는 중…";
+  try{
+    const md = await api("/api/briefing?format=md&" + briefParams());
+    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([md], {type: "text/markdown"})); a.download = "국감브리핑.md"; a.click();
+  }catch(e){ toast("내려받지 못했습니다: " + e.message) }
+  finally{ btn.disabled = false; btn.textContent = label }
 };
 
 // ── SPARQL ──

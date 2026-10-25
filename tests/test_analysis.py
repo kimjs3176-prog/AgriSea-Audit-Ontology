@@ -110,3 +110,26 @@ def test_key_point_items_carry_speaker(store):
     s = summarize_meeting(store, "SAMPLE-2025-1014")
     assert s["key_point_items"] and all(p["speaker"] for p in s["key_point_items"])
     assert set(s["composition"]) == {"member", "gov", "chair", "other"}
+
+
+def test_search_ignores_spacing_and_treats_wildcards_literally():
+    from agrisea.pipeline import load_sample
+    from agrisea.store import Store
+    s = Store(":memory:", fts=False)  # 배포 환경과 같은 LIKE 검색
+    load_sample(s)
+    row = s.search("쌀값")[0]
+    s.conn.execute("UPDATE utterances SET text=? WHERE id=?", ("가나다 라마바사 점검을 100% 완료_했습니다", row["id"]))
+    assert [r["id"] for r in s.search("가나다라마바사")] == [row["id"]]  # PDF 띄어쓰기 복원 차이 무시
+    assert all("100%" in r["text"] for r in s.search("100%"))            # %는 글자 그대로
+    assert [r["id"] for r in s.search("료_했")] == [row["id"]]             # _도 글자 그대로
+    assert s.search("\x00") == [] and s.search("%") == [r for r in s.search("%") if "%" in r["text"]]
+    st = s.search_stats("쌀값")
+    assert st["total"] == len(s.search("쌀값", limit=500)) and sum(st["by_session"].values()) <= st["total"]
+
+
+def test_briefing_unknown_issue_and_org_commitments(store):
+    import pytest
+    with pytest.raises(KeyError):
+        briefing(store, issue="없는쟁점")
+    b = briefing(store, org="해양수산부")
+    assert b["commitments"] and all(c["org"] == "해양수산부" for c in b["commitments"])
