@@ -156,6 +156,26 @@ def test_external_keeps_late_completion_beyond_many_records(tmp_path):
     assert followup.verdict(item["date"], out["evidence"], "2025-12-01") == "done"
 
 
+def test_external_reads_later_pages(tmp_path):
+    """맞는 공고·의안이 첫 쪽(100건) 뒤에 있어도 찾는다."""
+    filler = [{"pbanc_sn": i, "biz_pbanc_nm": "다른 공고", "pbanc_rcpt_bgng_dt": "20250301"} for i in range(100)]
+    hit = {"pbanc_sn": 999, "biz_pbanc_nm": "가축분뇨 퇴비화 지원 공고", "pbanc_rcpt_bgng_dt": "20250401"}
+    bills_p1 = [{"BILL_NO": str(i), "BILL_NAME": "다른법 일부개정법률안", "PROPOSE_DT": "2025-02-01"} for i in range(100)]
+    bill = {"BILL_NO": "777", "BILL_NAME": "축산법 일부개정법률안", "PROPOSE_DT": "2025-05-01", "PROC_RESULT": "원안가결"}
+
+    class Http:
+        def get(self, url, params=None, timeout=None):
+            if "assembly" in url:
+                rows = bills_p1 if params["pIndex"] == 1 else [bill]
+                return _Resp({"nzmimeepazxkubdpn": [{"head": [{"list_total_count": 101}]}, {"row": rows}]})
+            return _Resp({"data": filler if params["page"] == 1 else [hit]})
+
+    item = {"id": 1, "date": "2025-01-10", "laws": ["축산법"], "keywords": ["가축분뇨"], "action": "budget"}
+    out = external.external_evidence(Settings(api_key="K", kstartup_key="S", data_dir=tmp_path), item, Http())
+    assert {(e["source"], e["title"]) for e in out["evidence"]} == {
+        ("bill", "축산법 일부개정법률안"), ("kstartup", "가축분뇨 퇴비화 지원 공고")}
+
+
 def test_parse_kstartup_envelopes():
     row = {"pbanc_sn": "7", "biz_pbanc_nm": "가축분뇨 공고"}
     assert external.parse_kstartup(json.dumps({"data": [row]})) == [row]

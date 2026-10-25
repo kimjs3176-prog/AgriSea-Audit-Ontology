@@ -25,6 +25,8 @@ from .config import Settings
 BILL_API_URL = "https://open.assembly.go.kr/portal/openapi/nzmimeepazxkubdpn"
 KSTARTUP_URL = "https://apis.data.go.kr/B552735/kisedKstartupService01/getAnnouncementInformation01"
 TERM_22_START = "2024-05-30"
+# 요청 한 번(서버리스 60초 제한) 안에 끝나도록 출처마다 읽는 쪽 수의 상한
+BILL_PAGES, KSTARTUP_PAGES, PAGE_SIZE = 3, 5, 100
 
 BILL_FIELDS: dict[str, tuple[str, ...]] = {
     "name": ("BILL_NAME", "BILL_NM"),
@@ -80,9 +82,14 @@ def bills(settings: Settings, law: str, since: str, http: requests.Session | Non
     """since 이후 발의된, 이름에 law가 들어간 법률안."""
     age = "22" if since >= TERM_22_START else "21"
     client = AssemblyClient(replace(settings, api_url=BILL_API_URL), session=http, timeout=(5.0, 20.0), retries=1)
-    page = client.fetch_page(1, 100, AGE=age, BILL_NAME=law)
+    rows: list[dict] = []
+    for no in range(1, BILL_PAGES + 1):  # 개정안이 100건을 넘는 법률도 있어 여러 쪽을 읽는다
+        page = client.fetch_page(no, PAGE_SIZE, AGE=age, BILL_NAME=law)
+        rows += page.rows
+        if len(page.rows) < PAGE_SIZE or len(rows) >= page.total:
+            break
     out = []
-    for raw in page.rows:
+    for raw in rows:
         b = _norm(raw, BILL_FIELDS)
         b["date"] = normalize_date(b["date"])
         if law in b["name"] and b["date"] >= since:
@@ -137,13 +144,20 @@ def parse_kstartup(text: str) -> list[dict[str, Any]]:
 def kstartup(api_key: str, keyword: str, since: str, http: requests.Session | None = None) -> list[dict]:
     """since 이후 접수를 시작한, 공고명에 keyword가 들어간 공고. 서버가 조건 검색을 무시해도 받은 뒤 다시 거른다."""
     http = http or requests.Session()
-    params = {"serviceKey": api_key, "page": 1, "perPage": 50, "returnType": "json",
-              "cond[biz_pbanc_nm::LIKE]": keyword,
-              "cond[pbanc_rcpt_bgng_dt::GTE]": since.replace("-", "")}
-    resp = http.get(KSTARTUP_URL, params=params, timeout=(5.0, 20.0))
-    resp.raise_for_status()
+    rows: list[dict] = []
+    # 맞는 공고가 뒤쪽에 있을 수 있어 여러 쪽을 읽는다(조건 검색을 무시하는 경우에도 KSTARTUP_PAGES쪽까지)
+    for no in range(1, KSTARTUP_PAGES + 1):
+        params = {"serviceKey": api_key, "page": no, "perPage": PAGE_SIZE, "returnType": "json",
+                  "cond[biz_pbanc_nm::LIKE]": keyword,
+                  "cond[pbanc_rcpt_bgng_dt::GTE]": since.replace("-", "")}
+        resp = http.get(KSTARTUP_URL, params=params, timeout=(5.0, 20.0))
+        resp.raise_for_status()
+        page = parse_kstartup(resp.text)
+        rows += page
+        if len(page) < PAGE_SIZE:
+            break
     out = []
-    for raw in parse_kstartup(resp.text):
+    for raw in rows:
         a = _norm(raw, KSTARTUP_FIELDS)
         a["start"], a["end"] = normalize_date(a["start"]), normalize_date(a["end"])
         if keyword in a["title"] and a["start"] >= since:
