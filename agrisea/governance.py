@@ -37,6 +37,8 @@ DEFAULT_POLICY: dict[str, Any] = {
     "risk_threshold": 50,   # 이 점수 이상 → 숙련자 이관
     "sample_rate": 0.1,     # 저위험 중 표본 검증으로 돌릴 비율
     "keyword_block": [],    # 대상어로 쓰지 않을 말(오인으로 확인된 말)
+    # 이행·미이행을 단정하는 판정은 점수와 무관하게 숙련자 확인을 거친다(공개되면 기관 평가에 직결)
+    "escalate_statuses": ["done", "reraised"],
     "note": "초기 정책",
 }
 
@@ -71,7 +73,9 @@ EVENT_KINDS = {
     "run": "intake", "decision": "review", "rollback": "exception",
     "policy": "institution", "proposal_dismissed": "institution",
 }
-MIN_SUPPORT = 2  # 같은 대상어가 이만큼 거부 근거로 지목되면 차단 제안
+MIN_SUPPORT = 2  # 같은 대상어·같은 판정이 이만큼 거부되면 개정 제안
+STATUS_LABELS = {"done": "이행 보고", "progress": "진행 중", "reraised": "재지적", "early": "확인 기간 부족",
+                 "none": "근거 미확인", "excluded": "추적 제외(약속 아님)"}
 
 
 def now_iso() -> str:
@@ -95,6 +99,12 @@ def verify_chain(events: list[dict]) -> dict:
             return {"ok": False, "events": len(events), "broken_at": i}
         prev = ev["hash"]
     return {"ok": True, "events": len(events), "head": prev[:12] if prev else ""}
+
+
+def trusted(events: list[dict]) -> list[dict]:
+    """검증된 앞부분만: 해시 연결이 깨진 지점부터의 이벤트(결정·정책)는 판정에 반영하지 않는다."""
+    chain = verify_chain(events)
+    return events if chain["ok"] else events[:chain["broken_at"]]
 
 
 # ── 원장 저장소 ────────────────────────────────────────────
@@ -212,6 +222,10 @@ class LedgerConflict(Exception):
     """조건부 기록의 전제가 최신 원장에서 깨짐(다른 인스턴스가 먼저 결정·채택함)."""
 
 
+class LedgerBroken(Exception):
+    """원장의 해시 연결이 깨져(수정·삭제 흔적) 새 기록을 받지 않는다."""
+
+
 class Ledger:
     """추가 전용·해시 연결 원장. 읽기는 짧게 캐시하고(다른 인스턴스의 기록 반영), 쓰기는 저장소에 바로 커밋.
 
@@ -228,6 +242,11 @@ class Ledger:
         self.error = ""
 
     def events(self) -> list[dict]:
+        """판정에 쓰는 원장: 해시 연결이 검증된 앞부분(깨진 뒤의 결정·정책은 반영하지 않음)."""
+        return trusted(self.all_events())
+
+    def all_events(self) -> list[dict]:
+        """저장된 그대로(검증·열람용)."""
         with self._lock:
             if not self._loaded or time.time() - self._loaded > self.max_age:
                 try:
@@ -240,6 +259,9 @@ class Ledger:
     def append(self, kind: str, actor: str, role: str, payload: dict | Callable[[list[dict]], dict],
                case: str | None = None) -> dict:
         def build(events: list[dict]) -> dict:
+            chain = verify_chain(events)
+            if not chain["ok"]:
+                raise LedgerBroken(f"원장 해시 연결이 {chain['broken_at']}번 이벤트에서 깨져 기록을 멈췄습니다. 원장을 복구하세요.")
             body = payload(events) if callable(payload) else payload
             ev = {"seq": len(events), "ts": now_iso(), "kind": kind, "actor": actor, "role": role,
                   "case": case, "payload": body, "prev": events[-1]["hash"] if events else ""}
@@ -248,7 +270,7 @@ class Ledger:
         with self._lock:
             try:
                 self._events = self.sink.commit(build)
-            except LedgerConflict:
+            except (LedgerConflict, LedgerBroken):
                 self._loaded = 0.0  # 다음 읽기는 최신 원장으로
                 raise
             self._loaded = time.time()
@@ -321,7 +343,7 @@ def policy_from_file(path: str | None) -> dict:
     """사전 계산(자동 수집) 단계에서 쓸 정책: 원장 파일이 있으면 그 최신 정책."""
     if not path or not Path(path).exists():
         return dict(DEFAULT_POLICY)
-    return active_policy(FileSink(Path(path)).load())
+    return active_policy(trusted(FileSink(Path(path)).load()))
 
 
 # ── G2 위험평가 · G3 경로배정 ─────────────────────────────────
@@ -345,13 +367,17 @@ def assess(item: dict, policy: dict) -> dict:
             factors.append({"code": "weak", "label": "대상어 일치가 적은 근거", "points": 15})
         if ev and all(e.get("source") == "agenda" for e in ev):
             factors.append({"code": "agenda_only", "label": "의원 발의 안건만 근거(정부 조치 아님)", "points": 10})
+    must = item["status"] in policy.get("escalate_statuses", ())
+    if must:
+        factors.append({"code": "assertive", "label": "이행·미이행 단정 판정(숙련자 확인 필수)", "points": 0})
     score = min(100, sum(f["points"] for f in factors))
-    return {"score": score, "factors": factors, "tier": "high" if score >= policy["risk_threshold"] else "low"}
+    return {"score": score, "factors": factors, "tier": "high" if must or score >= policy["risk_threshold"] else "low"}
 
 
 def _sample(case_id: str, policy: dict) -> bool:
-    """표본 추출은 재현 가능해야 하므로(증거) 건 번호·정책 버전의 해시로 정한다."""
-    h = int(hashlib.sha256(f"{case_id}:{policy['version']}".encode()).hexdigest()[:8], 16)
+    """표본 추출은 재현 가능해야 하므로(증거) 건 번호·표본 비율의 해시로 정한다.
+    (정책 버전이 아니라 비율에 묶어, 표본과 무관한 개정으로 표본이 다시 섞이지 않게)"""
+    h = int(hashlib.sha256(f"{case_id}:{policy['sample_rate']}".encode()).hexdigest()[:8], 16)
     return (h % 10000) < policy["sample_rate"] * 10000
 
 
@@ -370,6 +396,24 @@ def fingerprint(item: dict) -> str:
 
 def case_id(item: dict) -> str:
     return f"followup:{item['id']}"
+
+
+def items_hash(items: list[dict]) -> str:
+    """AI 판정 결과의 해시(건·지문). 데이터나 판정 규칙이 바뀌면 달라져 G1 실행 기록을 새로 남긴다."""
+    return hashlib.sha256(_canon(sorted([case_id(x), fingerprint(x)] for x in items)).encode()).hexdigest()[:16]
+
+
+def run_payload(d: dict, policy: dict, data_hash: str, trigger: str) -> dict:
+    """G1 실행 기록: 무엇으로(데이터·정책) 무엇을(판정 결과 해시·경로별 건수) 냈는지."""
+    paths = Counter(route(case_id(x), assess(x, policy), policy) for x in d["items"])
+    return {"trigger": trigger, "data_hash": data_hash, "output_hash": items_hash(d["items"]), "as_of": d["as_of"],
+            "policy_version": policy["version"], "cases": len(d["items"]), "vague": d["vague"],
+            "paths": dict(paths), "statuses": d["counts"]}
+
+
+def has_run(events: list[dict], output_hash: str, policy_version: int) -> bool:
+    return any(e["kind"] == "run" and e["payload"].get("output_hash") == output_hash
+               and e["payload"].get("policy_version") == policy_version for e in events)
 
 
 # ── G4·G5 결정 접기 ───────────────────────────────────────────
@@ -418,23 +462,34 @@ def wilson(k: int, n: int, z: float = 1.96) -> tuple[float, float] | None:
     return (round((c - m) / d, 3), round((c + m) / d, 3))
 
 
+OUTCOMES = {"active": "유효", "rolled_back": "롤백됨", "superseded": "재검토로 대체됨"}
+
+
 def dataset(items: list[dict], events: list[dict], policy: dict) -> list[dict]:
-    """평가 데이터: 유효 결정 한 건이 한 줄(AI 판정 vs 숙련자 최종 판정)."""
+    """평가 데이터: 결정 한 건이 한 줄(AI 판정 vs 숙련자 최종 판정). 롤백·대체된 결정도 예외 기록으로 남긴다
+    (outcome). 일치율 등 지표는 유효(active)하고 지금 판정과 같은(stale 아님) 결정만 쓴다."""
     by_case = {case_id(x): x for x in items}
+    active = {st[-1]["seq"] for st in decision_stacks(events).values() if st}
+    rolled = {e["payload"].get("target"): e for e in events if e["kind"] == "rollback"}
     rows = []
-    for cid, stack in decision_stacks(events).items():
-        if not stack:
+    for d in events:
+        if d["kind"] != "decision":
             continue
-        d = stack[-1]
+        cid = d["case"]
         x = by_case.get(cid)
         p = d["payload"]
+        outcome = "active" if d["seq"] in active else "rolled_back" if d["seq"] in rolled else "superseded"
         rows.append({
             "case": cid, "decision_seq": d["seq"], "decided_at": d["ts"], "reviewer": d["actor"],
             "path": p.get("path"), "risk_score": p.get("risk_score"), "risk_factors": p.get("risk_factors"),
             "policy_version": p.get("policy_version"), "ai_status": p.get("ai_status"),
             "final_status": p.get("final_status"), "agree": p.get("action") == "approve",
             "reason": p.get("reason"), "flagged_keywords": p.get("keywords", []),
-            "stale": bool(x) and p.get("fingerprint") != fingerprint(x),
+            "outcome": outcome,
+            "rollback_reason": rolled[d["seq"]]["payload"].get("reason") if outcome == "rolled_back" else None,
+            # 판정이 바뀌었거나(재검토 필요) 정책 개정으로 판정 대상에서 빠진 건의 결정은 지표에서 뺀다
+            "removed": x is None,
+            "stale": x is None or p.get("fingerprint") != fingerprint(x),
             "org": x and x.get("org"), "action": x and x.get("action"), "promise_date": x and x.get("date"),
         })
     return sorted(rows, key=lambda r: r["decision_seq"])
@@ -443,7 +498,8 @@ def dataset(items: list[dict], events: list[dict], policy: dict) -> list[dict]:
 def metrics(items: list[dict], events: list[dict], policy: dict) -> dict:
     stacks = decision_stacks(events)
     views = [case_view(x, policy, stacks.get(case_id(x), [])) for x in items]
-    rows = [r for r in dataset(items, events, policy) if not r["stale"]]
+    data = dataset(items, events, policy)
+    rows = [r for r in data if r["outcome"] == "active" and not r["stale"]]
     paths = Counter(v["path"] for v in views)
     states = Counter(v["state"] for v in views)
 
@@ -471,6 +527,8 @@ def metrics(items: list[dict], events: list[dict], policy: dict) -> dict:
         "reasons": dict(Counter(r["reason"] for r in rows if r["reason"])),
         "by_policy_version": {v: agree(rs) for v, rs in sorted(by_version.items())},
         "rollbacks": sum(1 for e in events if e["kind"] == "rollback"),
+        "exceptions": dict(Counter(r["outcome"] for r in data if r["outcome"] != "active")),
+        "removed": sum(1 for r in data if r["outcome"] == "active" and r["removed"]),
         "policies_adopted": sum(1 for e in events if e["kind"] == "policy"),
         "runs": sum(1 for e in events if e["kind"] == "run"),
     }
@@ -484,7 +542,7 @@ def _pid(kind: str, value: Any) -> str:
 def proposals(items: list[dict], events: list[dict], policy: dict) -> list[dict]:
     """쌓인 예외에서 규칙 개정안을 만든다(채택·기각된 제안은 다시 내지 않는다)."""
     closed = closed_proposals(events)
-    rows = [r for r in dataset(items, events, policy) if not r["stale"]]
+    rows = [r for r in dataset(items, events, policy) if r["outcome"] == "active" and not r["stale"]]
     out = []
     support: dict[str, list[int]] = defaultdict(list)
     for r in rows:
@@ -497,6 +555,19 @@ def proposals(items: list[dict], events: list[dict], policy: dict) -> list[dict]
                         "title": f"대상어 「{kw}」 차단",
                         "rationale": f"숙련자 거부 {len(seqs)}건에서 엉뚱한 근거를 끌어온 말로 지목됨",
                         "support": seqs, "change": {"keyword_block": policy["keyword_block"] + [kw]}})
+    # 같은 판정 종류가 과대·과소로 거듭 거부되면 그 판정을 항상 숙련자에게 이관
+    misjudged: dict[str, list[int]] = defaultdict(list)
+    for r in rows:
+        if (not r["agree"] and r["reason"] in ("overclaim", "underclaim")
+                and r["ai_status"] not in policy["escalate_statuses"]):
+            misjudged[r["ai_status"]].append(r["decision_seq"])
+    for st, seqs in sorted(misjudged.items(), key=lambda x: -len(x[1])):
+        if len(seqs) >= MIN_SUPPORT:
+            label = STATUS_LABELS.get(st, st)
+            out.append({"id": _pid("escalate_status", st), "type": "escalate_status", "value": st,
+                        "title": f"판정 「{label}」 항상 숙련자 이관",
+                        "rationale": f"AI가 「{label}」로 판정한 건이 숙련자 검토에서 {len(seqs)}번 과대·과소로 정정됨",
+                        "support": seqs, "change": {"escalate_statuses": policy["escalate_statuses"] + [st]}})
     sampled = [r for r in rows if r["path"] == "sampled"]
     escal = [r for r in rows if r["path"] == "escalated"]
     if len(sampled) >= 10:
@@ -533,6 +604,10 @@ def adopt(policy: dict, proposal: dict) -> dict:
         if v in policy["keyword_block"]:
             raise LedgerConflict(f"「{v}」는 이미 차단돼 있습니다")
         change = {"keyword_block": policy["keyword_block"] + [v]}
+    elif t == "escalate_status":
+        if v in policy["escalate_statuses"]:
+            raise LedgerConflict(f"「{STATUS_LABELS.get(v, v)}」는 이미 항상 이관됩니다")
+        change = {"escalate_statuses": policy["escalate_statuses"] + [v]}
     else:
         change = {t: v}
     return {**policy, **change, "version": policy["version"] + 1, "note": proposal["title"]}
@@ -544,9 +619,10 @@ def closed_proposals(events: list[dict]) -> set:
 
 # ── 증거 보고서 ───────────────────────────────────────────────
 def evidence_report(items: list[dict], events: list[dict], status: dict) -> str:
-    policy = active_policy(events)
-    m = metrics(items, events, policy)
     chain = verify_chain(events)
+    good = trusted(events)  # 지표·정책은 검증된 앞부분으로
+    policy = active_policy(good)
+    m = metrics(items, good, policy)
     runs = [e for e in events if e["kind"] == "run"]
     pct = lambda v: "-" if v is None else f"{v:.1%}"
     ag = m["agreement"]
@@ -556,7 +632,8 @@ def evidence_report(items: list[dict], events: list[dict], status: dict) -> str:
         f"- 원장: 이벤트 {chain['events']}건 · 해시 연결 {'정상' if chain['ok'] else '깨짐(' + str(chain.get('broken_at')) + '번)'}"
         f" · 보관 {status['storage']}({'영구' if status['durable'] else '임시'})",
         f"- 현재 정책: v{policy['version']} (위험 기준 {policy['risk_threshold']}, 표본 비율 {policy['sample_rate']:.0%},"
-        f" 차단 대상어 {len(policy['keyword_block'])}개)", "",
+        f" 차단 대상어 {len(policy['keyword_block'])}개,"
+        f" 항상 이관 {', '.join(STATUS_LABELS.get(x, x) for x in policy['escalate_statuses']) or '없음'})", "",
         "## G1 접수(업무 시작점 = AI)",
         f"- 자동 실행 기록 {len(runs)}건" + (f", 최근 {runs[-1]['ts']} (데이터 {runs[-1]['payload'].get('data_hash', '')[:12]}, 정책 v{runs[-1]['payload'].get('policy_version')})" if runs else ""),
         f"- 판정 대상 {m['total']}건", "",
@@ -564,7 +641,8 @@ def evidence_report(items: list[dict], events: list[dict], status: dict) -> str:
         f"- 자동 처리 {m['paths'].get('auto', 0)} · 표본 검증 {m['paths'].get('sampled', 0)} · 숙련자 이관 {m['paths'].get('escalated', 0)}",
         f"- 자동화율 {pct(m['auto_rate'])} · 이관율 {pct(m['escalation_rate'])}", "",
         "## G4 숙련자 검토 · G5 예외처리",
-        f"- 검토 완료 {m['reviewed']}건 · 대기 {m['pending']}건 · 롤백 {m['rollbacks']}건",
+        f"- 검토 완료 {m['reviewed']}건 · 대기 {m['pending']}건 · 롤백 {m['rollbacks']}건"
+        + "".join(f" · {OUTCOMES[k]} 결정 {v}건" for k, v in m["exceptions"].items()),
         f"- 상태: " + ", ".join(f"{STATES[k]} {v}" for k, v in m["states"].items()), "",
         "## G6 평가 데이터",
         f"- AI–숙련자 일치율 {pct(ag['rate'])} (n={ag['n']}, 95% 구간 {ag['ci95']})",

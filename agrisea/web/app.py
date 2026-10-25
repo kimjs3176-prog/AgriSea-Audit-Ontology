@@ -214,6 +214,7 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
     from ..followup import track_all
     FOLLOWUP_EXT_TTL = 24 * 3600  # 외부 근거(국회 의안·지원사업 공고)는 하루 동안 다시 묻지 않는다
     FINAL_STATUSES = {**{k: v[0] for k, v in FU_STATUS.items()}, "excluded": "추적 제외(약속 아님)"}
+    EXCLUDED_DESC = "약속으로 보기 어려운 발언이라 추적에서 제외"
     ledger = gov.ledger_from_env(settings.data_dir, settings.serverless)
     roles = gov.Roles.from_env(settings.serverless)
     app.state.ledger, app.state.roles = ledger, roles
@@ -223,7 +224,8 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
 
     def followups_data() -> dict:
         """이행 판정(G1 산출물). 정책 버전이 바뀌면(G7 제도 반영) 새 정책으로 다시 판정한다.
-        (데이터 버전, 정책 버전)마다 AI 실행 기록이 원장에 없으면 한 번 남긴다(자동 수집이 이미 남겼으면 생략)."""
+        (판정 결과, 정책 버전)마다 AI 실행 기록이 원장에 없으면 한 번 남긴다(자동 수집이 이미 남겼으면 생략).
+        판정 결과는 건·지문의 해시라, 화면에서 수집해 데이터가 바뀌어도 새 실행으로 기록된다."""
         events = ledger.events()
         pol = gov.active_policy(events)
         d = store.kv_get("followups")
@@ -236,11 +238,11 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
                     d = track_all(store, pol)
                     store.kv_set("followups", d)
         data_hash = seed_meta().get("hash") or "local"
-        key = (data_hash, pol["version"])
+        out_hash = gov.items_hash(d["items"])
+        key = (out_hash, pol["version"])
         if key not in runs_seen:
             runs_seen.add(key)
-            if not any(e["kind"] == "run" and e["payload"].get("data_hash") == data_hash
-                       and e["payload"].get("policy_version") == pol["version"] for e in events):
+            if not gov.has_run(events, out_hash, pol["version"]):
                 try:
                     ledger.append("run", "AI 판정", "system", run_payload(d, pol, data_hash, trigger))
                 except Exception as e:  # 원장 기록이 실패해도 판정은 보여 준다(상태 화면에 오류 표시)
@@ -248,10 +250,7 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         return d
 
     def run_payload(d: dict, pol: dict, data_hash: str, trigger: str) -> dict:
-        paths = __import__("collections").Counter(
-            gov.route(gov.case_id(x), gov.assess(x, pol), pol) for x in d["items"])
-        return {"trigger": trigger, "data_hash": data_hash, "as_of": d["as_of"], "policy_version": pol["version"],
-                "cases": len(d["items"]), "vague": d["vague"], "paths": dict(paths), "statuses": d["counts"]}
+        return gov.run_payload(d, pol, data_hash, trigger)
 
     def followup_item(cid: int) -> dict:
         item = next((x for x in followups_data()["items"] if x["id"] == cid), None)
@@ -275,7 +274,7 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         for x in items:
             v = gov.case_view(x, pol, stacks.get(gov.case_id(x), []))
             fin = v["final_status"]
-            desc = FU_STATUS[fin][1] if fin in FU_STATUS else "숙련자가 약속이 아니라고 정정해 추적에서 제외"
+            desc = FU_STATUS[fin][1] if fin in FU_STATUS else EXCLUDED_DESC
             out.append({**x, "ai_status": x["status"], "ai_status_label": x["status_label"],
                         "status": fin, "status_label": FINAL_STATUSES[fin], "status_desc": desc, "gov": v})
         return out
@@ -304,7 +303,7 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         orgs = Counter(x["org"] for x in d["items"] if x["org"])
         keep = ("id", "date", "session", "org", "speaker", "text", "status", "status_label", "ai_status", "action",
                 "action_label", "keywords", "laws", "issues")
-        statuses = {**d["statuses"], **({"excluded": {"label": FINAL_STATUSES["excluded"], "desc": "숙련자가 약속이 아니라고 정정"}}
+        statuses = {**d["statuses"], **({"excluded": {"label": FINAL_STATUSES["excluded"], "desc": EXCLUDED_DESC}}
                                         if counts.get("excluded") else {})}
         return {"as_of": d["as_of"], "vague": d["vague"], "statuses": statuses, "actions": d["actions"],
                 "policy_version": d.get("policy_version", 1),
@@ -336,20 +335,40 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         return governed([followup_view(item, ext)])[0]
 
     # ── 운영 관문 API ──
+    loopback = {"127.0.0.1", "::1", "localhost", "testclient"}
+
     def me(request: Request) -> dict:
-        return roles.who(request.headers.get("x-agrisea-token"))
+        who = roles.who(request.headers.get("x-agrisea-token"))
+        # 개발용 개방 모드는 이 컴퓨터에서 온 요청만(0.0.0.0 으로 열어도 다른 컴퓨터가 관리자가 되지 않게)
+        if who["open"] and (request.client is None or request.client.host not in loopback):
+            return {"name": "", "role": "viewer", "open": False}
+        return who
 
     def require(request: Request, role: str) -> dict:
+        """결정·롤백·제도 반영의 공통 관문: 역할 확인 → 원장이 영구 보관·무결해야 기록."""
         who = me(request)
         if role == "admin" and who["role"] != "admin" or role == "reviewer" and who["role"] not in ("reviewer", "admin"):
             need = "관리자(제도 승인권자)" if role == "admin" else "검토자(숙련자)"
-            raise HTTPException(403, f"{need} 권한이 필요합니다. 운영 관문 화면에서 인증 토큰을 입력하세요.")
+            raise HTTPException(403, f"{need} 권한이 필요합니다. X-Agrisea-Token 헤더로 인증 토큰을 보내세요.")
+        if not ledger.sink.durable:
+            raise HTTPException(503, "운영 증거 원장이 임시 저장소라 결정을 기록하지 않습니다. "
+                                     "AGRISEA_GOV_GITHUB_REPO·AGRISEA_GOV_GITHUB_TOKEN 을 설정하세요.")
+        chain = gov.verify_chain(ledger.all_events())
+        if not chain["ok"]:
+            raise HTTPException(503, f"원장 해시 연결이 {chain['broken_at']}번 이벤트에서 깨져 기록을 멈췄습니다. 원장을 복구하세요.")
         return who
 
+    def append(*args, **kw) -> dict:
+        try:
+            return ledger.append(*args, **kw)
+        except gov.LedgerConflict as e:
+            raise HTTPException(409, str(e)) from None
+        except gov.LedgerBroken as e:
+            raise HTTPException(503, str(e)) from None
+
     def gov_status(request: Request | None = None) -> dict:
-        events = ledger.events()
         return {"storage": ledger.sink.kind, "durable": ledger.sink.durable, "error": ledger.error,
-                "chain": gov.verify_chain(events), "policy": gov.active_policy(events),
+                "chain": gov.verify_chain(ledger.all_events()), "policy": gov.active_policy(ledger.events()),
                 "roles": {"configured": roles.configured, "open_mode": roles.open_mode},
                 "me": me(request) if request else None, "gates": gov.GATES, "reasons": gov.REASONS,
                 "final_statuses": FINAL_STATUSES, "paths": gov.PATHS, "states": gov.STATES}
@@ -390,8 +409,7 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
     def governance_case(cid: int):
         """건 상세: AI 판정·근거·위험 요인·경로·결정 이력(원장 이벤트)."""
         x = followup_detail(cid)
-        events = ledger.events()
-        x["history"] = [e for e in events if e.get("case") == gov.case_id(x)]
+        x["history"] = [e for e in ledger.all_events() if e.get("case") == gov.case_id(x)]
         return x
 
     @app.post("/api/governance/cases/{cid}/decision")
@@ -400,7 +418,9 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         who = require(request, "reviewer")
         x = followup_detail(cid)
         g = x["gov"]
-        if payload.get("fingerprint") and payload["fingerprint"] != g["fingerprint"]:
+        if not payload.get("fingerprint"):
+            raise HTTPException(400, "검토한 판정의 지문(fingerprint)을 함께 보내세요.")
+        if payload["fingerprint"] != g["fingerprint"]:
             raise HTTPException(409, "그사이 AI 판정이 바뀌었습니다. 화면을 새로 고친 뒤 다시 검토하세요.")
         action = payload.get("action")
         if action not in ("approve", "reject"):
@@ -416,6 +436,8 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
             kws = [k for k in payload.get("keywords") or [] if k in x["keywords"]]
             if reason == "keyword" and not kws:
                 raise HTTPException(400, "대상어 오인이면 잘못 쓰인 대상어를 하나 이상 고르세요.")
+            if reason == "keyword" and not x["evidence"]:
+                raise HTTPException(400, "근거가 없는 판정에는 대상어 오인 사유를 쓸 수 없습니다.")
         if g["decision"] and g["state"] != "stale":
             raise HTTPException(409, "이미 결정된 건입니다. 바꾸려면 먼저 롤백하세요.")
         cs = gov.case_id(x)
@@ -431,10 +453,7 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
                     "risk_factors": [f["code"] for f in g["risk"]["factors"]],
                     "policy_version": gov.active_policy(events)["version"],
                     "subject": {"org": x["org"], "date": x["date"], "text": x["text"][:120]}}
-        try:
-            ev = ledger.append("decision", who["name"], who["role"], body, case=cs)
-        except gov.LedgerConflict as e:
-            raise HTTPException(409, str(e)) from None
+        ev = append("decision", who["name"], who["role"], body, case=cs)
         return {"event": ev, "case": governance_case(cid)}
 
     @app.post("/api/governance/cases/{cid}/rollback")
@@ -457,16 +476,13 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
             if not latest or latest[-1]["seq"] != target["seq"]:
                 raise gov.LedgerConflict("그사이 이 건의 결정이 바뀌었습니다. 화면을 새로 고치세요.")
             return {"target": target["seq"], "target_action": target["payload"]["action"], "reason": reason[:500]}
-        try:
-            ev = ledger.append("rollback", who["name"], who["role"], body, case=cid_s)
-        except gov.LedgerConflict as e:
-            raise HTTPException(409, str(e)) from None
+        ev = append("rollback", who["name"], who["role"], body, case=cid_s)
         return {"event": ev, "case": governance_case(cid)}
 
     @app.get("/api/governance/ledger")
     def governance_ledger(kind: str = "", case: str = "", limit: int = Query(200, le=2000)):
-        """운영 증거 원장(최근 순)과 해시 연결 검증."""
-        events = ledger.events()
+        """운영 증거 원장(최근 순, 저장된 그대로)과 해시 연결 검증."""
+        events = ledger.all_events()
         rows = [e for e in events if (not kind or e["kind"] == kind) and (not case or e.get("case") == case)]
         return {"chain": gov.verify_chain(events), "count": len(rows), "events": list(reversed(rows))[:limit]}
 
@@ -493,7 +509,8 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         if fmt == "csv":
             buf = io.StringIO()
             cols = ["case", "decision_seq", "decided_at", "reviewer", "path", "risk_score", "policy_version",
-                    "ai_status", "final_status", "agree", "reason", "flagged_keywords", "stale", "org", "action", "promise_date"]
+                    "ai_status", "final_status", "agree", "reason", "flagged_keywords", "outcome", "rollback_reason",
+                    "stale", "removed", "org", "action", "promise_date"]
             w = csv.DictWriter(buf, fieldnames=cols, extrasaction="ignore")
             w.writeheader()
             for r in rows:
@@ -535,10 +552,7 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
             return {"policy": gov.adopt(latest, p), "previous_version": latest["version"], "proposal": p["id"],
                     "change": p["title"], "rationale": p["rationale"], "support": p["support"],
                     "note": str(payload.get("note") or "")[:500]}
-        try:
-            ev = ledger.append("policy", who["name"], who["role"], body)
-        except gov.LedgerConflict as e:
-            raise HTTPException(409, str(e)) from None
+        ev = append("policy", who["name"], who["role"], body)
         return {"event": ev, "policy": ev["payload"]["policy"]}
 
     @app.post("/api/governance/proposals/{pid}/dismiss")
@@ -552,18 +566,14 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
             if p["id"] in gov.closed_proposals(events):
                 raise gov.LedgerConflict("이미 처리된 제안입니다.")
             return {"proposal": p["id"], "title": p["title"], "reason": reason[:500]}
-        try:
-            ev = ledger.append("proposal_dismissed", who["name"], who["role"], body)
-        except gov.LedgerConflict as e:
-            raise HTTPException(409, str(e)) from None
+        ev = append("proposal_dismissed", who["name"], who["role"], body)
         return {"event": ev}
 
     @app.get("/api/governance/report.md")
     def governance_report():
         """모든 관문의 운영 증거 보고서(Markdown)."""
         items = current_items()
-        events = ledger.events()
-        return PlainTextResponse(gov.evidence_report(items, events, gov_status()),
+        return PlainTextResponse(gov.evidence_report(items, ledger.all_events(), gov_status()),
                                  media_type="text/markdown; charset=utf-8")
 
     @app.get("/api/orgs")
