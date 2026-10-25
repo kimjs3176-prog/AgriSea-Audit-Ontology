@@ -65,8 +65,8 @@ def test_index_has_flow_graph_and_transcript_tools(store, settings):
         assert marker in html, marker
 
 
-def test_index_has_no_governance_menu(store, settings):
-    """운영 관문은 별도 메뉴 없이 API와 이행 추적 화면의 관문 상태 표시로만 제공한다."""
+def test_index_has_no_governance_display(store, settings):
+    """운영 관문(위험평가·경로배정·결정 원장·평가 데이터·정책)은 화면에 표시하지 않고 API로만 제공한다."""
     html = TestClient(create_app(settings, store)).get("/").text
-    assert 'data-tab="gov"' not in html and 'id="govFlow"' not in html and "function govChip" not in html
-    assert "const govChip" in html
+    for marker in ('data-tab="gov"', "govFlow", "govChip", "govchip", "fugov", "/api/governance"):
+        assert marker not in html, marker
