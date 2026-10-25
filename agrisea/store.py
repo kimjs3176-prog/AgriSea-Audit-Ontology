@@ -37,6 +37,13 @@ CREATE INDEX IF NOT EXISTS ix_utt_speaker ON utterances(speaker_name);
 CREATE TABLE IF NOT EXISTS summaries (
     meeting_id TEXT, kind TEXT, payload TEXT, PRIMARY KEY (meeting_id, kind)
 );
+-- 지원사업 공고(K-Startup, 농림·해양수산 관련만). issues_json: 회의록과 같은 쟁점 체계
+CREATE TABLE IF NOT EXISTS programs (
+    id TEXT PRIMARY KEY, title TEXT, program TEXT, org TEXT, supervisor TEXT, agency TEXT,
+    category TEXT, target TEXT, region TEXT, start_date TEXT, end_date TEXT, url TEXT, content TEXT,
+    issues_json TEXT DEFAULT '{}'
+);
+CREATE INDEX IF NOT EXISTS ix_prog_start ON programs(start_date);
 -- 집계 결과 캐시(쟁점·기관·관계망 등). 데이터가 바뀌면 비운다.
 CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT);
 """
@@ -324,6 +331,43 @@ class Store:
             "SELECT u.speaker_type, COUNT(*)" + where + " GROUP BY u.speaker_type", args)}
         return {"total": sum(by_type.values()), "by_session": by_session, "by_type": by_type}
 
+    # ── 지원사업 공고 ───────────────────────────────────────
+    def save_programs(self, rows: list[dict]) -> int:
+        """공고를 받은 그대로 덮어쓴다(바뀐 게 있으면 집계 캐시를 비움). 반환: 저장 건수."""
+        new = [(a["id"], a["title"], a["program"], a["org"], a["supervisor"], a["agency"], a["category"],
+                a["target"], a["region"], a["start"], a["end"], a["url"], a["content"],
+                json.dumps(a["issues"], ensure_ascii=False)) for a in rows]
+        old = {r[0]: tuple(r) for r in self.conn.execute(
+            "SELECT id, title, program, org, supervisor, agency, category, target, region, start_date, end_date, "
+            "url, content, issues_json FROM programs")}
+        if {r[0]: r for r in new} == old:
+            return len(new)
+        with self.tx() as c:
+            c.execute("DELETE FROM programs")
+            c.executemany("INSERT INTO programs VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)", new)
+            c.execute("DELETE FROM kv")
+        return len(new)
+
+    def programs(self, issue: str = "", agency: str = "", since: str = "", limit: int | None = None) -> list[dict]:
+        """공고(최신 접수 순). issue는 그 쟁점과 하위 쟁점, agency는 피감기관 정규명."""
+        sql, args = "SELECT * FROM programs WHERE 1=1", []
+        if agency:
+            sql += " AND agency=?"; args.append(agency)
+        if since:
+            sql += " AND start_date >= ?"; args.append(since)
+        sql += " ORDER BY start_date DESC, id DESC"
+        rows = []
+        for r in self.conn.execute(sql, args):
+            d = dict(r)
+            d["issues"] = json.loads(d.pop("issues_json") or "{}")
+            d["start"], d["end"] = d.pop("start_date"), d.pop("end_date")
+            rows.append(d)
+        if issue:
+            from .lexicon import ISSUES
+            ids = {issue} | {k for k, v in ISSUES.items() if v[1] == issue}
+            rows = [d for d in rows if ids & set(d["issues"])]
+        return rows[:limit] if limit else rows
+
     def kv_get(self, key: str) -> Any:
         r = self.conn.execute("SELECT value FROM kv WHERE key=?", (key,)).fetchone()
         return json.loads(r["value"]) if r else None
@@ -379,6 +423,8 @@ class Store:
                 "JOIN meetings m ON m.id=u.meeting_id WHERE m.is_sample=0 "
                 "ORDER BY u.meeting_id, u.idx"):
             h.update(repr(tuple(r)).encode())
+        for r in self.conn.execute("SELECT id, title, start_date, end_date, issues_json FROM programs ORDER BY id"):
+            h.update(repr(tuple(r)).encode())
         return h.hexdigest()
 
     def stats(self) -> dict:
@@ -390,6 +436,7 @@ class Store:
             "commitments": c.execute("SELECT COUNT(*) FROM utterances WHERE is_commitment=1").fetchone()[0],
             "questions": c.execute("SELECT COUNT(*) FROM utterances WHERE is_question=1").fetchone()[0],
             "samples": c.execute("SELECT COUNT(*) FROM meetings WHERE is_sample=1").fetchone()[0],
+            "programs": c.execute("SELECT COUNT(*) FROM programs").fetchone()[0],
             "date_min": c.execute("SELECT MIN(date) FROM meetings").fetchone()[0],
             "date_max": c.execute("SELECT MAX(date) FROM meetings").fetchone()[0],
         }

@@ -18,7 +18,7 @@ import json
 import sys
 from pathlib import Path
 
-from .config import get_settings
+from .config import TERM_START, get_settings
 from .store import Store
 
 
@@ -64,6 +64,8 @@ def main(argv: list[str] | None = None) -> int:
     i.add_argument("--kind", default="")
     i.add_argument("--agenda", action="append", default=[])
 
+    pg = sub.add_parser("programs", help="지원사업 공고(공공데이터포털 K-Startup) 수집: 농림·해양수산 관련만 저장")
+    pg.add_argument("--since", default=TERM_START, help="이 날짜 이후 접수를 시작한 공고(YYYY-MM-DD)")
     sub.add_parser("sample", help="시연용 가상 예시 회의록 적재")
     sub.add_parser("export-seed", help="현재 DB를 배포용 초기 데이터(data/seed.sqlite3)로 내보내기(가상 예시 제외)")
     sub.add_parser("build", help="RDF 지식그래프(TTL) 재생성")
@@ -111,7 +113,6 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "collect":
         from datetime import date, timedelta
 
-        from .config import TERM_START
         from .pipeline import collect, collect_range, fetch_minutes, rebuild_graph
         params = {"DAE_NUM": args.dae, **_kv(args.param)}
         if args.resume:
@@ -150,6 +151,14 @@ def main(argv: list[str] | None = None) -> int:
         n = ingest_file(store, args.path, meta)
         print(f"발언 {n}건 적재")
         rebuild_graph(store, settings)
+    elif args.cmd == "programs":
+        from .programs import ProgramError, collect as collect_programs
+        try:
+            n = collect_programs(store, settings, args.since)
+        except ProgramError as e:
+            print(f"지원사업 공고 수집 실패: {e}", file=sys.stderr)
+            return 1
+        print(f"지원사업 공고 {n}건 저장")
     elif args.cmd == "sample":
         from .pipeline import load_sample, rebuild_graph
         n = load_sample(store)

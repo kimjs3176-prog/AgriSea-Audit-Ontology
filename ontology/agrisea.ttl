@@ -50,6 +50,9 @@ ag:Organization a owl:Class ; rdfs:subClassOf foaf:Organization ; rdfs:label "�
 ag:AuditedAgency a owl:Class ; rdfs:subClassOf ag:Organization ; rdfs:label "피감기관"@ko .
 
 ag:Issue a owl:Class ; rdfs:subClassOf skos:Concept ; rdfs:label "쟁점"@ko .
+
+ag:SupportProgram a owl:Class ; rdfs:label "지원사업 공고"@ko ;
+    rdfs:comment "공공데이터포털(창업진흥원 K-Startup)의 농림·해양수산 관련 지원사업 공고. 쟁점·주관 기관·정부 약속과 이어진다."@ko .
 ag:IssueScheme a skos:ConceptScheme ; rdfs:label "농해수위 쟁점 분류체계"@ko .
 
 ########## 객체 속성 ##########
@@ -85,6 +88,11 @@ ag:audited a owl:ObjectProperty ; rdfs:label "감사 대상"@ko ;
     rdfs:domain ag:AuditMeeting ; rdfs:range ag:AuditedAgency .
 ag:committedBy a owl:ObjectProperty ; rdfs:label "약속 주체 기관"@ko ;
     rdfs:domain ag:Commitment ; rdfs:range ag:Organization .
+ag:announcedBy a owl:ObjectProperty ; rdfs:label "공고 기관(피감기관)"@ko ;
+    rdfs:domain ag:SupportProgram ; rdfs:range ag:Organization .
+ag:followedUpBy a owl:ObjectProperty ; rdfs:label "약속 뒤 공고"@ko ;
+    rdfs:comment "정부 약속 뒤에 같은 쟁점·대상어로 나온 지원사업 공고(이행 추적 근거)."@ko ;
+    rdfs:domain ag:Commitment ; rdfs:range ag:SupportProgram .
 
 ########## 데이터 속성 ##########
 
@@ -101,4 +109,8 @@ ag:minutesURL a owl:DatatypeProperty ; rdfs:label "회의록 보기"@ko ; rdfs:r
 ag:vodURL a owl:DatatypeProperty ; rdfs:label "영상회의록"@ko ; rdfs:range xsd:anyURI .
 ag:keyword a owl:DatatypeProperty ; rdfs:label "쟁점 키워드"@ko .
 ag:mentionCount a owl:DatatypeProperty ; rdfs:label "언급 횟수"@ko ; rdfs:range xsd:integer .
+ag:receptionStart a owl:DatatypeProperty ; rdfs:label "접수 시작일"@ko ; rdfs:range xsd:date .
+ag:receptionEnd a owl:DatatypeProperty ; rdfs:label "접수 마감일"@ko ; rdfs:range xsd:date .
+ag:announcementURL a owl:DatatypeProperty ; rdfs:label "공고 보기"@ko ; rdfs:range xsd:anyURI .
+ag:announcer a owl:DatatypeProperty ; rdfs:label "공고 기관명"@ko .
 ag:isSampleData a owl:DatatypeProperty ; rdfs:label "예시(가상) 데이터 여부"@ko ; rdfs:range xsd:boolean .

@@ -54,6 +54,8 @@ class Settings:
     api_key: str = field(default_factory=lambda: os.environ.get("ASSEMBLY_API_KEY", ""))
     # 선택: 약속 이행 추적에서 지원사업 공고(K-Startup, 공공데이터포털)를 근거로 찾을 때
     kstartup_key: str = field(default_factory=lambda: os.environ.get("KSTARTUP_API_KEY", ""))
+    # 공공데이터포털이 해외(GitHub Actions) 접속을 막을 때 서울 리전 배포본의 /api/kstartup 을 거쳐 받는다
+    kstartup_proxy: str = field(default_factory=lambda: os.environ.get("KSTARTUP_PROXY", ""))
     api_url: str = field(default_factory=lambda: os.environ.get("ASSEMBLY_API_URL", API_URL))
     data_dir: Path = field(default_factory=_default_data_dir)
     serverless: bool = IS_SERVERLESS

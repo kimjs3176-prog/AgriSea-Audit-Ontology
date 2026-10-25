@@ -9,7 +9,7 @@ on:
     branches: [main, governance-log]
   # 자동 수집 워크플로가 GITHUB_TOKEN으로 푸시한 커밋은 push 이벤트를 만들지 않으므로 따로 받는다
   workflow_run:
-    workflows: ["회의록 데이터 갱신", "지원사업 공고 갱신"]
+    workflows: ["회의록 데이터 갱신"]
     types: [completed]
   workflow_dispatch:
 concurrency: gitlab-mirror

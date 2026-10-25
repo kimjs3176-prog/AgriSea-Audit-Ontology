@@ -124,20 +124,28 @@ class _Http:
         ], "totalCount": 3})
 
 
-def test_external_bills_and_kstartup(tmp_path):
+def test_external_bills_and_programs(tmp_path):
+    from agrisea import programs as P
     http = _Http()
-    s = Settings(api_key="SECRET1", kstartup_key="SECRET2", data_dir=tmp_path)
-    item = {"date": "2025-01-10", "laws": ["축산법"], "keywords": ["가축분뇨", "퇴비화"], "action": "budget"}
-    out = external.external_evidence(s, item, http)
+    s = Settings(api_key="SECRET1", data_dir=tmp_path)
+    progs = [a for a in map(P.normalize, [
+        {"pbanc_sn": 1, "biz_pbanc_nm": "2025년 가축분뇨 퇴비화 지원사업 공고", "pbanc_ntrp_nm": "농식품부",
+         "pbanc_rcpt_bgng_dt": "20250301", "pbanc_rcpt_end_dt": "20250331", "detl_pg_url": "https://k-startup.go.kr/1"},
+        {"pbanc_sn": 2, "biz_pbanc_nm": "스마트팜 창업 공고", "pbanc_rcpt_bgng_dt": "20250301"},       # 대상어 없음
+        {"pbanc_sn": 3, "biz_pbanc_nm": "가축분뇨 처리 시범사업", "pbanc_ntrp_nm": "농식품부",
+         "pbanc_rcpt_bgng_dt": "20240101"},                                                         # 약속 전
+    ]) if a]
+    item = {"date": "2025-01-10", "laws": ["축산법"], "keywords": ["가축분뇨", "퇴비화"], "action": "budget",
+            "issues": ["축산·가축방역"]}
+    out = external.external_evidence(s, item, http, programs=progs)
     assert [x["status"] for x in out["sources"]] == ["ok", "ok"]
     bills = [e for e in out["evidence"] if e["source"] == "bill"]
     assert [(e["kind"], e["date"]) for e in bills] == [("done", "2025-03-02"), ("progress", "2025-08-01")]
-    ann = [e for e in out["evidence"] if e["source"] == "kstartup"]
+    ann = [e for e in out["evidence"] if e["source"] == "program"]
     assert len(ann) == 1 and ann[0]["kind"] == "progress" and ann[0]["date"] == "2025-03-01"
     bill_call = next(p for u, p in http.calls if "assembly" in u)
     assert bill_call["BILL_NAME"] == "축산법" and bill_call["AGE"] == "22"
-    ks_call = next(p for u, p in http.calls if "data.go.kr" in u)
-    assert ks_call["cond[pbanc_rcpt_bgng_dt::GTE]"] == "20250110"
+    assert not any("data.go.kr" in u for u, _ in http.calls)  # 공고는 수집해 둔 목록에서(실시간 API 없음)
 
 
 def test_external_keeps_late_completion_beyond_many_records(tmp_path):
@@ -157,23 +165,18 @@ def test_external_keeps_late_completion_beyond_many_records(tmp_path):
 
 
 def test_external_reads_later_pages(tmp_path):
-    """맞는 공고·의안이 첫 쪽(100건) 뒤에 있어도 찾는다."""
-    filler = [{"pbanc_sn": i, "biz_pbanc_nm": "다른 공고", "pbanc_rcpt_bgng_dt": "20250301"} for i in range(100)]
-    hit = {"pbanc_sn": 999, "biz_pbanc_nm": "가축분뇨 퇴비화 지원 공고", "pbanc_rcpt_bgng_dt": "20250401"}
+    """맞는 의안이 첫 쪽(100건) 뒤에 있어도 찾는다."""
     bills_p1 = [{"BILL_NO": str(i), "BILL_NAME": "다른법 일부개정법률안", "PROPOSE_DT": "2025-02-01"} for i in range(100)]
     bill = {"BILL_NO": "777", "BILL_NAME": "축산법 일부개정법률안", "PROPOSE_DT": "2025-05-01", "PROC_RESULT": "원안가결"}
 
     class Http:
         def get(self, url, params=None, timeout=None):
-            if "assembly" in url:
-                rows = bills_p1 if params["pIndex"] == 1 else [bill]
-                return _Resp({"nzmimeepazxkubdpn": [{"head": [{"list_total_count": 101}]}, {"row": rows}]})
-            return _Resp({"data": filler if params["page"] == 1 else [hit]})
+            rows = bills_p1 if params["pIndex"] == 1 else [bill]
+            return _Resp({"nzmimeepazxkubdpn": [{"head": [{"list_total_count": 101}]}, {"row": rows}]})
 
     item = {"id": 1, "date": "2025-01-10", "laws": ["축산법"], "keywords": ["가축분뇨"], "action": "budget"}
-    out = external.external_evidence(Settings(api_key="K", kstartup_key="S", data_dir=tmp_path), item, Http())
-    assert {(e["source"], e["title"]) for e in out["evidence"]} == {
-        ("bill", "축산법 일부개정법률안"), ("kstartup", "가축분뇨 퇴비화 지원 공고")}
+    out = external.external_evidence(Settings(api_key="K", data_dir=tmp_path), item, Http())
+    assert {(e["source"], e["title"]) for e in out["evidence"]} == {("bill", "축산법 일부개정법률안")}
 
 
 def test_parse_kstartup_envelopes():
@@ -205,10 +208,9 @@ def test_external_skips_and_masks_keys(tmp_path):
             raise requests.ConnectionError(f"{url}?serviceKey={params.get('serviceKey')}&KEY={params.get('KEY')} 실패")
 
     item = {"date": "2025-01-10", "laws": ["축산법"], "keywords": ["가축분뇨"], "action": "budget"}
-    out = external.external_evidence(Settings(api_key="SECRET1", kstartup_key="SECRET2", data_dir=tmp_path), item, Boom())
-    assert [x["status"] for x in out["sources"]] == ["error", "error"]
-    msgs = " ".join(x["message"] for x in out["sources"])
-    assert "SECRET1" not in msgs and "SECRET2" not in msgs
+    out = external.external_evidence(Settings(api_key="SECRET1", data_dir=tmp_path), item, Boom())
+    assert [x["status"] for x in out["sources"]] == ["error", "skipped"]  # 공고는 아직 수집 전
+    assert "SECRET1" not in " ".join(x["message"] for x in out["sources"])
 
 
 def test_followup_endpoints(tmp_path, monkeypatch):
@@ -226,7 +228,7 @@ def test_followup_endpoints(tmp_path, monkeypatch):
     # 외부 근거(지원사업 공고)가 진행 근거를 더하면 재판정, 결과는 저장해 다시 묻지 않는다
     calls = []
 
-    def fake(settings, item, http=None):
+    def fake(settings, item, http=None, programs=None):
         calls.append(item["id"])
         return {"fetched_at": "2025-11-01T00:00:00+00:00", "sources": [],
                 "evidence": [{"source": "kstartup", "kind": "progress", "date": "2025-10-20",

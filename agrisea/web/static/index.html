@@ -363,7 +363,18 @@ h3{font-size:14.5px;color:var(--ink)}
 .scrollbox{max-height:var(--box-h,440px);overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;padding-right:6px}
 .dash-a,.dash-b{display:grid;gap:16px;margin-bottom:16px;align-items:stretch}
 .dash-a{grid-template-columns:minmax(0,1.75fr) minmax(300px,1fr)}
-.dash-b{grid-template-columns:repeat(2,minmax(0,1fr))}
+.dash-b{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (max-width:1300px) and (min-width:1001px){.dash-b{grid-template-columns:repeat(2,minmax(0,1fr))}.dash-b>.card:last-child{grid-column:1/-1}}
+/* 쟁점 상세: 질의·답변과 지원사업 공고를 나란히(세로로 길게 쌓지 않게) */
+.g32{display:grid;gap:16px;grid-template-columns:minmax(0,3fr) minmax(0,2fr);align-items:start}
+.g32>.card{margin:0}
+@media (max-width:1100px){.g32{grid-template-columns:minmax(0,1fr)}}
+.prog{border-left:3px solid var(--line)}
+.prog.open{border-left-color:var(--brand)} .prog.upcoming{border-left-color:var(--member)}
+.prog .txt a{color:inherit;text-decoration:none} .prog .txt a:hover{text-decoration:underline}
+.sigbox{border-radius:10px;padding:10px 12px;background:var(--brand-weak);margin-bottom:10px;font-size:13px}
+.sigbox b{font-size:15px;margin-right:6px}
+.sigbox.gap{background:var(--warn-weak)} .sigbox.gap b{color:var(--warn)}
 .dash-a>.card,.dash-b>.card{margin:0}
 #rank .bars{gap:4px 10px}
 @media (max-width:1000px){.dash-a,.dash-b{grid-template-columns:minmax(0,1fr)}}
@@ -551,6 +562,11 @@ h3{font-size:14.5px;color:var(--ink)}
       <p class="sub">무엇을 하겠다고 답했는지 · 앞선 위원 질의와 함께 · 국감 사후 점검 대상</p>
       <div id="recentCommit" class="clist scrollbox"></div>
     </div>
+    <div class="card">
+      <h2>지원사업 공고</h2>
+      <p class="sub" id="progSub">공공데이터포털(K-Startup)의 농림·해양수산 관련 공고 · 마감이 가까운 순</p>
+      <div id="progDash" class="points scrollbox"><div class="empty">불러오는 중…</div></div>
+    </div>
   </div>
   <div class="card">
     <details>
@@ -675,7 +691,7 @@ h3{font-size:14.5px;color:var(--ink)}
   <div class="card tablewrap" id="sOut"></div>
 </section>
 </main>
-<footer class="site-footer">국회 농해수위 온톨로지 · 자료: 열린국회정보 위원회 회의록 · 제작자 kimjs1408 · <button class="link" onclick="openTab('sparql')">고급 도구(SPARQL)</button></footer>
+<footer class="site-footer">국회 농해수위 온톨로지 · 자료: 열린국회정보 위원회 회의록·의안, 공공데이터포털 K-Startup 지원사업 공고 · 제작자 kimjs1408 · <button class="link" onclick="openTab('sparql')">고급 도구(SPARQL)</button></footer>
 
 <script>
 const $ = s => document.querySelector(s);
@@ -823,6 +839,10 @@ async function loadDash(){
     : '<div class="empty">데이터 없음</div>';
   $("#heat").scrollLeft = $("#heat").scrollWidth;  // 좁은 화면에서도 최근 회기(오른쪽)부터 보이게
 
+  api("/api/programs/overview").then(p => {
+    $("#progSub").textContent = `공공데이터포털(K-Startup)의 농림·해양수산 관련 공고 ${fmt(p.total)}건 · 접수 중 ${fmt(p.open)}건 · 마감이 가까운 순`;
+    $("#progDash").innerHTML = progList(p.closing.length ? p.closing : p.latest) || '<div class="empty">아직 수집한 공고가 없습니다.</div>';
+  }).catch(() => $("#progDash").innerHTML = '<div class="empty">공고를 불러오지 못했습니다.</div>');
   $("#recentCommit").innerHTML = ov.commitments.slice(0, 12).map(c => `
     <div class="ci"><div class="who"><b>${esc(c.speaker)}</b> · ${dot(c.date)} · <button class="link" onclick="gotoMeeting('${esc(c.meeting_id)}')">회의 보기</button></div>
       <div class="t">${esc(cut(c.text, 90))}</div>
@@ -1209,14 +1229,15 @@ async function showIssue(id){
       <p class="flowhint">← 옆으로 밀어서 전체 보기 →</p><div class="flowscroll"><div class="flow" id="iFlow" style="min-width:520px"></div></div>
       </div></div>
     </div>
-    <div class="card"><h2>질의와 정부 답변</h2><p class="sub">한 위원의 질의 순서에서 실제로 이어진 질의(왼쪽)와 정부 답변(오른쪽)입니다. <span class="chip warn">약속</span>은 구체적 조치 약속. 최근 회의 순.</p>
+    <div class="g32"><div class="card"><h2>질의와 정부 답변</h2><p class="sub">한 위원의 질의 순서에서 실제로 이어진 질의(왼쪽)와 정부 답변(오른쪽)입니다. <span class="chip warn">약속</span>은 구체적 조치 약속. 최근 회의 순.</p>
       <div class="scrollbox tall">${d.dialogue.map((t, i) => {
         const head = i === 0 || d.dialogue[i - 1].meeting_id !== t.meeting_id;
         return `${head ? `<div class="chat-day"><span>${dot(t.date)} · 제${t.session}회 · <button class="link" onclick="gotoMeeting('${esc(t.meeting_id)}')">회의 보기</button></span></div>` : ""}
         <div class="qa">${t.turns.map(x => x.side === "q"
           ? `<div class="bubble q"><div class="who">${esc(x.speaker)}</div>${esc(x.text)}</div>`
           : `<div class="bubble a${x.commitment ? " promise" : ""}${!x.commitment && isShort(x.text) ? " short" : ""}"><div class="who">${esc(x.speaker)} ${x.commitment ? '<span class="chip warn">약속</span>' : ""}</div>${esc(x.text)}</div>`).join("")}</div>`;
-      }).join("") || '<div class="empty">-</div>'}</div></div>`;
+      }).join("") || '<div class="empty">-</div>'}</div></div>
+    ${d.programs ? progCard(d.programs) : ""}</div>`;
   const iid = "issue:" + d.id, ms = d.members.slice(0, 8), os = d.orgs.slice(0, 8);
   flowRender($("#iFlow"), {
     aria: `${d.label} 관련 위원·기관 흐름도`, unit: "건", height: Math.max(220, 26 * Math.max(ms.length, os.length)), padL: 72, padR: 168, minW: 520,
@@ -1794,7 +1815,7 @@ function buildNet3d(THREE, stage, data){
 // ── 정부 약속 이행 추적 ──
 let fuState = {data: null, status: "", sel: null, filled: false};
 const FU_COLOR = {done: "var(--brand)", progress: "var(--seq)", reraised: "var(--bad)", early: "var(--muted)", none: "var(--warn)", excluded: "var(--line)"};
-const FU_SRC = {minutes: "후속 회의록", agenda: "후속 안건", bill: "국회 의안", kstartup: "지원사업 공고"};
+const FU_SRC = {minutes: "후속 회의록", agenda: "후속 안건", bill: "국회 의안", program: "지원사업 공고"};
 const FU_KIND = {done: "이행", progress: "진행", reraised: "재지적", related: "참고"};
 const fuChip = (st, label) => `<span class="fuchip st-${st}">${esc(label)}</span>`;
 let fuTimer = null;
@@ -1844,6 +1865,26 @@ function renderFuList(){
     || '<div class="empty">조건에 맞는 약속이 없습니다.</div>';
   document.querySelectorAll("#fuList .item").forEach(el => el.onclick = () => showFollowup(+el.dataset.id).then(() => toDetail("#fuDetail")));
 }
+// ── 지원사업 공고(공공데이터포털 K-Startup) ──
+const PROG_STATUS = {open: "접수 중", upcoming: "접수 예정", closed: "마감"};
+function progList(items){
+  return items.map(a => {
+    const url = /^https?:\/\//.test(a.url || "") ? a.url : "";
+    return `<div class="pt prog ${a.status}"><div class="who"><span class="chip ${a.status === "open" ? "" : "line"}">${PROG_STATUS[a.status] || ""}</span>${esc(a.org || "")}
+      <span class="meta">${dot(a.start)} ~ ${dot(a.end) || "미정"}</span></div>
+      <div class="txt">${url ? `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(a.title)} ↗</a>` : esc(a.title)}</div></div>` }).join("");
+}
+function progSignal(sig){
+  if(!sig) return "";
+  return `<div class="sigbox ${sig.quadrant}" data-tip="국회 발언: 데이터 마지막 회의 기준 최근 12개월 · 공고: 오늘 기준 최근 12개월 접수 시작"><b>${esc(sig.label)}</b>${esc(sig.desc)}
+    <div class="muted" style="margin-top:4px">국회 발언 ${fmt(sig.talk_12m)}건 · 공고 ${fmt(sig.programs_12m)}건(최근 12개월) · 접수 중 ${fmt(sig.open)}건</div></div>`;
+}
+function progCard(p, title = "지원사업 공고"){
+  return `<div class="card"><h2>${title} <span class="muted" style="font-size:13px;font-weight:400">${fmt(p.total)}건</span></h2>
+    <p class="sub">공공데이터포털(창업진흥원 K-Startup)의 농림·해양수산 관련 공고 · 제목을 누르면 공고 원문</p>
+    ${progSignal(p.signal)}
+    <div class="points scrollbox" style="--box-h:520px">${progList(p.items) || '<div class="empty">관련 공고가 없습니다.</div>'}</div></div>`;
+}
 function fuEvidence(e){
   const url = /^https?:\/\//.test(e.url || "") ? e.url : "";
   const link = e.meeting_id ? `<button class="link" onclick="gotoUtt('${esc(e.meeting_id)}', ${e.idx ?? -1})">회의록에서 보기 →</button>`
@@ -1857,7 +1898,7 @@ function fuExternal(x){
   const srcs = ext ? ext.sources.map(s => `<li><b>${esc(s.label)}</b> · ${s.status === "ok" ? `근거 ${fmt(s.count)}건` : s.status === "skipped" ? `건너뜀 — ${esc(s.message)}` : `<span style="color:var(--bad)">오류 — ${esc(s.message)}</span>`}</li>`).join("") : "";
   return `<div class="fuext">
     <div class="row" style="justify-content:space-between;gap:8px"><b>외부 근거 확인</b>
-      <button class="ghost" id="fuExtBtn" onclick="checkFollowupExternal(${x.id}, ${ext ? "true" : "false"})">${ext ? "다시 확인" : "국회 의안·지원사업 공고에서 확인"}</button></div>
+      <button class="ghost" id="fuExtBtn" onclick="checkFollowupExternal(${x.id}, ${ext ? "true" : "false"})">${ext ? "다시 확인" : "국회 의안 처리 현황 확인"}</button></div>
     <p class="muted" style="font-size:12px;margin:4px 0 0">약속 뒤 발의된 같은 법률의 개정안과 처리 결과(열린국회정보 의안 API), 약속 뒤 게시된 같은 주제의 지원사업 공고(K-Startup API)를 찾습니다.</p>
     ${ext ? `<ul class="fusrc">${srcs}</ul><p class="muted" style="font-size:12px;margin:0">확인 시각 ${esc((ext.fetched_at || "").replace("T", " ").slice(0, 16))} (UTC)</p>` : ""}</div>`;
 }
@@ -1964,7 +2005,8 @@ $("#bBtn").onclick = async () => {
   $("#bOut").innerHTML = `
   <div class="grid kpis">${[["관련 회의", c.meetings], ["관련 발언", c.utterances], ["질의·답변", c.qa_pairs], ["구체적 정부 약속", b.commitments.length]].map(([l, v]) => `<div class="card stat"><span class="l">${l}</span><span class="v">${fmt(v)}</span></div>`).join("")}</div>
   <div class="card"><div class="muted" style="font-size:13px">${scopeLabel()}</div><h2 style="font-size:19px">${esc(b.target)}</h2>
-    ${segTabs("bTabs", [["sum", "요약"], ["qa", `질의와 답변 ${b.top_questions.length}`], ["cm", `약속 추적 ${b.commitments.length}`], ["mt", `위원·회의 ${b.meetings.length}`]])}
+    ${segTabs("bTabs", [["sum", "요약"], ["qa", `질의와 답변 ${b.top_questions.length}`], ["cm", `약속 추적 ${b.commitments.length}`], ["mt", `위원·회의 ${b.meetings.length}`],
+      ...(b.programs ? [["pg", `지원사업 공고 ${b.programs.total}`]] : [])])}
     <div class="segpanel on" data-seg="bTabs" data-k="sum">
       <div class="grid g2">
         <div><h3 style="margin-top:0">핵심 쟁점</h3>${b.key_issues.length ? barsHtml(b.key_issues.map(i => ({id: i.id, label: i.label, count: i.count})), {onclick: "gotoIssue"}) : "-"}</div>
@@ -1981,6 +2023,9 @@ $("#bBtn").onclick = async () => {
       ${Object.keys(orgs).length ? `<div class="legend" style="margin-bottom:8px">${Object.entries(orgs).sort((a, b) => b[1].length - a[1].length).map(([o, xs]) => `<span><b>${esc(o)}</b> ${xs.length}건</span>`).join("")}</div>` : ""}
       <div class="points">${b.commitments.map(x => `<div class="pt warn" onclick="this.classList.toggle('open')"><div class="who">${esc(x.speaker)}<span class="meta">${dot(x.date)}</span>${chips(x.issues)}</div><div class="txt">${esc(x.text)}</div></div>`).join("") || '<div class="empty">-</div>'}</div>
     </div>
+    ${b.programs ? `<div class="segpanel" data-seg="bTabs" data-k="pg">
+      <p class="sub">이 기관이 주관·전담한 지원사업 공고(공공데이터포털 K-Startup) · 접수 중 ${fmt(b.programs.open)}건</p>
+      <div class="points scrollbox tall">${progList(b.programs.items) || '<div class="empty">이 기관의 공고가 없습니다.</div>'}</div></div>` : ""}
     <div class="segpanel" data-seg="bTabs" data-k="mt">
       <div class="grid g2">
         <div><h3 style="margin-top:0">질의한 위원</h3>${b.active_members.length ? barsHtml(b.active_members.map(m => ({id: m.name, label: m.name + " 위원", count: m.count})), {onclick: "briefMember"}) : "-"}

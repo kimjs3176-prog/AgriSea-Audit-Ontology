@@ -1,12 +1,11 @@
-"""약속 이행의 외부 근거(실시간): 국회 의안 처리 현황, 지원사업 공고.
+"""약속 이행의 외부 근거: 국회 의안 처리 현황(실시간), 지원사업 공고(수집해 둔 목록).
 
 - 국회 의안: 열린국회정보 「국회의원 발의법률안」(nzmimeepazxkubdpn, ASSEMBLY_API_KEY와 같은 인증키).
   약속에 나온 법률 이름으로 찾아, 약속 뒤 발의된 개정안과 처리 결과(가결·계류·대안반영·폐기)를 근거로 삼는다.
-- 지원사업 공고: 창업진흥원 K-Startup 조회서비스(공공데이터포털, KSTARTUP_API_KEY).
-  약속의 대상어로 공고명을 찾아, 약속 뒤 접수를 시작한 공고를 근거로 삼는다.
+  국내 접속만 허용하는 경우가 있어 서울 리전 배포본에서 호출한다.
+- 지원사업 공고: 자동 수집이 공공데이터포털(K-Startup)에서 받아 둔 공고(programs.py)에서 약속의 대상어로 찾는다.
 
-두 API 모두 국내 접속만 허용하는 경우가 있어 서울 리전 배포본에서 호출한다. 인증키가 없거나 호출이 실패하면
-그 출처만 건너뛰고(이유를 함께 돌려줌) 나머지 근거는 그대로 쓴다. 응답 필드명은 별칭까지 흡수한다.
+인증키가 없거나 호출이 실패하면 그 출처만 건너뛰고(이유를 함께 돌려줌) 나머지 근거는 그대로 쓴다.
 """
 from __future__ import annotations
 
@@ -23,10 +22,9 @@ from .api_client import AssemblyAPIError, AssemblyClient, normalize_date
 from .config import Settings
 
 BILL_API_URL = "https://open.assembly.go.kr/portal/openapi/nzmimeepazxkubdpn"
-KSTARTUP_URL = "https://apis.data.go.kr/B552735/kisedKstartupService01/getAnnouncementInformation01"
 TERM_22_START = "2024-05-30"
 # 요청 한 번(서버리스 60초 제한) 안에 끝나도록 출처마다 읽는 쪽 수의 상한
-BILL_PAGES, KSTARTUP_PAGES, PAGE_SIZE = 3, 5, 100
+BILL_PAGES, PAGE_SIZE = 3, 100
 
 BILL_FIELDS: dict[str, tuple[str, ...]] = {
     "name": ("BILL_NAME", "BILL_NM"),
@@ -36,14 +34,6 @@ BILL_FIELDS: dict[str, tuple[str, ...]] = {
     "result": ("PROC_RESULT", "PROC_RESULT_CD", "PROC_RSLT"),
     "committee": ("COMMITTEE", "CURR_COMMITTEE", "CMIT_NM"),
     "url": ("DETAIL_LINK", "LINK_URL", "BILL_URL"),
-}
-KSTARTUP_FIELDS: dict[str, tuple[str, ...]] = {
-    "id": ("pbanc_sn", "pbancSn", "id"),
-    "title": ("biz_pbanc_nm", "bizPbancNm", "pbanc_nm"),
-    "org": ("pbanc_ntrp_nm", "pbancNtrpNm", "sprv_inst"),
-    "start": ("pbanc_rcpt_bgng_dt", "pbancRcptBgngDt"),
-    "end": ("pbanc_rcpt_end_dt", "pbancRcptEndDt"),
-    "url": ("detl_pg_url", "detlPgUrl", "biz_gdnc_url"),
 }
 
 
@@ -100,7 +90,7 @@ def bills(settings: Settings, law: str, since: str, http: requests.Session | Non
 # ── 지원사업 공고(K-Startup) ───────────────────────────────
 def parse_kstartup(text: str) -> list[dict[str, Any]]:
     """K-Startup 응답의 레코드 목록. 공공데이터포털은 JSON(`data` 또는 `response.body.items.item`)과
-    XML(`<item><col name=…>` 또는 `<item><필드>`)을 섞어 돌려준다(support-radar/radar/kstartup.py와 같은 규칙)."""
+    XML(`<item><col name=…>` 또는 `<item><필드>`)을 섞어 돌려준다."""
     body = (text or "").strip().lstrip("\ufeff")
     if not body:
         raise RuntimeError("K-Startup 빈 응답")
@@ -141,37 +131,8 @@ def parse_kstartup(text: str) -> list[dict[str, Any]]:
     return [d for d in data if isinstance(d, dict)]
 
 
-def kstartup(api_key: str, keyword: str, since: str, http: requests.Session | None = None) -> list[dict]:
-    """since 이후 접수를 시작한, 공고명에 keyword가 들어간 공고. 서버가 조건 검색을 무시해도 받은 뒤 다시 거른다."""
-    http = http or requests.Session()
-    rows: list[dict] = []
-    # 맞는 공고가 뒤쪽에 있을 수 있어 여러 쪽을 읽는다(조건 검색을 무시하는 경우에도 KSTARTUP_PAGES쪽까지)
-    for no in range(1, KSTARTUP_PAGES + 1):
-        params = {"serviceKey": api_key, "page": no, "perPage": PAGE_SIZE, "returnType": "json",
-                  "cond[biz_pbanc_nm::LIKE]": keyword,
-                  "cond[pbanc_rcpt_bgng_dt::GTE]": since.replace("-", "")}
-        resp = http.get(KSTARTUP_URL, params=params, timeout=(5.0, 20.0))
-        resp.raise_for_status()
-        page = parse_kstartup(resp.text)
-        rows += page
-        if len(page) < PAGE_SIZE:
-            break
-    out = []
-    for raw in rows:
-        a = _norm(raw, KSTARTUP_FIELDS)
-        a["start"], a["end"] = normalize_date(a["start"]), normalize_date(a["end"])
-        if keyword in a["title"] and a["start"] >= since:
-            out.append(a)
-    return sorted(out, key=lambda a: a["start"])
-
-
-def _search_terms(item: dict) -> list[str]:
-    """공고 검색어: 세 글자 이상 대상어 우선 2개(두 글자 말로는 엉뚱한 공고가 많이 걸린다)."""
-    kws = item.get("keywords", [])
-    return ([k for k in kws if len(k) >= 3] or kws)[:2]
-
-
-def external_evidence(settings: Settings, item: dict, http: requests.Session | None = None) -> dict[str, Any]:
+def external_evidence(settings: Settings, item: dict, http: requests.Session | None = None,
+                      programs: list[dict] | None = None) -> dict[str, Any]:
     """약속 하나의 외부 근거. 반환: {fetched_at, sources:[{id,label,status,message,count}], evidence:[…]}"""
     sources, evidence = [], []
     since = item["date"]
@@ -199,29 +160,17 @@ def external_evidence(settings: Settings, item: dict, http: requests.Session | N
             src.update(status="error", message=_mask(str(e), settings.api_key))
     sources.append(src)
 
-    # 지원사업 공고
-    src = {"id": "kstartup", "label": "지원사업 공고(K-Startup)", "status": "ok", "message": "", "count": 0}
-    terms = _search_terms(item)
-    if item.get("action") not in ("budget", "improve", "review"):
+    # 지원사업 공고: 자동 수집이 공공데이터포털(K-Startup)에서 받아 둔 공고 목록에서 찾는다(실시간 API·인증키 불필요)
+    src = {"id": "program", "label": "지원사업 공고(공공데이터포털 K-Startup)", "status": "ok", "message": "", "count": 0}
+    if not programs:
+        src.update(status="skipped", message="지원사업 공고를 아직 수집하지 않음")
+    elif item.get("action") not in ("budget", "improve", "review"):
         src.update(status="skipped", message="예산·지원·사업 약속이 아니어서 찾지 않음")
-    elif not settings.kstartup_key:
-        src.update(status="skipped", message="이 서비스에서는 지원사업 공고 조회를 쓸 수 없음(인증키 미설정)")
-    elif not terms:
-        src.update(status="skipped", message="검색할 대상어가 없음")
     else:
-        try:
-            seen = set()
-            for kw in terms:
-                for a in kstartup(settings.kstartup_key, kw, since, http):
-                    if a["id"] in seen:
-                        continue
-                    seen.add(a["id"])
-                    evidence.append({"source": "kstartup", "kind": "progress" if item["action"] == "budget" else "related",
-                                     "date": a["start"], "title": a["title"], "url": a["url"],
-                                     "text": f"{a['org'] or '공고 기관'} · 접수 {a['start']} ~ {a['end'] or '미정'} · 검색어 「{kw}」"})
-            src["count"] = len(seen)
-        except (requests.RequestException, RuntimeError, ValueError) as e:
-            src.update(status="error", message=_mask(str(e), settings.kstartup_key))
+        from .programs import evidence_for
+        found = evidence_for(item, programs)
+        evidence += found
+        src.update(count=len(found), message=f"수집한 공고 {len(programs)}건에서 찾음")
     sources.append(src)
 
     # 자르지 않는다: 뒤늦게 가결된 의안처럼 판정을 바꾸는 근거가 잘려 나가면 안 된다(출처별 조회 건수가 이미 상한)

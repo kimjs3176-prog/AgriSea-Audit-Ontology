@@ -25,6 +25,7 @@ from .analysis import _question_text
 from .lexicon import ORGANIZATIONS, commitment_sentences, issue_label
 from .members import _nouns, vocab
 from .nlp import SENT_SPLIT, WORD, strip_josa, truncate
+from .programs import evidence_for as program_evidence
 from .store import Store
 
 # 조치 유형: 약속 문장에서 무엇을 하겠다는지(위에서부터 먼저 맞는 것)
@@ -336,6 +337,7 @@ def track_all(store: Store, policy: dict | None = None) -> dict[str, Any]:
     policy = policy or {}
     blocked = frozenset(policy.get("keyword_block") or ())
     c = Corpus(store)
+    progs = store.programs()  # 약속 뒤에 나온 지원사업 공고(공공데이터포털 K-Startup)
     items, vague = [], 0
     for pos, u in enumerate(c.utts):
         if not u["is_commitment"] or u["speaker_type"] not in _ANSWERERS:
@@ -344,7 +346,8 @@ def track_all(store: Store, policy: dict | None = None) -> dict[str, Any]:
         if it is None:
             vague += 1
             continue
-        ev = _minutes_evidence(c, it, pos) + (_agenda_evidence(c, it) if it["laws"] else [])
+        ev = (_minutes_evidence(c, it, pos) + (_agenda_evidence(c, it) if it["laws"] else [])
+              + program_evidence(it, progs))
         items.append(finalize(it, ev, c.as_of))
     items.sort(key=lambda x: (x["date"], x["idx"]), reverse=True)
     counts = Counter(x["status"] for x in items)
