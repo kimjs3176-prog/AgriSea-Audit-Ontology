@@ -55,3 +55,11 @@ def test_meeting_export_markdown(store, settings):
     d = c.get("/api/meetings/SAMPLE-2025-1014/export.md", params={"download": 1})
     assert "attachment" in d.headers["content-disposition"]
     assert c.get("/api/meetings/nope/export.md").status_code == 404
+
+
+def test_index_has_flow_graph_and_transcript_tools(store, settings):
+    """대시보드 관계 흐름도(기본)·3D 전환, 회의록 발언자 거르기·안건 이동·발언 흐름 미니맵."""
+    html = TestClient(create_app(settings, store)).get("/").text
+    for marker in ('id="netFlow"', 'id="netMode"', 'id="tSpeaker"', 'id="tAgenda"', 'id="tFlow"',
+                   "function flowRender", "function jumpToUtt"):
+        assert marker in html, marker
