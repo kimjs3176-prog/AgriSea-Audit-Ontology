@@ -34,6 +34,7 @@ on:
       - "agrisea/precompute.py"
       - "agrisea/spacing.py"
       - "agrisea/members.py"
+      - "agrisea/followup.py"
 
 permissions:
   contents: write
