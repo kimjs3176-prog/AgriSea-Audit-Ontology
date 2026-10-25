@@ -14,7 +14,8 @@ from .store import Store
 
 # 사전 계산 형식이 바뀌면 올린다(초기 데이터를 다시 만들게 함).
 # 2: 발언자 역할 재분류, 회기별 쟁점·개요 집계 / 3: 띄어쓰기 교정 / 4: 요약에서 의안 목록 제외 / 5: 위원별 분석
-PRECOMPUTE_VERSION = 5
+# 6: 주요 기관 브리핑
+PRECOMPUTE_VERSION = 6
 
 CACHED_VIEWS: dict[str, Callable[[Store], object]] = {
     "issues": analysis.issue_overview,
@@ -26,6 +27,19 @@ CACHED_VIEWS: dict[str, Callable[[Store], object]] = {
     "overview": analysis.overview,
     "members_all": members.member_profiles,  # 전체 회기 위원별 분석(가장 무거움: 사전 계산)
 }
+
+# 국감 브리핑 화면의 '기관으로 바로 만들기' 버튼(언급 많은 기관 6곳)과 같은 기관을 전체 회기로 미리 만든다
+BRIEFING_TOP_ORGS = 6
+
+
+def briefing_key(org: str) -> str:
+    return f"briefing:org:{org}"
+
+
+def top_orgs(orgs: list[dict], n: int = BRIEFING_TOP_ORGS) -> list[str]:
+    """org_overview 결과에서 언급 많은 기관 n곳(화면 버튼과 같은 순서)."""
+    return [o["name"] for o in sorted((o for o in orgs if o["mentions"]),
+                                      key=lambda o: -o["mentions"])[:n]]
 
 
 def fix_spacing(store: Store, progress: Callable[[str], None] = print) -> int:
@@ -98,11 +112,16 @@ def precompute(store: Store, kg_path: Path | None = None,
             n += 1
     for key, fn in CACHED_VIEWS.items():
         store.kv_set(key, fn(store))
-    out = {"spacing": spaced, "reclassified": fixed, "summaries": n, "views": list(CACHED_VIEWS)}
+    briefed = top_orgs(store.kv_get("orgs"))
+    for org in briefed:
+        store.kv_set(briefing_key(org), analysis.briefing(store, org))
+    out = {"spacing": spaced, "reclassified": fixed, "summaries": n, "views": list(CACHED_VIEWS),
+           "briefings": briefed}
     if kg_path:
         g = build_graph(store, text_limit=500)
         to_ntriples_gz(g, kg_path)
         out["triples"] = len(g)
-    progress(f"사전 계산: 발언자 재분류 {fixed}건, 회의 요약 {n}건, 집계 {len(CACHED_VIEWS)}종"
+    progress(f"사전 계산: 발언자 재분류 {fixed}건, 회의 요약 {n}건, 집계 {len(CACHED_VIEWS)}종, "
+             f"기관 브리핑 {len(briefed)}건"
              + (f", 지식그래프 트리플 {out['triples']}개" if kg_path else ""))
     return out
