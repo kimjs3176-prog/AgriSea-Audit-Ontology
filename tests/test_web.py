@@ -57,6 +57,19 @@ def test_meeting_export_markdown(store, settings):
     assert c.get("/api/meetings/nope/export.md").status_code == 404
 
 
+def test_org_briefing_is_cached(store, settings):
+    from agrisea.precompute import briefing_key
+    c = TestClient(create_app(settings, store))
+    b = c.get("/api/briefing", params={"org": "해양수산부"}).json()
+    assert b["counts"]["utterances"] and store.kv_get(briefing_key("해양수산부")) == b
+    assert c.get("/api/briefing", params={"org": "해양수산부"}).json() == b
+    # 다른 조건이 붙거나 사전에 없는 기관은 저장하지 않고 그때그때 계산
+    c.get("/api/briefing", params={"org": "해양수산부", "session": 430})
+    c.get("/api/briefing", params={"org": "없는기관"})
+    keys = {k for (k,) in store.conn.execute("SELECT key FROM kv WHERE key LIKE 'briefing:%'")}
+    assert keys == {briefing_key("해양수산부")}
+
+
 def test_index_has_flow_graph_and_transcript_tools(store, settings):
     """대시보드 관계 흐름도(기본)·3D 전환, 회의록 발언자 거르기·안건 이동·발언 흐름 미니맵."""
     html = TestClient(create_app(settings, store)).get("/").text

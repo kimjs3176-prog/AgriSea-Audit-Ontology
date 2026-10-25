@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse, PlainTextResponse
 
 from .. import analysis, members
 from ..config import Settings, get_settings
-from ..lexicon import ISSUES
+from ..lexicon import ISSUES, ORGANIZATIONS
 from ..ontology import KG_PATH, PRESET_QUERIES, kg_from_file, kg_from_store, run_sparql
 from ..pipeline import seed_meta
 from ..ontology import SCHEMA_PATH
@@ -578,8 +578,17 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
     def briefing(org: str = "", issue: str = "", keyword: str = "", member: str = "",
                  date_from: str = "", date_to: str = "", format: str = "json",
                  session: int | None = None):
-        b = analysis.briefing(store, org, issue, keyword, member, date_from, date_to,
-                              session=session)
+        if org in ORGANIZATIONS and not (issue or keyword or member or date_from or date_to
+                                         or session):
+            # 기관만 고른 전체 회기 브리핑은 가장 무거워(발언 1만여 건) 저장해 재사용한다
+            from ..precompute import briefing_key
+            b = store.kv_get(briefing_key(org))
+            if b is None:
+                b = analysis.briefing(store, org)
+                store.kv_set(briefing_key(org), b)
+        else:
+            b = analysis.briefing(store, org, issue, keyword, member, date_from, date_to,
+                                  session=session)
         if format == "md":
             return PlainTextResponse(analysis.briefing_markdown(b),
                                      media_type="text/markdown; charset=utf-8")

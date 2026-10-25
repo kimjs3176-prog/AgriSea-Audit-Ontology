@@ -174,12 +174,15 @@ _ISSUE_MASK = re.compile("|".join(sorted(
     key=len, reverse=True)))
 
 
+_ISSUE_KWS = [(iid, tuple(kws)) for iid, (_, _, kws) in ISSUES.items()]
+
+
 def match_issues(text: str) -> dict[str, int]:
     """텍스트에서 이슈별 키워드 출현 횟수(기관·위원회명 속 키워드는 제외)."""
-    text = _ISSUE_MASK.sub(" ", text)
+    count = _ISSUE_MASK.sub(" ", text).count
     hits: dict[str, int] = {}
-    for iid, (_, _, kws) in ISSUES.items():
-        n = sum(text.count(k) for k in kws)
+    for iid, kws in _ISSUE_KWS:
+        n = sum(map(count, kws))
         if n:
             hits[iid] = n
     return hits

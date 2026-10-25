@@ -4,6 +4,7 @@ from __future__ import annotations
 import math
 import re
 from collections import Counter
+from functools import lru_cache
 from typing import Iterable
 
 from .lexicon import ISSUES, match_issues
@@ -31,8 +32,12 @@ SENT_SPLIT = re.compile(r"(?<=[.?!])\s+")
 WORD = re.compile(r"[가-힣]{2,}|[A-Za-z][A-Za-z0-9]+|\d+(?:\.\d+)?%?")
 
 _DOMAIN_TERMS = sorted({k for _, _, kws in ISSUES.values() for k in kws}, key=len, reverse=True)
+_DOMAIN_SET = frozenset(_DOMAIN_TERMS)
+_SPACED_TERMS = [t for t in _DOMAIN_TERMS if " " in t]
 
 
+# 같은 낱말이 수없이 반복되므로(브리핑 한 번에 백만 회 이상) 결과를 기억해 둔다
+@lru_cache(maxsize=1 << 18)
 def strip_josa(tok: str) -> str:
     for e in ENDINGS:
         if tok.endswith(e) and len(tok) - len(e) >= 2:
@@ -46,17 +51,20 @@ def strip_josa(tok: str) -> str:
 def tokenize(text: str) -> list[str]:
     toks: list[str] = []
     # 띄어쓰기가 들어간 도메인 복합어는 통째로 보존
-    for term in _DOMAIN_TERMS:
-        if " " in term and term in text:
+    for term in _SPACED_TERMS:
+        if term in text:
             toks.extend([term] * text.count(term))
-    for w in WORD.findall(text):
-        if w[0].isdigit():
-            continue
-        w = strip_josa(w)
-        if len(w) < 2 or w in STOPWORDS:
-            continue
-        toks.append(w)
+    toks.extend(t for t in map(_word_token, WORD.findall(text)) if t)
     return toks
+
+
+@lru_cache(maxsize=1 << 18)
+def _word_token(w: str) -> str:
+    """낱말 하나를 토큰으로(숫자·불용어·한 글자는 빈 문자열)."""
+    if w[0].isdigit():
+        return ""
+    w = strip_josa(w)
+    return "" if len(w) < 2 or w in STOPWORDS else w
 
 
 def split_sentences(text: str) -> list[str]:
@@ -77,7 +85,7 @@ def keywords(texts: Iterable[str], top_k: int = 15,
         if w in skip:
             continue
         idf = math.log((n_docs + 1) / (background.get(w, 0) + 1)) + 1 if background else 1.0
-        bonus = 1.5 if w in _DOMAIN_TERMS else 1.0
+        bonus = 1.5 if w in _DOMAIN_SET else 1.0
         scored.append((w, c * idf * bonus))
     scored.sort(key=lambda x: -x[1])
     return scored[:top_k]
@@ -115,7 +123,7 @@ def extractive_summary(text: str, n: int = 3, focus: Iterable[str] = ()) -> list
             scores.append((0.0, i))
             continue
         base = sum(freq[t] for t in toks) / (len(toks) ** 0.6)
-        domain = sum(1 for t in toks if t in _DOMAIN_TERMS or t in focus)
+        domain = sum(1 for t in toks if t in _DOMAIN_SET or t in focus)
         numeric = 0.5 if re.search(r"\d", s) else 0.0
         issue = 0.5 * len(match_issues(s))
         score = base + domain + numeric + issue
