@@ -574,18 +574,30 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
     def speakers():
         return cached("speakers")
 
+    def _cacheable_target(kind: str, value: str) -> bool:
+        if kind == "org":
+            return value in ORGANIZATIONS
+        if kind == "issue":
+            return value in ISSUES
+        return any(s["speaker_type"] == "member" and s["speaker_name"] == value
+                   for s in cached("speakers"))
+
     @app.get("/api/briefing")
     def briefing(org: str = "", issue: str = "", keyword: str = "", member: str = "",
                  date_from: str = "", date_to: str = "", format: str = "json",
                  session: int | None = None):
-        if org in ORGANIZATIONS and not (issue or keyword or member or date_from or date_to
-                                         or session):
-            # 기관만 고른 전체 회기 브리핑은 가장 무거워(발언 1만여 건) 저장해 재사용한다
-            from ..precompute import briefing_key
-            b = store.kv_get(briefing_key(org))
+        # 기관·쟁점·위원 중 하나만 고른 전체 회기 브리핑(화면 바로가기 버튼)은 전체 발언을 다 읽어
+        # 1초 넘게 걸리므로 저장해 재사용한다. 저장 대상은 사전·명단에 있는 값으로 한정(kv가 무한히 늘지 않게)
+        chosen = [(k, v) for k, v in (("org", org), ("issue", issue), ("member", member)) if v]
+        single = (len(chosen) == 1 and not (keyword or date_from or date_to or session)
+                  and _cacheable_target(*chosen[0]))
+        if single:
+            from ..precompute import briefing_for, briefing_key
+            key = briefing_key(*chosen[0])
+            b = store.kv_get(key)
             if b is None:
-                b = analysis.briefing(store, org)
-                store.kv_set(briefing_key(org), b)
+                b = briefing_for(store, *chosen[0])
+                store.kv_set(key, b)
         else:
             b = analysis.briefing(store, org, issue, keyword, member, date_from, date_to,
                                   session=session)
