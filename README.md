@@ -22,22 +22,6 @@
 - **SPARQL·TTL**: 지식그래프 직접 질의와 내려받기
 - (선택) **Claude 요약**: `ANTHROPIC_API_KEY`가 있으면 LLM 회의 요약
 
-## 운영 관문 (API 전용, 화면 표시 없음)
-
-이행 판정은 AI가 먼저 하고, 사람은 위험이 큰 판정과 예외에 집중합니다(`agrisea/governance.py`, `/api/governance/*`).
-
-| 관문 | 내용 |
-|---|---|
-| G1 접수 | AI가 수집·약속 인식·판정을 수행하고 실행 기록을 남김 |
-| G2·G3 위험평가·경로배정 | 위험 점수로 자동 공개 / 표본 검증 / 숙련자 이관. 이행 보고·재지적 판정은 항상 이관 |
-| G4·G5 검토·예외처리 | 승인·거부(정정)·롤백. 공개 판정은 숙련자 결정을 따름 |
-| G6 평가 데이터 | AI 대 최종 판정 일치율·혼동 행렬, CSV/JSONL |
-| G7 제도 반영 | 반복된 예외에서 규칙 개정 제안 → 관리자 채택 → 새 정책 버전 |
-
-- 모든 행위는 해시로 이어진 원장에 남습니다(`governance-log` 브랜치). 연결이 깨지거나 임시 저장소면 기록을 받지 않습니다.
-- 검토자·관리자 토큰(`AGRISEA_REVIEWERS`, `AGRISEA_ADMINS`, `이름:토큰`)을 `X-Agrisea-Token` 헤더로 보냅니다.
-- 증거 보고서: `/api/governance/report.md`
-
 ## 시작하기
 
 ```bash
@@ -60,8 +44,6 @@ python -m agrisea serve --port 8000                    # http://127.0.0.1:8000
 | `ASSEMBLY_API_KEY` | 열린국회정보 인증키(필수) |
 | `KSTARTUP_API_KEY` | 이행 추적의 지원사업 공고 근거(선택) |
 | `ANTHROPIC_API_KEY`, `AGRISEA_LLM_MODEL` | Claude 요약(선택) |
-| `AGRISEA_REVIEWERS`, `AGRISEA_ADMINS` | 운영 관문 검토자·관리자 |
-| `AGRISEA_GOV_GITHUB_REPO`, `AGRISEA_GOV_GITHUB_TOKEN` | 운영 관문 원장 영구 보관 |
 
 배포 환경은 `/tmp`만 쓸 수 있어, 화면에서 수집한 데이터는 재시작하면 사라집니다.
 
@@ -71,7 +53,7 @@ python -m agrisea serve --port 8000                    # http://127.0.0.1:8000
 |---|---|---|
 | 회의록 데이터 갱신 | 하루 3번 회의록을 수집·분석해 `data/`에 커밋하면 Vercel이 재배포(국회 PDF는 서울 리전 배포본을 거쳐 받음) | Secret `ASSEMBLY_API_KEY` |
 | 지원사업 공고 갱신 | 지원사업 레이더 공고 수집 | Secret `KSTARTUP_API_KEY` |
-| GitLab 미러 | `main`·`governance-log`를 `gitlab.aigov.go.kr/kimjs1408/kookgam-ax`로 푸시 | Secret `GITLAB_TOKEN`, Variable `MIRROR_RUNNER` |
+| GitLab 미러 | `main`을 `gitlab.aigov.go.kr/kimjs1408/kookgam-ax`로 푸시 | Secret `GITLAB_TOKEN`, Variable `MIRROR_RUNNER` |
 
 기관 GitLab은 해외(GitHub 러너)에서 접속되지 않습니다. 국내 PC에 self-hosted 러너를 두고 `MIRROR_RUNNER=self-hosted`로 지정하거나,
 그 PC에서 `scripts/mirror-gitlab.sh`를 주기적으로 실행하세요.
@@ -96,7 +78,6 @@ python -m agrisea stats
 | `GET /api/issues`, `/api/issues/{id}`, `/api/graph` | 쟁점·관계망 |
 | `GET /api/briefing?org=&issue=&format=md` | 국감 브리핑 |
 | `GET /api/followups`, `/{id}`, `/{id}/external` | 약속 이행 추적 |
-| `GET·POST /api/governance/*` | 운영 관문 |
 | `POST /api/sparql` | 읽기 전용 SPARQL |
 | `POST /api/admin/collect`, `/fetch-minutes`, `/sample` | 수집(인증 없음) |
 
