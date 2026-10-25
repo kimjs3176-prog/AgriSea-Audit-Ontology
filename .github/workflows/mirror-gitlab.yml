@@ -1,0 +1,25 @@
+name: GitLab 미러
+on:
+  push:
+    branches: [main, governance-log]
+  # 자동 수집 워크플로가 GITHUB_TOKEN으로 푸시한 커밋은 push 이벤트를 만들지 않으므로 따로 받는다
+  workflow_run:
+    workflows: ["회의록 데이터 갱신", "지원사업 공고 갱신"]
+    types: [completed]
+  workflow_dispatch:
+concurrency: gitlab-mirror
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: GitLab으로 푸시
+        env:
+          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+        run: |
+          url="https://oauth2:${GITLAB_TOKEN}@gitlab.aigov.go.kr/kimjs1408/kookgam-ax.git"
+          for b in main governance-log; do
+            git rev-parse -q --verify "origin/$b" >/dev/null && \
+              git push "$url" "refs/remotes/origin/$b:refs/heads/$b"
+          done
