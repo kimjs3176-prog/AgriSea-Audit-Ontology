@@ -36,6 +36,7 @@ on:
       - "agrisea/members.py"
       - "agrisea/followup.py"
       - "agrisea/governance.py"
+      - "agrisea/programs.py"
 
 permissions:
   contents: write
@@ -57,6 +58,10 @@ jobs:
       # 회의록 PDF 서버는 해외(Actions) 접속이 막혀 있어 서울 리전 배포본을 거쳐 본문을 받는다.
       # 배포 주소가 바뀌면 저장소 Variables에 MINUTES_PROXY 로 지정.
       AGRISEA_MINUTES_PROXY: ${{ vars.MINUTES_PROXY || 'https://ax-rosy-seven.vercel.app/api/minutes-text' }}
+      # 지원사업 공고(공공데이터포털 K-Startup). 해외 접속이 막히면 서울 리전 배포본의 /api/kstartup 을 거친다
+      # (배포본에도 KSTARTUP_API_KEY 필요). 배포 주소가 바뀌면 Variables 에 KSTARTUP_PROXY 로 지정.
+      KSTARTUP_API_KEY: ${{ secrets.KSTARTUP_API_KEY }}
+      KSTARTUP_RELAY: ${{ vars.KSTARTUP_PROXY || 'https://ax-rosy-seven.vercel.app/api/kstartup' }}
     steps:
       # 이벤트 시점 커밋이 아니라 실행 시작 시점의 최신 브랜치를 받는다(앞선 실행이 커밋한 데이터를 이어받기 위함)
       - uses: actions/checkout@v5
@@ -87,6 +92,15 @@ jobs:
           fi
           python -m agrisea fetch-minutes   # 이전에 실패한 본문 재시도
           python -m agrisea stats
+
+      - name: 지원사업 공고 수집(공공데이터포털)
+        continue-on-error: true   # 공고 수집이 막혀도 회의록 갱신은 계속한다(저장된 공고 유지)
+        run: |
+          if [ -z "$KSTARTUP_API_KEY" ]; then echo "::warning::KSTARTUP_API_KEY secret이 없어 지원사업 공고 수집을 건너뜁니다."; exit 0; fi
+          python -m agrisea programs || {
+            echo "직접 접속 실패 → 서울 리전 배포본을 거쳐 다시 받습니다"
+            KSTARTUP_PROXY="$KSTARTUP_RELAY" python -m agrisea programs
+          } || { echo "::warning::지원사업 공고 수집 실패(이전 공고 유지)"; exit 1; }
 
       - name: 운영 관문 정책 받기(governance-log 브랜치)
         run: |

@@ -193,7 +193,39 @@ def build_graph(store: Store, with_schema: bool = True, core: bool = False,
                 g.add((uu, RDF.type, AG.Answer))
                 if u["org"]:
                     g.add((uu, AG.committedBy, org_uri(u["org"])))
+    add_programs(g, store)
     return g
+
+
+def program_uri(pid: str) -> URIRef:
+    return AGD[f"program/{_slug(str(pid))}"]
+
+
+def add_programs(g: Graph, store: Store) -> None:
+    """지원사업 공고와 그 연결: 쟁점(ag:concernsIssue), 공고 기관(ag:announcedBy), 약속 뒤 공고(ag:followedUpBy)."""
+    for a in store.programs():
+        pu = program_uri(a["id"])
+        g.add((pu, RDF.type, AG.SupportProgram))
+        g.add((pu, RDFS.label, Literal(a["title"], lang="ko")))
+        for iid in a["issues"]:
+            if iid in ISSUES:
+                g.add((pu, AG.concernsIssue, issue_uri(iid)))
+        if a["agency"]:
+            g.add((pu, AG.announcedBy, org_uri(a["agency"])))
+        if a["org"]:
+            g.add((pu, AG.announcer, Literal(a["org"], lang="ko")))
+        for prop, key in ((AG.receptionStart, "start"), (AG.receptionEnd, "end")):
+            if a[key]:
+                g.add((pu, prop, Literal(a[key], datatype=XSD.date)))
+        if a["url"]:
+            g.add((pu, AG.announcementURL, Literal(a["url"], datatype=XSD.anyURI)))
+    # 이행 추적이 사전 계산돼 있으면 약속 → 그 뒤 공고를 잇는다
+    fu = store.kv_get("followups") or {}
+    for item in fu.get("items", []):
+        for e in item.get("evidence", []):
+            if e.get("source") == "program" and e.get("program_id"):
+                uu = AGD[f"utt/{_slug(item['meeting_id'])}/{item['idx']}"]
+                g.add((uu, AG.followedUpBy, program_uri(e["program_id"])))
 
 
 def save_graph(g: Graph, path: Path) -> None:
@@ -212,6 +244,23 @@ WHERE {
   ?issue skos:prefLabel ?issueLabel .
 }
 GROUP BY ?issueLabel ORDER BY DESC(?utterances)""",
+    "약속 뒤 나온 지원사업 공고": """
+PREFIX ag: <https://w3id.org/agrisea/ontology#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT ?orgLabel ?program ?start ?url
+WHERE {
+  ?c a ag:Commitment ; ag:followedUpBy ?p .
+  OPTIONAL { ?c ag:committedBy ?org . ?org rdfs:label ?orgLabel }
+  ?p rdfs:label ?program ; ag:receptionStart ?start .
+  OPTIONAL { ?p ag:announcementURL ?url }
+}
+ORDER BY DESC(?start)""",
+    "쟁점별 지원사업 공고": """
+PREFIX ag: <https://w3id.org/agrisea/ontology#>
+PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+SELECT ?issueLabel (COUNT(DISTINCT ?p) AS ?programs)
+WHERE { ?p a ag:SupportProgram ; ag:concernsIssue ?i . ?i skos:prefLabel ?issueLabel . }
+GROUP BY ?issueLabel ORDER BY DESC(?programs)""",
     "기관별 이행약속 답변": """
 PREFIX ag: <https://w3id.org/agrisea/ontology#>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>

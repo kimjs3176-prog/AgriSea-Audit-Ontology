@@ -7,9 +7,9 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import Body, FastAPI, HTTPException, Query, Request
-from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi.responses import FileResponse, PlainTextResponse, Response
 
-from .. import analysis, members
+from .. import analysis, members, programs
 from ..config import Settings, get_settings
 from ..lexicon import ISSUES
 from ..ontology import KG_PATH, PRESET_QUERIES, kg_from_file, kg_from_store, run_sparql
@@ -177,9 +177,17 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
     def issue(issue_id: str, session: int | None = None):
         """쟁점 상세: 회기별 추이, 관련 기관·위원, 대표 질의, 정부 약속."""
         try:
-            return analysis.issue_detail(store, issue_id, session)
+            d = analysis.issue_detail(store, issue_id, session)
         except KeyError:
             raise HTTPException(404, "쟁점을 찾을 수 없습니다.") from None
+        # 이 쟁점의 지원사업 공고(공공데이터포털 K-Startup)와 국회 관심 대비 공급 신호
+        d["programs"] = programs.issue_view(store, issue_id, cached("program_signals"))
+        return d
+
+    @app.get("/api/programs/overview")
+    def programs_overview():
+        """대시보드용 지원사업 공고 요약: 접수 중·예정 수, 마감이 가까운 공고, 최근 공고(접수 상태는 오늘 기준)."""
+        return programs.overview(store)
 
     def member_scope(session: int | None, meetings: str) -> dict:
         """위원별 분석 범위: 고른 회의들 > 회기 > 전체(전체·회기 결과는 저장해 재사용)."""
@@ -263,7 +271,10 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
     def followup_view(item: dict, ext: dict | None) -> dict:
         """사전 계산한 내부 근거에 외부 근거를 더해 다시 판정."""
         as_of = followups_data()["as_of"]
-        out = fu_finalize(item, item["evidence"] + (ext or {}).get("evidence", []), as_of) if ext else dict(item)
+        if ext:  # 사전 계산에 이미 든 공고 근거와 겹치는 것은 한 번만
+            have = {(e.get("source"), e.get("title"), e.get("date")) for e in item["evidence"]}
+            extra = [e for e in ext.get("evidence", []) if (e.get("source"), e.get("title"), e.get("date")) not in have]
+        out = fu_finalize(item, item["evidence"] + extra, as_of) if ext else dict(item)
         out["status_desc"] = FU_STATUS[out["status"]][1]
         out["external"] = ext
         return out
@@ -332,7 +343,7 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         key = f"followup_ext:{cid}"
         ext = store.kv_get(key)
         if refresh or not ext or time.time() - ext.get("_ts", 0) > FOLLOWUP_EXT_TTL:
-            ext = {**external_evidence(settings, item), "_ts": time.time()}
+            ext = {**external_evidence(settings, item, programs=store.programs()), "_ts": time.time()}
             # 모든 출처를 건너뛰었으면(인증키 미설정 등) 저장하지 않는다: '외부 확인' 표시가 붙거나
             # 키를 넣은 뒤에도 하루 동안 예전 결과가 남지 않게
             if ext["evidence"] or any(src["status"] != "skipped" for src in ext["sources"]):
@@ -605,6 +616,8 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
             # 화면의 선택 상자로 고르는 조건(기관·쟁점·위원·회기)만 저장: 임의 입력으로 캐시가 늘지 않게
             if not (keyword or date_from or date_to) and b["counts"]["utterances"]:
                 store.kv_set(key, b)
+        if org:  # 기관 브리핑: 그 기관이 주관·전담한 지원사업 공고
+            b = {**b, "programs": programs.agency_view(store, org)}
         if format == "md":
             return PlainTextResponse(analysis.briefing_markdown(b),
                                      media_type="text/markdown; charset=utf-8")
@@ -647,6 +660,23 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         except Exception as e:
             raise HTTPException(502, f"회의록을 가져오지 못했습니다: {e}") from e
         return PlainTextResponse(text, media_type="text/plain; charset=utf-8")
+
+    @app.get("/api/kstartup")
+    def kstartup_relay(page: int = Query(1, ge=1, le=200), perPage: int = Query(500, ge=1, le=1000),
+                       returnType: str = "json"):
+        """자동 수집용 중계: 공공데이터포털이 해외(GitHub Actions) 접속을 막을 때 서울 리전에서 대신 받는다.
+        공고 조회 오퍼레이션 하나만, 인증키는 서버에서 붙인다(임의 URL 프록시로 쓰일 수 없음)."""
+        import requests
+        if not settings.kstartup_key:
+            raise HTTPException(400, "이 서비스에는 지원사업 공고 인증키가 설정되지 않았습니다.")
+        try:
+            r = requests.get(programs.API_URL, params={"page": page, "perPage": perPage, "returnType": returnType,
+                                                       "serviceKey": settings.kstartup_key}, timeout=(10, 50))
+        except requests.RequestException as e:
+            raise HTTPException(502, "공공데이터포털에 접속하지 못했습니다: "
+                                + str(e).replace(settings.kstartup_key, "***")) from None
+        return Response(r.content, status_code=r.status_code,
+                        media_type=r.headers.get("content-type", "application/json"))
 
     @app.get("/api/ontology.ttl")
     def ontology_ttl():

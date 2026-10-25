@@ -312,6 +312,13 @@ def briefing_markdown(b: dict) -> str:
     L += [f"- {m['name']} 위원: 질의 {m['count']}회" for m in b["active_members"]]
     L += ["", "## 6. 관련 회의"]
     L += [f"- {m['date']} {m['title']}" for m in b["meetings"]]
+    if b.get("programs"):  # 기관 브리핑: 그 기관의 지원사업 공고(공공데이터포털 K-Startup)
+        p = b["programs"]
+        L += ["", f"## 7. 지원사업 공고 ({p['total']}건, 접수 중 {p['open']}건)", "",
+              "| 접수 | 상태 | 공고 |", "|---|---|---|"]
+        status = {"open": "접수 중", "upcoming": "접수 예정", "closed": "마감"}
+        L += [f"| {a['start']} ~ {a['end'] or '미정'} | {status.get(a['status'], '')} | "
+              f"[{a['title'].replace('|', '/')}]({a['url']}) |" for a in p["items"]]
     return "\n".join(L) + "\n"
 
 

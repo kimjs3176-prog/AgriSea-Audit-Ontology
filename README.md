@@ -2,84 +2,55 @@
 
 배포: https://ax-rosy-seven.vercel.app/
 
-국회 **농림축산식품해양수산위원회** 회의록을 열린국회정보 API로 모아 회의·안건·발언·발언자·피감기관·쟁점·정부 약속을 잇는 **지식그래프**로 만들고,
-국정감사 준비에 필요한 검색·요약·브리핑·약속 이행 추적을 제공합니다.
+## 서비스 개요
 
-```
-열린국회정보 API → 회의록 PDF → 발언 파싱(질의·답변·약속 판별) → SQLite → RDF 지식그래프(SPARQL) → 웹·API·CLI
-```
+국회 **농림축산식품해양수산위원회** 회의록을 모아 회의·안건·발언·위원·피감기관·쟁점·정부 약속·지원사업 공고를 잇는
+**지식그래프**로 만들고, 국정감사 준비에 필요한 검색·요약·브리핑·약속 이행 추적을 제공합니다.
 
-관련 서비스: [지원사업 레이더](support-radar/README.md) — 회의록의 정책 신호를 K-Startup 지원사업 공고와 연결
+| 데이터 | 출처 |
+|---|---|
+| 위원회 회의록 | 열린국회정보 「위원회 회의록」 API + 국회 회의록 PDF |
+| 법률안 처리 현황 | 열린국회정보 「국회의원 발의법률안」 API |
+| 지원사업 공고 | 공공데이터포털 「창업진흥원 K-Startup 조회서비스」(농림·해양수산 관련 공고만) |
 
-## 주요 기능
+## 사용 방법
 
-- **대시보드**: 회기별 쟁점 히트맵, 위원→쟁점→기관 흐름도, 최근 회의·정부 약속
-- **회의록**: 통합 검색, 회의 요약·전체 회의록(발언 흐름 미니맵)·질의응답·약속·안건, Markdown 내보내기
-- **의원·쟁점 분석**: 의원별 관심 쟁점·질의 관점·예상 질문, 쟁점별 회기 추이와 질의–답변
-- **국감 브리핑**: 기관·쟁점·위원·기간 조건으로 핵심 쟁점, 질의와 답변, 약속 추적표를 정리(Markdown)
-- **정부 약속 이행 추적**: 약속마다 후속 회의록·안건, 국회 의안 API, K-Startup 공고 API에서 근거를 찾아
-  이행 보고 / 진행 중 / 재지적 / 확인 기간 부족 / 근거 미확인으로 판정
-- **SPARQL·TTL**: 지식그래프 직접 질의와 내려받기
-- (선택) **Claude 요약**: `ANTHROPIC_API_KEY`가 있으면 LLM 회의 요약
+| 화면 | 이렇게 씁니다 |
+|---|---|
+| 대시보드 | 회기별 쟁점 흐름, 위원→쟁점→기관 관계, 최근 회의·정부 약속, 접수 중인 지원사업 공고를 한눈에 봅니다. |
+| 회의록 | 상단 검색으로 발언을 찾고, 회의를 골라 요약·전체 회의록·질의응답·약속·안건을 봅니다. 발언 흐름 막대를 누르면 그 발언으로 이동합니다. |
+| 의원 분석 | 의원별 관심 쟁점, 질의 관점, 받아낸 약속, 예상 질문을 봅니다. |
+| 쟁점 분석 | 쟁점을 고르면 회기별 추이, 질의 위원·기관, 질의와 정부 답변, **관련 지원사업 공고**와 국회 관심 대비 공고 공급(공백·활발 등)을 봅니다. |
+| 이행 추적 | 정부 약속마다 뒤 회의록·안건·법률안·**지원사업 공고**에서 찾은 근거로 이행 보고 / 진행 중 / 재지적 / 근거 미확인을 판정합니다. |
+| 국감 브리핑 | 기관·쟁점·위원·기간을 골라 핵심 쟁점, 주요 질의와 답변, 약속 추적표(기관이면 그 기관의 지원사업 공고까지)를 만들고 Markdown으로 내려받습니다. |
+| SPARQL | 화면 아래 링크에서 지식그래프를 직접 질의합니다(예시 질의 제공). |
 
-## 시작하기
+화면 위의 회기 선택으로 범위를 좁힐 수 있고, 주소(`#/meetings/회의ID`, `#/issues/쟁점ID`, `#/brief`)로 화면을 공유할 수 있습니다.
+
+## 설치·실행
 
 ```bash
 pip install -r requirements.txt
-cp .env.example .env                                   # ASSEMBLY_API_KEY 입력
-python -m agrisea collect --dae 22 --days 14 --fetch   # 최근 14일 수집
+cp .env.example .env                                   # 인증키 입력
+python -m agrisea collect --dae 22 --days 14 --fetch   # 최근 14일 회의록 수집
+python -m agrisea programs                             # 지원사업 공고 수집
 python -m agrisea serve --port 8000                    # http://127.0.0.1:8000
 ```
 
-- 인증키는 `.env`나 환경변수로만 설정하세요(저장소에 넣지 않음).
-- 데이터는 `var/`에 저장됩니다(`AGRISEA_DATA_DIR`로 변경).
-- 시연용 가상 데이터: `python -m agrisea sample`
+그 밖의 명령: `search`(발언 검색), `summary <회의ID>`(회의 요약), `briefing --org 기관명 -o 파일.md`, `sparql "질의"`, `stats`.
+시연용 가상 데이터는 `python -m agrisea sample`(실제 회의록이 없을 때만)입니다.
 
-## 배포 (Vercel)
+## 배포·자동 갱신
 
-저장소를 Vercel에 연결하면 `main` 푸시마다 배포됩니다(서울 리전, 60초 제한). 환경 변수:
-
-| 이름 | 용도 |
-|---|---|
-| `ASSEMBLY_API_KEY` | 열린국회정보 인증키(필수) |
-| `KSTARTUP_API_KEY` | 이행 추적의 지원사업 공고 근거(선택) |
-| `ANTHROPIC_API_KEY`, `AGRISEA_LLM_MODEL` | Claude 요약(선택) |
-
-배포 환경은 `/tmp`만 쓸 수 있어, 화면에서 수집한 데이터는 재시작하면 사라집니다.
-
-## 자동화 (GitHub Actions)
-
-| 워크플로 | 하는 일 | 필요 설정 |
+| 설정 | 어디에 | 용도 |
 |---|---|---|
-| 회의록 데이터 갱신 | 하루 3번 회의록을 수집·분석해 `data/`에 커밋하면 Vercel이 재배포(국회 PDF는 서울 리전 배포본을 거쳐 받음) | Secret `ASSEMBLY_API_KEY` |
-| 지원사업 공고 갱신 | 지원사업 레이더 공고 수집 | Secret `KSTARTUP_API_KEY` |
-| GitLab 미러 | `main`을 `gitlab.aigov.go.kr/kimjs1408/kookgam-ax`로 푸시 | Secret `GITLAB_TOKEN`, Variable `MIRROR_RUNNER` |
+| `ASSEMBLY_API_KEY` | Vercel 환경 변수, GitHub Actions Secrets | 열린국회정보 인증키(필수) |
+| `KSTARTUP_API_KEY` | GitHub Actions Secrets, Vercel 환경 변수 | 공공데이터포털 인증키(지원사업 공고) |
+| `ANTHROPIC_API_KEY` | Vercel 환경 변수 | (선택) Claude 회의 요약 |
 
-기관 GitLab은 해외(GitHub 러너)에서 접속되지 않습니다. 국내 PC에 self-hosted 러너를 두고 `MIRROR_RUNNER=self-hosted`로 지정하거나,
-그 PC에서 `scripts/mirror-gitlab.sh`를 주기적으로 실행하세요.
-
-## CLI
-
-```bash
-python -m agrisea search 쌀값 시장격리            # 발언 검색
-python -m agrisea summary <회의ID> [--llm]        # 회의 요약
-python -m agrisea briefing --org 농촌진흥청 -o 브리핑.md
-python -m agrisea sparql "SELECT ..."             # 지식그래프 질의
-python -m agrisea ingest 회의록.pdf --title ... --date 2024-10-07   # PDF 직접 적재
-python -m agrisea stats
-```
-
-## REST API (주요)
-
-| 경로 | 설명 |
-|---|---|
-| `GET /api/meetings`, `/api/meetings/{id}`, `/{id}/summary` | 회의 목록·상세·요약 |
-| `GET /api/search?q=` | 발언 검색 |
-| `GET /api/issues`, `/api/issues/{id}`, `/api/graph` | 쟁점·관계망 |
-| `GET /api/briefing?org=&issue=&format=md` | 국감 브리핑 |
-| `GET /api/followups`, `/{id}`, `/{id}/external` | 약속 이행 추적 |
-| `POST /api/sparql` | 읽기 전용 SPARQL |
-| `POST /api/admin/collect`, `/fetch-minutes`, `/sample` | 수집(인증 없음) |
+- **회의록 데이터 갱신**(Actions, 하루 3번): 회의록과 지원사업 공고를 수집·분석해 `data/`에 커밋하면 Vercel이 다시 배포합니다.
+  국회 PDF와 공공데이터포털이 해외 접속을 막으면 서울 리전 배포본(`/api/minutes-text`, `/api/kstartup`)을 거쳐 받습니다.
+- **GitLab 미러**(Actions): `main`을 기관 GitLab으로 푸시합니다(`GITLAB_TOKEN`, 국내 PC의 self-hosted 러너 `MIRROR_RUNNER`).
 
 ## 테스트
 
@@ -88,8 +59,4 @@ pip install -r requirements-dev.txt
 python -m pytest -q
 ```
 
-## 한계
-
-- 요약과 질의·답변·약속 판별은 규칙 기반이라 오탐·누락이 있을 수 있습니다. 공식 문서에는 원문 PDF를 확인하세요.
-- 이행 판정은 기록에서 찾은 신호입니다. '근거 미확인'은 미이행이 아니라 회의록에서 확인하지 못했다는 뜻입니다.
-- PDF에서 사라진 띄어쓰기는 회의록 말뭉치로 학습한 규칙으로 복원합니다(`agrisea/spacing.py`).
+요약·질의응답·약속 판별과 이행 판정은 규칙 기반이라 놓치거나 잘못 잡는 경우가 있습니다. 공식 문서에는 원문을 확인하세요.

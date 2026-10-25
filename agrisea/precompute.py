@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 from typing import Callable
 
-from . import analysis, followup, governance, members
+from . import analysis, followup, governance, members, programs
 from .ontology import build_graph, to_ntriples_gz
 from .store import Store
 
@@ -34,6 +34,7 @@ CACHED_VIEWS: dict[str, Callable[[Store], object]] = {
     "members_all": members.member_profiles,  # 전체 회기 위원별 분석(가장 무거움: 사전 계산)
     "followups": lambda s: followup.track_all(s, current_policy()),  # 정부 약속 이행 추적(정책 반영)
     analysis.briefing_cache_key(): analysis.briefing,  # 조건 없는 전체 국감 브리핑(가장 무거운 조합)
+    "program_signals": programs.supply_signals,   # 쟁점별 국회 관심 대비 지원사업 공고 공급
 }
 
 
