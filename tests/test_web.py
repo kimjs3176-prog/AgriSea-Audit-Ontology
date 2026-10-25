@@ -63,3 +63,10 @@ def test_index_has_flow_graph_and_transcript_tools(store, settings):
     for marker in ('id="netFlow"', 'id="netMode"', 'id="tSpeaker"', 'id="tAgenda"', 'id="tFlow"',
                    "function flowRender", "function jumpToUtt"):
         assert marker in html, marker
+
+
+def test_index_has_no_governance_display(store, settings):
+    """운영 관문(위험평가·경로배정·결정 원장·평가 데이터·정책)은 화면에 표시하지 않고 API로만 제공한다."""
+    html = TestClient(create_app(settings, store)).get("/").text
+    for marker in ('data-tab="gov"', "govFlow", "govChip", "govchip", "fugov", "/api/governance"):
+        assert marker not in html, marker

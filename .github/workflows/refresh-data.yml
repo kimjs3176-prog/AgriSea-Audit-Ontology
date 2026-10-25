@@ -35,6 +35,7 @@ on:
       - "agrisea/spacing.py"
       - "agrisea/members.py"
       - "agrisea/followup.py"
+      - "agrisea/governance.py"
 
 permissions:
   contents: write
@@ -51,6 +52,8 @@ jobs:
     env:
       ASSEMBLY_API_KEY: ${{ secrets.ASSEMBLY_API_KEY }}
       AGRISEA_DATA_DIR: ${{ github.workspace }}/var
+      # 운영 관문 원장(governance-log 브랜치)의 최신 정책으로 이행 판정(G7 제도 반영)
+      AGRISEA_GOVERNANCE_LEDGER: ${{ github.workspace }}/var/governance.jsonl
       # 회의록 PDF 서버는 해외(Actions) 접속이 막혀 있어 서울 리전 배포본을 거쳐 본문을 받는다.
       # 배포 주소가 바뀌면 저장소 Variables에 MINUTES_PROXY 로 지정.
       AGRISEA_MINUTES_PROXY: ${{ vars.MINUTES_PROXY || 'https://ax-rosy-seven.vercel.app/api/minutes-text' }}
@@ -85,6 +88,11 @@ jobs:
           python -m agrisea fetch-minutes   # 이전에 실패한 본문 재시도
           python -m agrisea stats
 
+      - name: 운영 관문 정책 받기(governance-log 브랜치)
+        run: |
+          (git fetch --depth=1 origin governance-log && git show origin/governance-log:governance/events.jsonl > var/governance.jsonl) \
+            || { rm -f var/governance.jsonl; echo "원장 없음 → 초기 정책"; }
+
       - name: 사전 계산(요약·집계·지식그래프) 및 초기 데이터 내보내기
         run: |
           python -m agrisea export-seed
@@ -100,6 +108,13 @@ jobs:
           # 그사이 다른 실행이 데이터를 커밋했으면, 방금 만든 데이터 파일을 우선해 다시 얹는다
           git pull --rebase -X theirs origin "${GITHUB_REF_NAME}"
           git push origin "HEAD:${GITHUB_REF_NAME}"
+
+      # G1 접수 증거: AI가 판정한 실행 기록(데이터 해시·정책 버전·경로별 건수)을 원장에 커밋
+      - name: 운영 관문 실행 기록
+        env:
+          AGRISEA_GOV_GITHUB_REPO: ${{ github.repository }}
+          AGRISEA_GOV_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python -m agrisea governance-run --trigger "자동 수집(${{ github.event_name }})" || echo "::warning::운영 관문 원장 기록 실패"
 
       - name: 실행 요약
         if: always()

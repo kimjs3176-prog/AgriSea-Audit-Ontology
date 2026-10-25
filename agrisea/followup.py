@@ -295,7 +295,7 @@ def verdict(item_date: str, evidence: list[dict], as_of: str) -> str:
     return "none"
 
 
-def _item(c: Corpus, pos: int) -> dict | None:
+def _item(c: Corpus, pos: int, blocked: frozenset[str] = frozenset()) -> dict | None:
     u = c.utts[pos]
     sents = commitment_sentences(u["text"])
     if not sents:
@@ -303,7 +303,8 @@ def _item(c: Corpus, pos: int) -> dict | None:
     promise = " ".join(sents[:2])
     q = _question_before(c, pos)
     qtext = _question_text(q["text"]) if q else ""
-    exclude = {u["speaker_name"], *(q and [q["speaker_name"]] or [])}
+    # 정책으로 차단된 대상어(숙련자 검토에서 오인으로 확인돼 제도에 반영된 말)도 뺀다
+    exclude = {u["speaker_name"], *(q and [q["speaker_name"]] or []), *blocked}
     kws = _keywords(c, promise, qtext, exclude)
     laws = law_names(promise) or law_names(qtext)
     if len(kws) < 2 and not laws:  # 무엇을 하겠다는지 드러나지 않는 약속('지적사항 반영하겠습니다')
@@ -326,14 +327,20 @@ def finalize(item: dict, evidence: list[dict], as_of: str) -> dict:
             "action_label": ACTION_LABEL[item["action"]]}
 
 
-def track_all(store: Store) -> dict[str, Any]:
-    """모든 약속의 이행 추적(사전 계산 대상). 대상이 드러나지 않는 약속은 개수만 센다."""
+def track_all(store: Store, policy: dict | None = None) -> dict[str, Any]:
+    """모든 약속의 이행 추적(사전 계산 대상). 대상이 드러나지 않는 약속은 개수만 센다.
+
+    policy: 운영 관문의 현재 정책(governance.active_policy). 차단 대상어(keyword_block)를 판정에 반영하고,
+    결과에 어느 정책 버전으로 판정했는지 남긴다.
+    """
+    policy = policy or {}
+    blocked = frozenset(policy.get("keyword_block") or ())
     c = Corpus(store)
     items, vague = [], 0
     for pos, u in enumerate(c.utts):
         if not u["is_commitment"] or u["speaker_type"] not in _ANSWERERS:
             continue
-        it = _item(c, pos)
+        it = _item(c, pos, blocked)
         if it is None:
             vague += 1
             continue
@@ -341,7 +348,7 @@ def track_all(store: Store) -> dict[str, Any]:
         items.append(finalize(it, ev, c.as_of))
     items.sort(key=lambda x: (x["date"], x["idx"]), reverse=True)
     counts = Counter(x["status"] for x in items)
-    return {"as_of": c.as_of, "vague": vague,
+    return {"as_of": c.as_of, "vague": vague, "policy_version": policy.get("version", 1),
             "counts": {s: counts.get(s, 0) for s in STATUS_ORDER},
             "statuses": {s: {"label": l, "desc": d} for s, (l, d) in STATUS.items()},
             "actions": ACTION_LABEL, "items": items}
