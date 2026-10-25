@@ -237,3 +237,39 @@ def test_governance_cli_records_run(tmp_path, monkeypatch, settings):
     events = gov.FileSink(tmp_path / "gov.jsonl").load()
     assert events[-1]["kind"] == "run" and events[-1]["payload"]["trigger"] == "테스트"
     assert sum(events[-1]["payload"]["paths"].values()) == events[-1]["payload"]["cases"]
+
+
+def test_two_instances_cannot_double_decide_or_overwrite_policy(tmp_path, monkeypatch):
+    """서버리스 인스턴스 둘이 같은 원장을 쓰는 경우(각자 읽기 캐시가 낡음):
+    같은 건 이중 결정은 409, 서로 다른 개정 채택은 최신 정책 위에 다시 얹혀 둘 다 반영된다."""
+    monkeypatch.setenv("AGRISEA_REVIEWERS", "홍검토:r1,김검토:r2")
+    monkeypatch.setenv("AGRISEA_ADMINS", "박관리:a1,최관리:a2")
+    monkeypatch.delenv("AGRISEA_GOV_GITHUB_REPO", raising=False)
+    monkeypatch.setattr(gov, "MIN_SUPPORT", 1)
+    s = _tracked_store(tmp_path)
+    settings = Settings(api_key="K", data_dir=tmp_path / "run")
+    a, b = TestClient(create_app(settings, s)), TestClient(create_app(settings, s))
+    q = a.get("/api/governance/queue").json()
+    b.get("/api/governance/queue")  # B가 지금 원장을 읽어 캐시
+    hen = next(x for x in q["items"] if x["ai_status"] == "done")
+    manure = next(x for x in q["items"] if x["ai_status"] == "reraised")
+
+    assert a.post(f"/api/governance/cases/{hen['id']}/decision", headers=H("r1"), json={"action": "approve"}).status_code == 200
+    late = b.post(f"/api/governance/cases/{hen['id']}/decision", headers=H("r2"), json={"action": "approve"})
+    assert late.status_code == 409  # B의 낡은 캐시로는 통과했지만 기록 직전 최신 원장에서 막힘
+    led = gov.FileSink(tmp_path / "run" / "governance.jsonl").load()
+    assert sum(1 for e in led if e["kind"] == "decision") == 1 and gov.verify_chain(led)["ok"]
+
+    a.post(f"/api/governance/cases/{manure['id']}/decision", headers=H("r1"), json={
+        "action": "reject", "final_status": "none", "reason": "keyword", "keywords": ["가축분뇨", "퇴비화"]})
+    b.app.state.ledger._loaded = 0  # B도 제안 두 개를 봄
+    props = {p["value"]: p["id"] for p in b.get("/api/governance/proposals").json()["proposals"]}
+    assert set(props) == {"가축분뇨", "퇴비화"}
+    assert a.post(f"/api/governance/proposals/{props['퇴비화']}/adopt", headers=H("a1"), json={}).json()["policy"]["version"] == 2
+    r = b.post(f"/api/governance/proposals/{props['가축분뇨']}/adopt", headers=H("a2"), json={})
+    pol = r.json()["policy"]
+    assert pol["version"] == 3 and pol["keyword_block"] == ["퇴비화", "가축분뇨"]  # 덮어쓰지 않고 이어서 반영
+    assert r.json()["event"]["payload"]["previous_version"] == 2
+    b.app.state.ledger._loaded = 0
+    again = b.post(f"/api/governance/proposals/{props['퇴비화']}/adopt", headers=H("a2"), json={})
+    assert again.status_code in (404, 409)  # 이미 채택된 제안은 다시 채택하지 않음

@@ -418,13 +418,23 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
                 raise HTTPException(400, "대상어 오인이면 잘못 쓰인 대상어를 하나 이상 고르세요.")
         if g["decision"] and g["state"] != "stale":
             raise HTTPException(409, "이미 결정된 건입니다. 바꾸려면 먼저 롤백하세요.")
-        pol = gov.active_policy(ledger.events())
-        ev = ledger.append("decision", who["name"], who["role"], {
-            "action": action, "ai_status": x["ai_status"], "final_status": final, "reason": reason,
-            "keywords": kws, "note": str(payload.get("note") or "")[:500], "fingerprint": g["fingerprint"],
-            "path": g["path"], "risk_score": g["risk"]["score"], "risk_factors": [f["code"] for f in g["risk"]["factors"]],
-            "policy_version": pol["version"], "subject": {"org": x["org"], "date": x["date"], "text": x["text"][:120]},
-        }, case=gov.case_id(x))
+        cs = gov.case_id(x)
+
+        def body(events: list[dict]) -> dict:
+            # 다른 인스턴스가 그사이 같은 건을 결정했으면 기록하지 않는다(최신 원장 기준으로 다시 검사)
+            stack = gov.decision_stacks(events).get(cs, [])
+            if stack and stack[-1]["payload"].get("fingerprint") == g["fingerprint"]:
+                raise gov.LedgerConflict("다른 검토자가 먼저 결정했습니다. 화면을 새로 고치세요.")
+            return {"action": action, "ai_status": x["ai_status"], "final_status": final, "reason": reason,
+                    "keywords": kws, "note": str(payload.get("note") or "")[:500], "fingerprint": g["fingerprint"],
+                    "path": g["path"], "risk_score": g["risk"]["score"],
+                    "risk_factors": [f["code"] for f in g["risk"]["factors"]],
+                    "policy_version": gov.active_policy(events)["version"],
+                    "subject": {"org": x["org"], "date": x["date"], "text": x["text"][:120]}}
+        try:
+            ev = ledger.append("decision", who["name"], who["role"], body, case=cs)
+        except gov.LedgerConflict as e:
+            raise HTTPException(409, str(e)) from None
         return {"event": ev, "case": governance_case(cid)}
 
     @app.post("/api/governance/cases/{cid}/rollback")
@@ -441,9 +451,16 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         target = stack[-1]
         if who["role"] != "admin" and target["actor"] != who["name"]:
             raise HTTPException(403, "다른 검토자의 결정은 관리자만 롤백할 수 있습니다.")
-        ev = ledger.append("rollback", who["name"], who["role"],
-                           {"target": target["seq"], "target_action": target["payload"]["action"], "reason": reason[:500]},
-                           case=cid_s)
+
+        def body(events: list[dict]) -> dict:
+            latest = gov.decision_stacks(events).get(cid_s, [])
+            if not latest or latest[-1]["seq"] != target["seq"]:
+                raise gov.LedgerConflict("그사이 이 건의 결정이 바뀌었습니다. 화면을 새로 고치세요.")
+            return {"target": target["seq"], "target_action": target["payload"]["action"], "reason": reason[:500]}
+        try:
+            ev = ledger.append("rollback", who["name"], who["role"], body, case=cid_s)
+        except gov.LedgerConflict as e:
+            raise HTTPException(409, str(e)) from None
         return {"event": ev, "case": governance_case(cid)}
 
     @app.get("/api/governance/ledger")
@@ -508,12 +525,21 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
     def governance_adopt(pid: str, request: Request, payload: dict[str, Any] = Body(default={})):
         """관리자가 개정안을 채택 → 새 정책 버전. 다음 판정(조회)부터 새 정책으로 다시 판정된다."""
         who = require(request, "admin")
-        p, pol = find_proposal(pid)
-        new = gov.adopt(pol, p)
-        ev = ledger.append("policy", who["name"], who["role"], {
-            "policy": new, "previous_version": pol["version"], "proposal": p["id"], "change": p["title"],
-            "rationale": p["rationale"], "support": p["support"], "note": str(payload.get("note") or "")[:500]})
-        return {"event": ev, "policy": new}
+        p, _ = find_proposal(pid)
+
+        def body(events: list[dict]) -> dict:
+            # 다른 관리자가 그사이 다른 개정을 채택했으면 그 최신 정책 위에 다시 얹는다(덮어쓰지 않게)
+            if p["id"] in gov.closed_proposals(events):
+                raise gov.LedgerConflict("이미 처리된 제안입니다.")
+            latest = gov.active_policy(events)
+            return {"policy": gov.adopt(latest, p), "previous_version": latest["version"], "proposal": p["id"],
+                    "change": p["title"], "rationale": p["rationale"], "support": p["support"],
+                    "note": str(payload.get("note") or "")[:500]}
+        try:
+            ev = ledger.append("policy", who["name"], who["role"], body)
+        except gov.LedgerConflict as e:
+            raise HTTPException(409, str(e)) from None
+        return {"event": ev, "policy": ev["payload"]["policy"]}
 
     @app.post("/api/governance/proposals/{pid}/dismiss")
     def governance_dismiss(pid: str, request: Request, payload: dict[str, Any] = Body(default={})):
@@ -522,8 +548,14 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         reason = str(payload.get("reason") or "").strip()
         if not reason:
             raise HTTPException(400, "기각 사유를 적으세요.")
-        ev = ledger.append("proposal_dismissed", who["name"], who["role"],
-                           {"proposal": p["id"], "title": p["title"], "reason": reason[:500]})
+        def body(events: list[dict]) -> dict:
+            if p["id"] in gov.closed_proposals(events):
+                raise gov.LedgerConflict("이미 처리된 제안입니다.")
+            return {"proposal": p["id"], "title": p["title"], "reason": reason[:500]}
+        try:
+            ev = ledger.append("proposal_dismissed", who["name"], who["role"], body)
+        except gov.LedgerConflict as e:
+            raise HTTPException(409, str(e)) from None
         return {"event": ev}
 
     @app.get("/api/governance/report.md")

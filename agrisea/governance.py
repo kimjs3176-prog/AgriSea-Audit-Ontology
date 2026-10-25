@@ -208,8 +208,16 @@ class GitHubSink(MemorySink):
         raise RuntimeError("원장 기록 충돌이 계속됩니다")
 
 
+class LedgerConflict(Exception):
+    """조건부 기록의 전제가 최신 원장에서 깨짐(다른 인스턴스가 먼저 결정·채택함)."""
+
+
 class Ledger:
-    """추가 전용·해시 연결 원장. 읽기는 짧게 캐시하고(다른 인스턴스의 기록 반영), 쓰기는 저장소에 바로 커밋."""
+    """추가 전용·해시 연결 원장. 읽기는 짧게 캐시하고(다른 인스턴스의 기록 반영), 쓰기는 저장소에 바로 커밋.
+
+    payload 대신 함수(최신 이벤트 목록 → payload)를 주면 조건부 기록: 저장소가 충돌로 다시 시도할 때마다
+    가장 최신 원장에 대해 다시 검사·계산하고, 전제가 깨지면 LedgerConflict로 기록하지 않는다.
+    """
 
     def __init__(self, sink: MemorySink, max_age: float = 20.0):
         self.sink = sink
@@ -229,14 +237,20 @@ class Ledger:
                 self._loaded = time.time()
             return list(self._events)
 
-    def append(self, kind: str, actor: str, role: str, payload: dict, case: str | None = None) -> dict:
+    def append(self, kind: str, actor: str, role: str, payload: dict | Callable[[list[dict]], dict],
+               case: str | None = None) -> dict:
         def build(events: list[dict]) -> dict:
+            body = payload(events) if callable(payload) else payload
             ev = {"seq": len(events), "ts": now_iso(), "kind": kind, "actor": actor, "role": role,
-                  "case": case, "payload": payload, "prev": events[-1]["hash"] if events else ""}
+                  "case": case, "payload": body, "prev": events[-1]["hash"] if events else ""}
             ev["hash"] = event_hash(ev)
             return ev
         with self._lock:
-            self._events = self.sink.commit(build)
+            try:
+                self._events = self.sink.commit(build)
+            except LedgerConflict:
+                self._loaded = 0.0  # 다음 읽기는 최신 원장으로
+                raise
             self._loaded = time.time()
             return self._events[-1]
 
@@ -469,7 +483,7 @@ def _pid(kind: str, value: Any) -> str:
 
 def proposals(items: list[dict], events: list[dict], policy: dict) -> list[dict]:
     """쌓인 예외에서 규칙 개정안을 만든다(채택·기각된 제안은 다시 내지 않는다)."""
-    closed = {e["payload"].get("proposal") for e in events if e["kind"] in ("policy", "proposal_dismissed")}
+    closed = closed_proposals(events)
     rows = [r for r in dataset(items, events, policy) if not r["stale"]]
     out = []
     support: dict[str, list[int]] = defaultdict(list)
@@ -513,7 +527,19 @@ def proposals(items: list[dict], events: list[dict], policy: dict) -> list[dict]
 
 
 def adopt(policy: dict, proposal: dict) -> dict:
-    return {**policy, **proposal["change"], "version": policy["version"] + 1, "note": proposal["title"]}
+    """제안을 주어진(최신) 정책 위에 얹은 새 버전. 그사이 다른 개정이 채택됐어도 그 위에 다시 계산한다."""
+    t, v = proposal["type"], proposal["value"]
+    if t == "keyword_block":
+        if v in policy["keyword_block"]:
+            raise LedgerConflict(f"「{v}」는 이미 차단돼 있습니다")
+        change = {"keyword_block": policy["keyword_block"] + [v]}
+    else:
+        change = {t: v}
+    return {**policy, **change, "version": policy["version"] + 1, "note": proposal["title"]}
+
+
+def closed_proposals(events: list[dict]) -> set:
+    return {e["payload"].get("proposal") for e in events if e["kind"] in ("policy", "proposal_dismissed")}
 
 
 # ── 증거 보고서 ───────────────────────────────────────────────
