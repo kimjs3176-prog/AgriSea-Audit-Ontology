@@ -162,9 +162,11 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
 
     @app.get("/api/search")
     def search(q: str = Query(..., min_length=1), speaker_type: str = "", date_from: str = "",
-               date_to: str = "", limit: int = Query(50, le=500), session: int | None = None):
+               date_to: str = "", limit: int = Query(50, ge=1, le=500), session: int | None = None):
         rows = store.search(q, limit, speaker_type, date_from, date_to, session=session)
+        # 목록은 관련도 상위 limit건, 전체 건수·회기 분포는 일치하는 발언 전체 기준
         return {"query": q, "count": len(rows), "results": rows,
+                **store.search_stats(q, speaker_type, date_from, date_to, session=session),
                 "issues": analysis._issue_rank(rows, 6)}
 
     @app.get("/api/issues")
@@ -331,7 +333,10 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         ext = store.kv_get(key)
         if refresh or not ext or time.time() - ext.get("_ts", 0) > FOLLOWUP_EXT_TTL:
             ext = {**external_evidence(settings, item), "_ts": time.time()}
-            store.kv_set(key, ext)
+            # 모든 출처를 건너뛰었으면(인증키 미설정 등) 저장하지 않는다: '외부 확인' 표시가 붙거나
+            # 키를 넣은 뒤에도 하루 동안 예전 결과가 남지 않게
+            if ext["evidence"] or any(src["status"] != "skipped" for src in ext["sources"]):
+                store.kv_set(key, ext)
         return governed([followup_view(item, ext)])[0]
 
     # ── 운영 관문 API ──
@@ -588,8 +593,18 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
     def briefing(org: str = "", issue: str = "", keyword: str = "", member: str = "",
                  date_from: str = "", date_to: str = "", format: str = "json",
                  session: int | None = None):
-        b = analysis.briefing(store, org, issue, keyword, member, date_from, date_to,
-                              session=session)
+        # 조건별 결과를 저장해 둔다(데이터가 바뀌면 kv가 비워져 다시 계산). 넓은 조건은 수 초씩 걸린다.
+        key = analysis.briefing_cache_key(org, issue, keyword, member, date_from, date_to, session)
+        b = store.kv_get(key)
+        if b is None:
+            try:
+                b = analysis.briefing(store, org, issue, keyword, member, date_from, date_to,
+                                      session=session)
+            except KeyError as e:
+                raise HTTPException(404, e.args[0]) from None
+            # 화면의 선택 상자로 고르는 조건(기관·쟁점·위원·회기)만 저장: 임의 입력으로 캐시가 늘지 않게
+            if not (keyword or date_from or date_to) and b["counts"]["utterances"]:
+                store.kv_set(key, b)
         if format == "md":
             return PlainTextResponse(analysis.briefing_markdown(b),
                                      media_type="text/markdown; charset=utf-8")
@@ -678,12 +693,17 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         from ..pipeline import fetch_minutes, pending_count
         log: list[str] = []
         ok = fetch_minutes(store, settings, limit=limit, progress=log.append)
-        graphs.invalidate()
+        if ok:  # 처리한 회의가 없으면 그래프를 다시 만들 이유가 없다(다음 SPARQL이 수십 초 걸림)
+            graphs.invalidate()
         return {"parsed": ok, "pending": pending_count(store), "log": log}
 
     @app.post("/api/admin/sample")
     def admin_sample():
+        """가상 예시 데이터(시연용). 실제 회의록이 있는 서비스에는 섞지 않는다(공개 판정·통계가 오염됨)."""
         from ..pipeline import load_sample
+        st = store.stats()
+        if st["meetings"] - st["samples"] > 0:
+            raise HTTPException(409, "실제 회의록이 있어 가상 예시 데이터를 넣지 않습니다(데이터가 없는 환경의 시연용).")
         n = load_sample(store)
         graphs.invalidate()
         return {"utterances": n}

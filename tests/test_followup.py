@@ -243,3 +243,14 @@ def test_followup_endpoints(tmp_path, monkeypatch):
     row = next(x for x in d["items"] if x["id"] == manure["id"])
     assert row["checked"] and row["status"] == "progress"
     assert d["counts"]["reraised"] == 0 and d["counts"]["progress"] == 1
+
+
+def test_external_skipped_everywhere_is_not_marked_checked(tmp_path):
+    """인증키가 없어 모든 출처를 건너뛰면 '외부 확인' 표시도, 하루 동안의 저장도 하지 않는다."""
+    s = _tracked_store(tmp_path)
+    c = TestClient(create_app(Settings(api_key="", data_dir=tmp_path), s))
+    item = c.get("/api/followups").json()["items"][0]
+    r = c.get(f"/api/followups/{item['id']}/external").json()
+    assert all(x["status"] == "skipped" for x in r["external"]["sources"])
+    assert "API_KEY" not in " ".join(x["message"] for x in r["external"]["sources"])  # 환경변수 이름 노출 없이
+    assert not next(x for x in c.get("/api/followups").json()["items"] if x["id"] == item["id"])["checked"]

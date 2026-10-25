@@ -78,7 +78,13 @@ RUNNING_HEADER = re.compile(
     r"\(\s*\d{4}\s*년\s*\d{1,2}\s*월\s*\d{1,2}\s*일\s*\)(?:\s*\d{1,3}\b)?")
 
 
+# PDF 쪽 경계에 남는 글리프 잔여물: 'ਘ\x13\x11ੌ \x01 \x01 \x16'(구르무키 문자 + 제어문자 + 쪽 번호 코드)
+PDF_GLYPH_NOISE = re.compile(r"[\u0a00-\u0a7f][\x00-\x1f]*[\u0a00-\u0a7f]?(?:\s*[\x00-\x08\x0b\x0c\x0e-\x1f])*")
+CONTROL_CHARS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+
+
 def clean_utterance_text(text: str) -> str:
+    text = CONTROL_CHARS.sub(" ", PDF_GLYPH_NOISE.sub(" ", text))
     return re.sub(r"\s+", " ", RUNNING_HEADER.sub(" ", text)).strip()
 
 

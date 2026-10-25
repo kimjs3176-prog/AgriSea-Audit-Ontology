@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 import threading
 from contextlib import contextmanager
@@ -259,46 +260,69 @@ class Store:
         sql += " ORDER BY m.date, u.meeting_id, u.idx"
         return [self._utt(r) for r in self.conn.execute(sql, args)]
 
-    def search(self, query: str, limit: int = 50, speaker_type: str = "",
-               date_from: str = "", date_to: str = "", session: int | None = None) -> list[dict]:
-        terms = [t for t in query.split() if t]
-        if not terms:
-            return []
-        long_terms = [t for t in terms if len(t) >= 3]
-        short_terms = [t for t in terms if len(t) < 3]
-        sql = ("SELECT u.*, m.date AS meeting_date, m.title AS meeting_title, "
-               "m.session_no AS session_no "
-               "FROM utterances u JOIN meetings m ON m.id = u.meeting_id WHERE 1=1")
-        args: list[Any] = []
+    @staticmethod
+    def _like(term: str) -> str:
+        """LIKE 패턴(검색어의 %·_ 는 글자 그대로). 공백을 빼고 비교하므로 검색어 공백도 뺀다."""
+        t = term.replace(" ", "").replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        return f"%{t}%"
+
+    def _search_where(self, terms: list[str], speaker_type: str, date_from: str, date_to: str,
+                      session: int | None) -> tuple[str, list[Any]]:
+        sql, args = " FROM utterances u JOIN meetings m ON m.id = u.meeting_id WHERE 1=1", []
         if session:
             sql += " AND m.session_no=?"; args.append(session)
-        if not self.fts:
-            short_terms, long_terms = terms, []
+        long_terms = [t for t in terms if len(t) >= 3] if self.fts else []
         if long_terms:
             fts = " AND ".join('"' + t.replace('"', '""') + '"' for t in long_terms)
             sql += " AND u.id IN (SELECT rowid FROM utterances_fts WHERE utterances_fts MATCH ?)"
             args.append(fts)
-        for t in short_terms:
-            sql += " AND u.text LIKE ?"; args.append(f"%{t}%")
+        for t in terms:
+            if t in long_terms:
+                continue
+            # PDF에서 복원한 띄어쓰기가 표기와 다를 수 있어('아프리카 돼지열병') 공백을 무시하고 찾는다
+            sql += " AND replace(u.text, ' ', '') LIKE ? ESCAPE '\\'"; args.append(self._like(t))
         if speaker_type:
             sql += " AND u.speaker_type=?"; args.append(speaker_type)
         if date_from:
             sql += " AND m.date >= ?"; args.append(date_from)
         if date_to:
             sql += " AND m.date <= ?"; args.append(date_to)
+        return sql, args
+
+    def search(self, query: str, limit: int = 50, speaker_type: str = "",
+               date_from: str = "", date_to: str = "", session: int | None = None) -> list[dict]:
+        terms = re.sub(r"[\x00-\x1f]", " ", query).split()  # 제어문자(%00 등)는 구분자로
+        if not terms:
+            return []
+        where, args = self._search_where(terms, speaker_type, date_from, date_to, session)
         # 넉넉히 가져와 관련도로 고른 뒤 최신순으로 보여 준다(위원장 사회 발언·짧은 언급보다
         # 검색어를 여러 번 다룬 위원 질의와 정부 답변이 먼저 뽑히도록)
-        sql += " ORDER BY m.date DESC, u.idx LIMIT ?"
-        args.append(max(limit * 4, 200))
-        rows = [self._utt(r) for r in self.conn.execute(sql, args)]
+        sql = ("SELECT u.*, m.date AS meeting_date, m.title AS meeting_title, m.session_no AS session_no"
+               + where + " ORDER BY m.date DESC, u.idx LIMIT ?")
+        rows = [self._utt(r) for r in self.conn.execute(sql, args + [max(limit * 20, 2000)])]
         weight = {"member": 1.0, "official": 0.9, "witness": 0.9, "reference": 0.8,
                   "staff": 0.5, "chair": 0.3}
+        bare = [t.replace(" ", "") for t in terms]
 
         def score(u: dict) -> float:
-            hits = sum(u["text"].count(t) for t in terms)
+            text = u["text"].replace(" ", "")
+            hits = sum(text.count(t) for t in bare)
             return weight.get(u["speaker_type"], 0.6) * (min(hits, 5) + min(len(u["text"]) / 400, 1))
         top = sorted(rows, key=score, reverse=True)[:limit]
         return sorted(top, key=lambda u: (u["meeting_date"] or "", -u["idx"]), reverse=True)
+
+    def search_stats(self, query: str, speaker_type: str = "", date_from: str = "", date_to: str = "",
+                     session: int | None = None) -> dict:
+        """검색 결과 전체의 건수와 회기·발언자 유형별 분포(목록은 관련도 상위만 돌려주므로 따로 센다)."""
+        terms = re.sub(r"[\x00-\x1f]", " ", query).split()  # 제어문자(%00 등)는 구분자로
+        if not terms:
+            return {"total": 0, "by_session": {}, "by_type": {}}
+        where, args = self._search_where(terms, speaker_type, date_from, date_to, session)
+        by_session = {r[0]: r[1] for r in self.conn.execute(
+            "SELECT m.session_no, COUNT(*)" + where + " GROUP BY m.session_no", args) if r[0]}
+        by_type = {r[0]: r[1] for r in self.conn.execute(
+            "SELECT u.speaker_type, COUNT(*)" + where + " GROUP BY u.speaker_type", args)}
+        return {"total": sum(by_type.values()), "by_session": by_session, "by_type": by_type}
 
     def kv_get(self, key: str) -> Any:
         r = self.conn.execute("SELECT value FROM kv WHERE key=?", (key,)).fetchone()
