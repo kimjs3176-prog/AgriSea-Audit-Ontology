@@ -167,9 +167,9 @@ python -m agrisea ingest 회의록.pdf --title "제418회 국회(정기회) 제1
 
 **기관 GitLab 미러**: 「GitLab 미러」(`.github/workflows/mirror-gitlab.yml`)가 `main`·`governance-log`가 바뀔 때와 자동 수집이 끝날 때
 `gitlab.aigov.go.kr/kimjs1408/kookgam-ax`로 푸시합니다(GitHub가 원본, GitLab에서는 직접 커밋하지 않음). Secrets에 `GITLAB_TOKEN`(write_repository)을 등록하세요.
-기관 GitLab은 GitHub 호스트 러너(해외)에서 접속되지 않으므로, 다음 중 하나가 필요합니다.
-- 기관망 안 서버에 self-hosted 러너를 등록하고 저장소 **Variables**에 `MIRROR_RUNNER`(러너 라벨, 예: `self-hosted`) 지정
-- 러너를 둘 수 없으면 기관망 서버에서 `scripts/mirror-gitlab.sh`를 cron으로 실행(`GITLAB_TOKEN=… scripts/mirror-gitlab.sh`)
+기관 GitLab은 GitHub 호스트 러너(해외)에서 접속되지 않으므로(국내 PC에서는 접속됨), 다음 중 하나가 필요합니다.
+- 국내 PC·서버(Windows는 Git for Windows 설치)에 self-hosted 러너를 등록하고 저장소 **Variables**에 `MIRROR_RUNNER`(러너 라벨, 예: `self-hosted`) 지정
+- 러너를 둘 수 없으면 그 PC에서 `scripts/mirror-gitlab.sh`를 cron으로 실행(`GITLAB_TOKEN=… scripts/mirror-gitlab.sh`)
 
 배포 환경(Vercel)은 `/tmp`만 쓸 수 있어 화면에서 직접 수집한 데이터는 서버가 재시작되면 사라집니다(확인·시연용).
 초기 데이터에는 전문검색 인덱스를 넣지 않고 압축하며, 배포 환경에서는 일반 문자열 검색을 씁니다.
