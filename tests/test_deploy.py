@@ -85,13 +85,15 @@ def test_export_seed_roundtrip(tmp_path, monkeypatch):
     # 사전 계산 결과(요약·집계·지식그래프)가 함께 실림
     assert restored.summary("SAMPLE-2025-1014", "rule")["key_issues"]
     assert {o["name"] for o in restored.kv_get("orgs") if o["mentions"]} >= {"농림축산식품부"}
-    # 브리핑 화면의 주요 기관 버튼은 미리 만든 브리핑을 그대로 쓴다
+    # 브리핑 화면의 바로가기 버튼(기관·쟁점·위원)은 미리 만든 브리핑을 그대로 쓴다
     import json
 
-    from agrisea.analysis import briefing
-    from agrisea.precompute import briefing_key
-    assert restored.kv_get(briefing_key("농림축산식품부")) == json.loads(
-        json.dumps(briefing(restored, "농림축산식품부"), ensure_ascii=False))
+    from agrisea.precompute import briefing_for, briefing_key, quick_briefings
+    quick = quick_briefings(restored)
+    assert {k for k, _ in quick} == {"org", "issue", "member"} and ("org", "농림축산식품부") in quick
+    for kind, value in quick:
+        assert restored.kv_get(briefing_key(kind, value)) == json.loads(
+            json.dumps(briefing_for(restored, kind, value), ensure_ascii=False))
     assert (tmp_path / "data" / "kg.nt.gz").exists() and meta["kg_triples"] > 0
     from agrisea.ontology import kg_from_file
     kg = kg_from_file(tmp_path / "data" / "kg.nt.gz")

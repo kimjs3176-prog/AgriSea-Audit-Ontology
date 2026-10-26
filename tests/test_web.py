@@ -1,3 +1,5 @@
+import json
+
 from fastapi.testclient import TestClient
 
 from agrisea.web.app import create_app
@@ -57,17 +59,25 @@ def test_meeting_export_markdown(store, settings):
     assert c.get("/api/meetings/nope/export.md").status_code == 404
 
 
-def test_org_briefing_is_cached(store, settings):
+def test_quick_briefings_are_cached(store, settings):
+    from agrisea.analysis import briefing
     from agrisea.precompute import briefing_key
     c = TestClient(create_app(settings, store))
-    b = c.get("/api/briefing", params={"org": "해양수산부"}).json()
-    assert b["counts"]["utterances"] and store.kv_get(briefing_key("해양수산부")) == b
-    assert c.get("/api/briefing", params={"org": "해양수산부"}).json() == b
-    # 다른 조건이 붙거나 사전에 없는 기관은 저장하지 않고 그때그때 계산
+    member = next(s["speaker_name"] for s in store.speakers() if s["speaker_type"] == "member")
+    targets = [("org", "해양수산부"), ("issue", "rice"), ("member", member)]
+    for kind, value in targets:
+        b = c.get("/api/briefing", params={kind: value}).json()
+        assert b["counts"]["utterances"] and store.kv_get(briefing_key(kind, value)) == b
+        assert c.get("/api/briefing", params={kind: value}).json() == b
+        assert b == json.loads(json.dumps(briefing(store, **{kind: value}), ensure_ascii=False))
+    # 조건이 둘 이상이거나 회기가 붙거나 사전·명단에 없는 값은 저장하지 않고 그때그때 계산
     c.get("/api/briefing", params={"org": "해양수산부", "session": 430})
+    c.get("/api/briefing", params={"org": "해양수산부", "issue": "rice"})
     c.get("/api/briefing", params={"org": "없는기관"})
+    c.get("/api/briefing", params={"issue": "없는쟁점"})
+    c.get("/api/briefing", params={"member": "없는위원"})
     keys = {k for (k,) in store.conn.execute("SELECT key FROM kv WHERE key LIKE 'briefing:%'")}
-    assert keys == {briefing_key("해양수산부")}
+    assert keys == {briefing_key(k, v) for k, v in targets}
 
 
 def test_index_has_flow_graph_and_transcript_tools(store, settings):
