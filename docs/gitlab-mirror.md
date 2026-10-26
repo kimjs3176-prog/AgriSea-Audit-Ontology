@@ -1,6 +1,6 @@
 # 기관 GitLab 자동 미러 설정
 
-GitHub(`kimjs3176-prog/ax-`)가 원본이고, 기관 GitLab(`https://gitlab.aigov.go.kr/kimjs1408/kookgam-ax.git`)에
+GitHub(`kimjs3176-prog/AgriSea-Audit-Ontology`)가 원본이고, 기관 GitLab(`https://gitlab.aigov.go.kr/kimjs1408/kookgam-ax.git`)에
 `main`·`governance-log` 브랜치를 그대로 복사합니다. 자동 수집 데이터 커밋도 함께 넘어갑니다.
 
 > **왜 GitHub Actions만으로는 안 되나**: 기관 GitLab은 GitHub 호스트 러너(해외 서버)에서 접속되지 않습니다

@@ -8,7 +8,7 @@
 # 필요: Git for Windows(git 명령)
 $ErrorActionPreference = "Stop"
 
-$Src = if ($env:SRC) { $env:SRC } else { "https://github.com/kimjs3176-prog/ax-.git" }
+$Src = if ($env:SRC) { $env:SRC } else { "https://github.com/kimjs3176-prog/AgriSea-Audit-Ontology.git" }
 $Dst = if ($env:DST) { $env:DST } else { "https://gitlab.aigov.go.kr/kimjs1408/kookgam-ax.git" }
 $Dir = if ($env:MIRROR_DIR) { $env:MIRROR_DIR } else { Join-Path $env:LOCALAPPDATA "ax-mirror.git" }
 $Branches = if ($env:BRANCHES) { $env:BRANCHES -split " " } else { @("main", "governance-log") }
