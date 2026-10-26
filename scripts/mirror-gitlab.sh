@@ -6,7 +6,7 @@
 # 원본 저장소가 비공개면 GITHUB_TOKEN(contents 읽기)도 지정한다.
 set -euo pipefail
 
-SRC=${SRC:-https://github.com/kimjs3176-prog/ax-.git}
+SRC=${SRC:-https://github.com/kimjs3176-prog/AgriSea-Audit-Ontology.git}
 DST=${DST:-https://gitlab.aigov.go.kr/kimjs1408/kookgam-ax.git}
 DIR=${MIRROR_DIR:-$HOME/.cache/ax-mirror.git}
 BRANCHES=${BRANCHES:-"main governance-log"}

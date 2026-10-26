@@ -1,8 +1,11 @@
-# GitLab 미러: main·governance-log 를 기관 GitLab(gitlab.aigov.go.kr)에 그대로 밀어 넣는다(GitHub가 원본).
-# 기관 GitLab은 GitHub 호스트 러너(해외)에서 접속되지 않는다(443 연결 시간 초과). 국내 PC(집·사무실)에서는 접속된다.
-# 그 PC에 self-hosted 러너를 등록하고, 저장소 Variables 에 MIRROR_RUNNER 를 그 러너 라벨(예: self-hosted)로 지정한다.
-# 러너를 둘 수 없으면 그 PC에서 scripts/mirror-gitlab.sh 를 주기적으로 돌린다.
-# 저장소 Settings > Secrets and variables > Actions 에 GITLAB_TOKEN(write_repository) 을 등록해야 한다.
+# GitLab 미러: GitHub(원본)의 main·governance-log 를 기관 GitLab(gitlab.aigov.go.kr)에 그대로 밀어 넣는다.
+#
+# 기관 GitLab은 GitHub 호스트 러너(해외)에서 접속되지 않는다(443 연결 시간 초과). 그래서 이 작업은
+# 국내 PC·서버에 등록한 self-hosted 러너에서만 돌린다. 설정 방법은 docs/gitlab-mirror.md 참고.
+#   - Secrets: GITLAB_TOKEN  (GitLab 프로젝트/개인 액세스 토큰, 권한 write_repository)
+#   - Variables: MIRROR_RUNNER (러너 라벨, 예: self-hosted 또는 kookgam)
+# MIRROR_RUNNER 가 없으면(러너 미설치) 작업을 건너뛴다: 접속 불가로 매번 실패 표시가 쌓이지 않게.
+# 러너 대신 국내 PC의 작업 스케줄러로 scripts/mirror-gitlab.sh(.ps1)를 돌려도 된다.
 name: GitLab 미러
 on:
   push:
@@ -15,14 +18,15 @@ on:
 concurrency: gitlab-mirror
 jobs:
   mirror:
-    runs-on: ${{ vars.MIRROR_RUNNER || 'ubuntu-latest' }}
-    timeout-minutes: 10
+    if: ${{ vars.MIRROR_RUNNER != '' }}
+    runs-on: ${{ vars.MIRROR_RUNNER }}
+    timeout-minutes: 15
     # Windows 러너도 Git Bash 로 같은 명령을 실행한다
     defaults:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with: { fetch-depth: 0 }
       - name: GitLab 접속 확인
         env:
@@ -30,15 +34,19 @@ jobs:
         run: |
           if [ -z "$GITLAB_TOKEN" ]; then echo "::error::GITLAB_TOKEN secret이 없습니다."; exit 1; fi
           if ! curl -sS -o /dev/null --connect-timeout 15 https://gitlab.aigov.go.kr/; then
-            echo "::error::이 러너(${RUNNER_NAME})에서 gitlab.aigov.go.kr 에 접속할 수 없습니다. 국내 PC의 self-hosted 러너를 Variables 의 MIRROR_RUNNER 로 지정하세요."
+            echo "::error::이 러너(${RUNNER_NAME})에서 gitlab.aigov.go.kr 에 접속할 수 없습니다(기관망·VPN 확인)."
             exit 1
           fi
       - name: GitLab으로 푸시
         env:
           GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+          GITLAB_REPO: ${{ vars.GITLAB_REPO || 'https://gitlab.aigov.go.kr/kimjs1408/kookgam-ax.git' }}
         run: |
-          url="https://oauth2:${GITLAB_TOKEN}@gitlab.aigov.go.kr/kimjs1408/kookgam-ax.git"
+          # 토큰을 주소에 넣지 않고 헤더로 넘긴다(원격 설정·오류 메시지에 남지 않게)
+          auth="Authorization: Basic $(printf 'oauth2:%s' "$GITLAB_TOKEN" | base64 | tr -d '\n')"
+          echo "::add-mask::$(printf 'oauth2:%s' "$GITLAB_TOKEN" | base64 | tr -d '\n')"
           for b in main governance-log; do
-            git rev-parse -q --verify "origin/$b" >/dev/null && \
-              git push "$url" "refs/remotes/origin/$b:refs/heads/$b"
+            git rev-parse -q --verify "origin/$b" >/dev/null || continue
+            git -c http.extraHeader="$auth" push "$GITLAB_REPO" "refs/remotes/origin/$b:refs/heads/$b"
+            echo "$b → $(git rev-parse --short "origin/$b")" >> "$GITHUB_STEP_SUMMARY"
           done
