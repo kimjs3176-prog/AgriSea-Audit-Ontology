@@ -16,7 +16,7 @@ from .store import Store
 # 사전 계산 형식이 바뀌면 올린다(초기 데이터를 다시 만들게 함).
 # 2: 발언자 역할 재분류, 회기별 쟁점·개요 집계 / 3: 띄어쓰기 교정 / 4: 요약에서 의안 목록 제외 / 5: 위원별 분석
 # 6: 정부 약속 이행 추적 / 7: 운영 관문 정책(차단 대상어) 반영
-PRECOMPUTE_VERSION = 9
+PRECOMPUTE_VERSION = 10
 
 
 def current_policy() -> dict:
