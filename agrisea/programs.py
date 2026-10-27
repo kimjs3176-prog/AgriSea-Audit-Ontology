@@ -12,10 +12,10 @@ from __future__ import annotations
 import json
 import re
 import time
-import xml.etree.ElementTree as ET
 from datetime import date
 from typing import Any, Callable
 
+import defusedxml.ElementTree as ET  # 표준 xml 대신: 외부 엔티티(XXE)·XML 폭탄 차단
 import requests
 
 from .api_client import normalize_date
