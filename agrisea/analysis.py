@@ -576,14 +576,19 @@ def agenda_headline(agendas: list[str]) -> str:
     return first + (f" 외 {len(main) - 1}건" if len(main) > 1 else "")
 
 
-def overview(store: Store, recent: int = 6) -> dict:
-    """대시보드용: 최근 회의(대표 안건·핵심 쟁점), 최근 정부 약속(무엇을 하겠다는지 드러나는 것만, 질의 맥락 포함)."""
+def overview(store: Store, recent: int = 6, ledger: int = 10) -> dict:
+    """대시보드용: 최근 회의 원장(대표 안건·핵심 쟁점·발언·질의·약속 수),
+    최근 정부 약속(무엇을 하겠다는지 드러나는 것만, 질의 맥락 포함)."""
     out_m = []
-    for m in store.meetings()[:recent]:
+    for m in store.meetings()[:ledger]:
         s = store.summary(m["id"], "rule") or {}
+        n = store.conn.execute(
+            "SELECT COUNT(*), COALESCE(SUM(is_question),0), COALESCE(SUM(is_commitment),0) "
+            "FROM utterances WHERE meeting_id=?", (m["id"],)).fetchone()
         out_m.append({"id": m["id"], "date": m["date"], "title": m["title"],
                       "session_no": m["session_no"], "agendas": m["agendas"][:3],
                       "n_agendas": len(main_agendas(m["agendas"])),
+                      "n_utterances": n[0], "n_questions": n[1], "n_commitments": n[2],
                       "issues": [i["label"] for i in (s.get("key_issues") or [])[:3]],
                       "headline": agenda_headline(m["agendas"])})
     rows = store.conn.execute(

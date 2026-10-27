@@ -9,11 +9,12 @@
 <link href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@600&family=Red+Hat+Text:wght@400;500;600&family=Red+Hat+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <style>
-/* Hallmark · shape: app screen · genre: modern-minimal · theme: Furrow (deal 2/3, seed national-assembly-agriculture-fisheries-742a·f86ecc95·2026-10-27·r0) · redesign: restyle
- * nav: kept (top bar, five tabs) · signature: kept (the meeting record and its dialogue) · states: loading, empty, error, full
+/* Hallmark · shape: app screen · genre: modern-minimal · theme: Furrow (deal 2/3, seed national-assembly-agriculture-fisheries-742a·f86ecc95·2026-10-27·r0) · redesign: full
+ * nav: top bar, one row on wide screens (wordmark, six tabs, search, session) · signature: the meeting ledger (dated table of recent meetings) leads the dashboard · states: loading, empty, error, full
  * axes: light/grotesk-sans/warm · posture: committed · contrast: pass · modes: light+dark · v2.0.0 */
 /* Hallmark · pre-emit critique: P4 H3 E4 S4 R4 V4 · weakest: H (headings were coloured per section), set every head in ink, one weight */
 /* Hallmark · answered: F15 kept layout (restyle) · 24b spacing moved onto the 4px scale */
+/* Hallmark · full: composition recomposed inside the shell (v6 below); ids, handlers, fields and links kept */
 /* 참고: gate 56(sticky 두 개)은 오탐. .agenda-h는 페이지가 아니라 자기 스크롤 상자(.tscroll) 안에서 붙으므로 헤더와 겹치지 않는다 */
 :root{
   color-scheme: light;
@@ -103,7 +104,6 @@ main{padding:20px 0 24px}
 section{display:none} section.on{display:block}
 .card{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:var(--radius);padding:16px 20px;margin-bottom:16px;min-width:0}
 .grid{display:grid;gap:16px}
-.kpis{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
 .g2{grid-template-columns:repeat(auto-fit,minmax(min(340px,100%),1fr))}
 .two{display:grid;grid-template-columns:340px minmax(0,1fr);gap:16px;align-items:start}
 .pbar{display:grid;grid-template-columns:110px minmax(0,1fr) 92px;gap:8px;align-items:center;font-size:13px;margin:4px 0}
@@ -125,9 +125,6 @@ section{display:none} section.on{display:block}
 .mcard{border:1px solid var(--line);border-radius:10px;padding:12px 12px;background:var(--panel);color:var(--ink);font-size:13px}
 .mcard .n{font-weight:700;font-size:15px;color:var(--member)}
 @media (max-width:860px){.two{grid-template-columns:minmax(0,1fr)}}
-.stat .v{display:block;font-size:26px;font-weight:700;line-height:1.2;font-variant-numeric:tabular-nums}
-.stat .l{color:var(--muted);font-size:13px}
-.stat .s{color:var(--ink-2);font-size:12px;margin-top:2px}
 h2{font-size:16px;margin:0 0 4px}
 .sub{color:var(--muted);font-size:13px;margin:0 0 12px}
 h3{font-size:14px;margin:16px 0 8px;color:var(--ink-2)}
@@ -290,10 +287,7 @@ main.wrap{padding-top:24px;padding-bottom:28px}
 h2{font-size:16px;letter-spacing:-.02em;display:flex;align-items:center;gap:8px}
 h2::before{content:"";width:4px;height:15px;border-radius:2px;background:var(--brand);flex:none}
 .sub{margin-bottom:16px}
-/* 대시보드 첫 화면: 한 줄 요약 + 핵심 수치 */
-.hero{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,2fr);gap:24px;align-items:center;padding:24px 24px}
-.hero .headline{font-size:22px;font-weight:800;letter-spacing:-.03em;line-height:1.35;margin:4px 0 8px}
-.hero .meta{font-size:13px;color:var(--muted)}
+/* 대시보드 핵심 수치 */
 .kpirow{display:grid;grid-template-columns:repeat(4,1fr)}
 .kpirow div{padding:4px 20px;border-left:1px solid var(--line)}
 .kpirow b{display:block;font-size:30px;font-weight:800;letter-spacing:-.03em;line-height:1.15;font-variant-numeric:tabular-nums}
@@ -301,15 +295,13 @@ h2::before{content:"";width:4px;height:15px;border-radius:2px;background:var(--b
 .kpirow small{display:block;font-size:11px;color:var(--muted)}
 .g3{grid-template-columns:repeat(3,minmax(0,1fr))}
 @media (max-width:1100px){.g3{grid-template-columns:repeat(auto-fit,minmax(min(360px,100%),1fr))}}
-@media (max-width:900px){.hero{grid-template-columns:1fr}.kpirow div:first-child{border-left:0;padding-left:0}}
+@media (max-width:900px){.kpirow div:first-child{border-left:0;padding-left:0}}
 @media (max-width:640px){
   .wrap{padding:0 16px}
   .top{padding:12px 0 8px;gap:8px}
   h1{font-size:16px} h1 small{display:none}
   .brand svg{width:26px;height:26px}
   .sessionbar{width:100%} .sessionbar select{flex:1;max-width:none}
-  .hero{padding:20px}
-  .hero .headline{font-size:19px}
   .kpirow{grid-template-columns:repeat(2,1fr);row-gap:12px}
   .kpirow div:nth-child(3){border-left:0;padding-left:0}
   .kpirow b{font-size:24px}
@@ -409,9 +401,6 @@ h3{font-size:14.5px;color:var(--ink)}
 .dash-a>.card,.dash-b>.card{margin:0}
 #rank .bars{gap:4px 12px}
 @media (max-width:1000px){.dash-a,.dash-b{grid-template-columns:minmax(0,1fr)}}
-.qlinks{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
-.qlinks button{border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:4px 12px;font:inherit;font-size:13px;cursor:pointer;color:var(--ink)}
-.qlinks button:hover{border-color:var(--brand);color:var(--brand)}
 /* 흐름도(3열 리본): 굵기 = 함께 언급된 횟수 */
 .flow{position:relative;min-width:0}
 .flow svg{display:block;width:100%;height:auto;overflow:visible}
@@ -549,20 +538,18 @@ a.law{color:inherit;text-decoration:underline;text-decoration-color:color-mix(in
 .net-tip .nt-meta{color:var(--net-ink-3)} .net-tip .nt-link{color:var(--net-ink-2)} .net-tip .nt-hint{color:var(--net-issue);margin-top:4px}
 .sep{display:inline-block;width:12px}
 /* 제목: 먹색 한 가지, 한 굵기(구역마다 색을 바꾸지 않는다) */
-h2,h3,.pagehead h2,.hero .headline{font-family:var(--font-display);font-weight:var(--display-weight);letter-spacing:var(--tracking-display);color:var(--ink);text-wrap:balance}
+h2,h3,.pagehead h2{font-family:var(--font-display);font-weight:var(--display-weight);letter-spacing:var(--tracking-display);color:var(--ink);text-wrap:balance}
 h2{font-size:17px} h2::before{display:none}
 .pagehead h2{font-size:24px}
 /* 카드: 종이 위 흰 장 한 가지(괘선 테두리, 그림자 거의 없음) */
 .card{background:var(--color-paper-2);border:1px solid var(--color-rule);border-radius:var(--radius-card);box-shadow:var(--shadow-card)}
 .netside,.mcard,.eq,.pt,.mini div,.fuext{border-radius:var(--radius-pill)}
-/* 대시보드 첫 줄: 쟁점 이름을 크게, 숫자는 같은 서체로 */
-.hero .headline{font-size:30px;line-height:1.15;margin:0 0 4px}
-.hero .lede{margin:0 0 8px;color:var(--ink-2);font-size:15px}
-.kpirow b,.mini b,.stat .v{font-family:var(--font-display);font-weight:var(--display-weight);font-variant-numeric:tabular-nums;letter-spacing:var(--tracking-display)}
+/* 숫자는 제목과 같은 서체로 */
+.kpirow b,.mini b{font-family:var(--font-display);font-weight:var(--display-weight);font-variant-numeric:tabular-nums;letter-spacing:var(--tracking-display)}
 .site-footer{display:flex;flex-wrap:wrap;justify-content:center;gap:4px 16px}
 /* 칩·필터: 6px 모서리, 문장형, 자간 없음 */
 .chip,.fuchip,.fukind{border-radius:var(--radius-pill);font-weight:500}
-.filterchips button,.qlinks button,.netmode button,.fustat button,.starter .ex button,button.ghost,.actbar a,.actbar button,.dd>summary,input,select{border-radius:var(--radius-pill)}
+.filterchips button,.netmode button,.fustat button,.starter .ex button,button.ghost,.actbar a,.actbar button,.dd>summary,input,select{border-radius:var(--radius-pill)}
 .chat-day span{border-radius:var(--radius-pill)}
 .netmode button.on{background:var(--color-paper-3);border-color:var(--color-ink);box-shadow:inset 0 0 0 1px var(--color-ink);color:var(--ink);font-weight:600}
 .segtabs button.on{border-bottom-color:var(--color-accent);font-weight:600}
@@ -571,7 +558,7 @@ h2{font-size:17px} h2::before{display:none}
 button:active:not(:disabled),.dd>summary:active{transform:translateY(1px)}
 button:disabled,button[aria-disabled="true"],input:disabled,select:disabled{opacity:.5;cursor:not-allowed}
 button.primary:hover{border-color:var(--color-ink)}
-.filterchips button:hover,.qlinks button:hover,.fustat button:hover,.netmode button:hover{border-color:var(--color-ink);color:var(--ink)}
+.filterchips button:hover,.fustat button:hover,.netmode button:hover{border-color:var(--color-ink);color:var(--ink)}
 /* 왼쪽 색 띠 대신: 테두리는 괘선 한 가지, 누구의 말인지는 이름 색으로 */
 .pt,.pt.member,.pt.gov,.pt.staff{border-left:1px solid var(--color-rule)}
 .pt.warn{border:1px solid color-mix(in oklab,var(--warn) 30%,var(--color-rule))}
@@ -589,6 +576,83 @@ button.primary:hover{border-color:var(--color-ink)}
 /* 다크에서 카드가 바닥보다 어둡지 않게 */
 :root[data-theme="dark"] .card{color:var(--ink)}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .card{color:var(--ink)}}
+/* ═══ v6 · Hallmark 전면 재구성: 상단 한 줄, 회의 원장(표)이 첫머리, 상자 속 상자 대신 괘선 행 ═══ */
+/* 상단바: 넓은 화면에서는 표지·탭·검색·회기를 한 줄에(두 줄 머리글이 화면 위 128px를 차지하던 것을 60px로) */
+@media (min-width:1200px){
+  :root{--header-h:61px}
+  header .wrap{display:flex;align-items:stretch;gap:20px}
+  header .top{display:contents}
+  header .brand{order:1;padding:12px 0;flex:none}
+  header h1{white-space:nowrap;font-size:18px}
+  header h1 small{display:none}
+  header nav{order:2;flex:1 1 auto;margin:0;align-self:stretch}
+  header nav button{padding:0 12px;height:100%;border-bottom-width:3px}
+  header .gsearch{order:3;flex:0 1 260px;min-width:160px;align-self:center}
+  header .sessionbar{order:4;align-self:center;white-space:nowrap;flex:none}
+  header .sessionbar select{max-width:220px}
+  .two>.card:first-child{top:calc(var(--header-h) + 16px);max-height:calc(100vh - var(--header-h) - 32px)}
+}
+/* 대시보드 머리: 기간·갱신 문장과 핵심 수치 한 줄(상자 없이 먹 괘선 위에) */
+.dhead{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px 32px;align-items:end;border-top:2px solid var(--color-ink);border-bottom:1px solid var(--color-rule);padding:16px 0;margin:0 0 16px}
+.dhead .dtitle{font-size:22px;margin:0 0 4px}
+.dhead p{margin:0;color:var(--ink-2);font-size:14px;line-height:1.6}
+.dhead p.upd{color:var(--muted);font-size:13px}
+.dhead .kpirow{grid-template-columns:repeat(4,auto)}
+.dhead .kpirow div{padding:0 0 0 20px;margin-left:20px}
+.dhead .kpirow div:first-child{border-left:0;margin-left:0;padding-left:0}
+.dhead .kpirow b{font-size:26px}
+@media (max-width:1000px){.dhead{grid-template-columns:minmax(0,1fr)}.dhead .kpirow{grid-template-columns:repeat(4,minmax(0,1fr))}.dhead .kpirow div{margin-left:0;padding-left:12px}}
+@media (max-width:640px){.dhead .dtitle{font-size:19px}.dhead .kpirow{grid-template-columns:repeat(2,minmax(0,1fr));row-gap:12px}.dhead .kpirow div:nth-child(3){border-left:0;padding-left:0}.dhead .kpirow b{font-size:22px}}
+/* 카드 머리: 제목과 이동 링크 한 줄 */
+.cardhead{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.cardhead .link{font-size:13px}
+/* 회의 원장: 이 서비스의 얼굴. 날짜·회의·쟁점·숫자를 표로 */
+table.ledger{font-size:14px}
+table.ledger thead th{border-bottom:2px solid var(--color-ink);padding-top:0}
+table.ledger th.num,table.ledger td.num{text-align:right;white-space:nowrap;width:1%}
+table.ledger td.num,table.ledger td.d{font-family:var(--font-mono);font-size:13px;font-variant-numeric:tabular-nums;padding-top:10px}
+table.ledger td.num{color:var(--ink-2)}
+table.ledger td.num.hot{color:var(--ink);font-weight:500}
+table.ledger td.d{white-space:nowrap;color:var(--ink-2);width:1%}
+table.ledger tbody tr{cursor:pointer}
+table.ledger tbody tr:hover{background:var(--color-paper-3)}
+table.ledger .rowlink{font-weight:600;color:var(--ink);text-align:left}
+table.ledger tr:hover .rowlink{text-decoration:underline;text-decoration-color:var(--color-accent);text-underline-offset:.2em}
+table.ledger .h{color:var(--ink-2);font-size:13px;margin-top:2px}
+table.ledger td.iss{max-width:260px}
+@media (max-width:760px){table.ledger .c-iss,table.ledger .c-utt{display:none}}
+@media (max-width:480px){table.ledger .c-q{display:none}table.ledger td,table.ledger th{padding:8px 4px}}
+/* 대시보드 배치: 원장 → (쟁점 흐름 | 많이 논의된 쟁점) → (정부 약속 | 지원사업 공고) → 관계 흐름 */
+.dash-b{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media (max-width:1300px) and (min-width:1001px){.dash-b{grid-template-columns:repeat(2,minmax(0,1fr))}.dash-b>.card:last-child{grid-column:auto}}
+/* 상자 속 상자 없애기: 카드 안의 작은 상자는 괘선 행으로 */
+.points{gap:0 24px}
+.pt,.pt.member,.pt.gov,.pt.staff,.pt.warn,.prog,.prog.open,.prog.upcoming{border:0;border-top:1px solid var(--color-rule);border-radius:0;background:none;padding:12px 0;cursor:pointer}
+.pt:hover{background:linear-gradient(var(--color-paper-3),var(--color-paper-3)) no-repeat 0 0/100% 100%}
+.pt.warn .who{color:var(--warn)}
+.prog{cursor:default}
+.eq,.eq.follow,.eq.repeat{border:0;border-top:1px solid var(--color-rule);border-radius:0;background:none;padding:12px 0}
+.eqs{gap:0 24px}
+.mcards{gap:0 24px}
+.mcard{border:0;border-top:1px solid var(--color-rule);border-radius:0;background:none;padding:12px 0}
+.mini{gap:0;border-top:1px solid var(--color-rule);border-bottom:1px solid var(--color-rule);padding:8px 0}
+.mini div{background:none;border-radius:0;border-left:1px solid var(--color-rule);padding:4px 16px}
+.mini div:first-child{border-left:0;padding-left:0}
+@media (max-width:640px){.mini div:nth-child(3){border-left:0;padding-left:0}}
+.netside{border:0;border-left:1px solid var(--color-rule);border-radius:0;padding:0 0 0 16px}
+@media (max-width:1000px){.netside{border-left:0;border-top:1px solid var(--color-rule);padding:12px 0 0}}
+.fuext{border:0;border-top:1px solid var(--color-rule);border-radius:0;padding:12px 0 0}
+/* 질의 차례: 위원 한 명 = 한 구획(먹 괘선 아래 질문 줄) */
+.tcard{border:0;border-radius:0;background:none;padding:12px 0 4px;margin:0;border-top:2px solid var(--color-ink)}
+.tcard+.tcard{margin-top:12px}
+.tcard li{border-radius:0;border-top:1px solid var(--color-rule)}
+.tcard .a .lbl{display:inline-block;font-size:12px;color:var(--muted);margin-right:8px}
+/* 질의 차례 이동 단추: 숫자는 표처럼 */
+.turnnav button b{font-family:var(--font-mono);font-weight:400;font-variant-numeric:tabular-nums;color:var(--muted);margin-left:4px}
+/* 상태: 불러오기·빈 상태·오류를 같은 모양으로 */
+.empty.err{color:var(--bad)}
+/* 링크 단추: 초점·누름 표시 */
+button.link:hover{text-decoration:underline;text-underline-offset:.2em}
 /* 움직임 줄이기 */
 @media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
 </style>
@@ -623,18 +687,35 @@ button.primary:hover{border-color:var(--color-ink)}
 <!-- 대시보드 -->
 <section id="dash" class="on">
   <div id="noticeArea"></div>
-  <div class="card hero" id="kpis"></div>
+  <div class="dhead" id="kpis"><div><h2 class="dtitle">회의록 원장</h2><p class="upd">불러오는 중…</p></div></div>
+  <div class="card">
+    <div class="cardhead"><h2>최근 회의</h2><button class="link" onclick="openTab('meetings')">회의록 전체 보기</button></div>
+    <p class="sub">가장 최근에 열린 회의부터 대표 안건, 핵심 쟁점, 발언·질의·정부 약속 수를 적었습니다. 행을 누르면 3줄 브리핑과 질의 차례가 열립니다.</p>
+    <div id="recent" class="tablewrap"><div class="empty">불러오는 중…</div></div>
+  </div>
   <div class="dash-a">
     <div class="card">
       <h2>회기별 쟁점 흐름</h2>
       <p class="sub">최근 14개 회기에서 쟁점이 언급된 횟수입니다. 색이 진할수록 많고, <span class="reg">굵은 번호</span>는 정기회입니다. 쟁점 이름을 누르면 상세로 갑니다.</p>
       <div class="heat" id="heat"></div>
-      <div class="scale"><span>적음</span><span class="grad"></span><span>많음</span><span>· 점선 칸 = 언급 없음</span></div>
+      <div class="scale"><span>적음</span><span class="grad"></span><span>많음</span><span>점선 칸은 언급 없음</span></div>
     </div>
     <div class="card">
       <h2>많이 논의된 쟁점</h2>
       <p class="sub">전체 회기 언급 횟수입니다. 누르면 쟁점 분석으로 갑니다.</p>
       <div id="rank" class="scrollbox" style="--box-h:380px"></div>
+    </div>
+  </div>
+  <div class="dash-b">
+    <div class="card">
+      <div class="cardhead"><h2>최근 정부 약속</h2><button class="link" onclick="openTab('followups')">이행 추적</button></div>
+      <p class="sub">무엇을 하겠다고 답했는지 앞선 위원 질의와 함께 봅니다. 국감 사후 점검 대상입니다.</p>
+      <div id="recentCommit" class="clist scrollbox"><div class="empty">불러오는 중…</div></div>
+    </div>
+    <div class="card">
+      <h2>지원사업 공고</h2>
+      <p class="sub" id="progSub">공공데이터포털(K-Startup)의 농림·해양수산 관련 공고를 마감이 가까운 순으로 보여 줍니다.</p>
+      <div id="progDash" class="points scrollbox"><div class="empty">불러오는 중…</div></div>
     </div>
   </div>
   <div class="card">
@@ -653,23 +734,6 @@ button.primary:hover{border-color:var(--color-ink)}
     </div>
     </div>
     <aside class="netside" id="netSide"><div class="muted" style="font-size:13px">연결을 불러오는 중…</div></aside>
-    </div>
-  </div>
-  <div class="dash-b">
-    <div class="card">
-      <h2>최근 회의</h2>
-      <p class="sub">대표 안건과 핵심 쟁점입니다. 누르면 요약을 엽니다.</p>
-      <div id="recent" class="scrollbox"></div>
-    </div>
-    <div class="card">
-      <div class="row" style="justify-content:space-between;align-items:baseline"><h2>최근 정부 약속</h2><button class="link" style="font-size:13px" onclick="openTab('followups')">이행 추적</button></div>
-      <p class="sub">무엇을 하겠다고 답했는지 앞선 위원 질의와 함께 봅니다. 국감 사후 점검 대상입니다.</p>
-      <div id="recentCommit" class="clist scrollbox"></div>
-    </div>
-    <div class="card">
-      <h2>지원사업 공고</h2>
-      <p class="sub" id="progSub">공공데이터포털(K-Startup)의 농림·해양수산 관련 공고를 마감이 가까운 순으로 보여 줍니다.</p>
-      <div id="progDash" class="points scrollbox"><div class="empty">불러오는 중…</div></div>
     </div>
   </div>
   <div class="card">
@@ -691,7 +755,7 @@ button.primary:hover{border-color:var(--color-ink)}
 
 <!-- 회의록 -->
 <section id="meetings">
-  <div class="pagehead"><h2>회의록</h2><p>회의를 고르면 <b>요약(3줄 브리핑) → 질의 차례 → 전체 회의록 → 약속</b> 순으로 볼 수 있고(전체 회의록은 「읽기 쉽게」로 다듬어 보거나 원문 그대로 볼 수 있음), 위에서 전체 회의록을 검색할 수 있습니다.</p></div>
+  <div class="pagehead"><h2>회의록</h2><p>회의를 고르면 3줄 브리핑 아래 요약, 전체 회의록, 질의 차례, 약속·자료요구를 탭으로 볼 수 있습니다. 전체 회의록은 「읽기 쉽게」로 다듬어 보거나 원문 그대로 볼 수 있고, 아래 검색창은 회의록 전체에서 찾습니다.</p></div>
   <div class="card searchbar">
     <div class="row">
       <input type="search" id="q" placeholder="회의록 전체에서 찾기 — 예: 쌀값 시장격리, 산불 진화헬기, 오염수">
@@ -833,7 +897,7 @@ async function loadSessions(){
   SESSIONS = await api("/api/sessions");
   SESS = Object.fromEntries(SESSIONS.map(s => [s.session_no, s]));
   $("#session").innerHTML = '<option value="">전체 회기</option>' + SESSIONS.map(s =>
-    `<option value="${s.session_no}">${esc(s.label)} · 회의 ${s.meetings}건</option>`).join("");
+    `<option value="${s.session_no}">${esc(s.label)} (회의 ${s.meetings}건)</option>`).join("");
   try{ const v = sessionStorage.getItem("agrisea-session"); if(v && SESS[v]) $("#session").value = v }catch(e){}
 }
 $("#session").onchange = () => {
@@ -881,7 +945,7 @@ function barsHtml(rows, {onclick = ""} = {}){
   const max = Math.max(1, ...rows.filter(r => !r.parentRow).map(r => r.count));
   return `<div class="bars">${rows.map(r => {
     const key = r.id ?? r.name, label = r.label ?? r.name;
-    return `<div class="hit ${onclick ? "click" : ""}" data-key="${esc(key)}" ${onclick ? `onclick="${onclick}('${esc(key)}')"` : ""} data-tip="${esc(label)} · ${fmt(r.count)}회">
+    return `<div class="hit ${onclick ? "click" : ""}" data-key="${esc(key)}" ${onclick ? `onclick="${onclick}('${esc(key)}')"` : ""} data-tip="${esc(label)} ${fmt(r.count)}회">
       <span class="name ${r.parentRow ? "parent" : ""}" style="${r.indent ? "padding-left:14px" : ""}">${esc(label)}</span>
       <span>${r.parentRow ? "" : `<span class="fill" style="width:${r.count ? Math.max(2, r.count / max * 100) : 0}%"></span>`}</span>
       <span class="num">${fmt(r.count)}</span></div>` }).join("")}</div>`;
@@ -899,11 +963,9 @@ async function loadDash(){
   const latest = SESSIONS[0];
   const renderHero = (topIssue, recentN) => { $("#kpis").innerHTML = `
     <div>
-      <div class="headline">${topIssue ? esc(topIssue) : "농해수위 회의록 분석"}</div>
-      <p class="lede">${topIssue ? "전체 회기에서 가장 많이 다룬 쟁점입니다." : "회의록을 불러오는 중입니다."}</p>
-      <div class="meta">${dot(s.date_min)} ~ ${dot(s.date_max)}<span class="sep"></span>회기 ${SESSIONS.length}개${recentN ? `<span class="sep"></span>최근 회기(${esc(latest.label)}) 회의 ${recentN}건` : ""}<br>${upd}</div>
-      <div class="qlinks">${[["meetings", "회의록"], ["issues", "쟁점"], ["members", "의원"], ["brief", "국감 브리핑"]]
-        .map(([t, l]) => `<button onclick="openTab('${t}')">${l}</button>`).join("")}</div>
+      <h2 class="dtitle">회의록 원장</h2>
+      <p>${dot(s.date_min)}부터 ${dot(s.date_max)}까지 회기 ${fmt(SESSIONS.length)}개의 회의록입니다.${recentN ? ` 최근 회기인 ${esc(latest.label)}에는 회의가 ${fmt(recentN)}건 열렸습니다.` : ""}${topIssue ? ` 가장 많이 다룬 쟁점은 <button class="link" onclick="gotoIssue('${esc(topIssue.id)}')">${esc(topIssue.label)}</button>입니다.` : ""}</p>
+      <p class="upd">${upd}</p>
     </div>
     <div class="kpirow">${[
       ["회의", s.meetings, "수록된 전체·소위 회의"],
@@ -913,21 +975,31 @@ async function loadDash(){
     ].map(([l, v, sub]) => `<div><b>${fmt(v)}</b><span>${l}</span><small>${sub}</small></div>`).join("")}</div>` };
   renderHero(null, 0);
 
-  const [issues, trend, ov] = await Promise.all([api("/api/issues"), api("/api/issue-trend"), api("/api/overview")]);
+  let issues, trend, ov;
+  try{ [issues, trend, ov] = await Promise.all([api("/api/issues"), api("/api/issue-trend"), api("/api/overview")]) }
+  catch(e){
+    const err = `<div class="empty err">불러오지 못했습니다: ${esc(e.message)}</div>`;
+    ["#recent", "#rank", "#heat", "#recentCommit"].forEach(sel => $(sel).innerHTML = err); return;
+  }
   // 가장 아래 단계 쟁점끼리 비교(하위 쟁점이 없는 최상위 쟁점도 포함: '공공기관·예산·조직운영' 등)
   const parents = new Set(issues.map(i => i.parent).filter(Boolean));
   const leaf = issues.filter(i => i.count && !parents.has(i.id)).sort((a, b) => b.count - a.count);
   $("#rank").innerHTML = leaf.length ? barsHtml(leaf, {onclick: "gotoIssue"}) : '<div class="empty">데이터 없음</div>';
-  renderHero(leaf[0]?.label, latest?.meetings || 0);
+  renderHero(leaf[0], latest?.meetings || 0);
   loadNet();
 
-  $("#recent").innerHTML = ov.meetings.map(m => `
-    <div class="item" onclick="gotoMeeting('${esc(m.id)}')">
-      <div class="d">${dot(m.date)}<span class="sep"></span>${esc(SESS[m.session_no]?.kind || "")}<span class="sep"></span>안건 ${m.n_agendas}건</div>
-      <div class="t">${esc(meetingShort(m))}</div>
-      ${m.headline ? `<div class="h">${esc(cut(m.headline, 90))}</div>` : ""}
-      <div>${chips(m.issues)}</div>
-    </div>`).join("") || '<div class="empty">데이터 없음</div>';
+  // 회의 원장: 날짜·회의·대표 안건·핵심 쟁점·발언·질의·약속 수(행 전체를 누르거나 회의 이름 단추로)
+  $("#recent").innerHTML = ov.meetings.length ? `<table class="t ledger">
+    <thead><tr><th scope="col">일자</th><th scope="col">회의와 대표 안건</th><th scope="col" class="c-iss">핵심 쟁점</th>
+      <th scope="col" class="num c-utt">발언</th><th scope="col" class="num c-q">질의</th><th scope="col" class="num">약속</th></tr></thead>
+    <tbody>${ov.meetings.map(m => `<tr onclick="gotoMeeting('${esc(m.id)}')">
+      <td class="d">${dot(m.date)}</td>
+      <td><button class="link rowlink" onclick="event.stopPropagation();gotoMeeting('${esc(m.id)}')">${esc(meetingShort(m))}</button>
+        <div class="h">${esc(cut(m.headline || "", 90))}</div></td>
+      <td class="iss c-iss">${chips(m.issues) || '<span class="muted">-</span>'}</td>
+      <td class="num c-utt">${m.n_utterances == null ? "-" : fmt(m.n_utterances)}</td><td class="num c-q">${m.n_questions == null ? "-" : fmt(m.n_questions)}</td>
+      <td class="num ${m.n_commitments ? "hot" : ""}">${m.n_commitments == null ? "-" : fmt(m.n_commitments)}</td></tr>`).join("")}</tbody></table>`
+    : '<div class="empty">아직 수집한 회의가 없습니다. 아래 데이터 직접 수집에서 가져올 수 있습니다.</div>';
 
   const cols = trend.sessions.slice(-14);   // 최근 14개 회기(전체 추이는 쟁점 분석에서)
   const recentSum = r => cols.reduce((a, c) => a + (r.by_session[c] || 0), 0);
@@ -974,7 +1046,7 @@ function moreList(htmls, n, unit = "건", wrap = ""){
   // wrap: 카드 격자처럼 감싸는 틀이 필요하면 클래스 이름(펼친 뒤에도 같은 격자로 보이게)
   if(htmls.length <= n) return htmls.join("");
   const rest = wrap ? `<div class="${wrap}">${htmls.slice(n).join("")}</div>` : htmls.slice(n).join("");
-  return htmls.slice(0, n).join("") + `<details class="more"><summary>${htmls.length - n}${unit} 더 보기 ▾</summary>${rest}</details>`;
+  return htmls.slice(0, n).join("") + `<details class="more"><summary>${htmls.length - n}${unit} 더 보기</summary>${rest}</details>`;
 }
 function stackBar(parts){
   const total = parts.reduce((a, p) => a + p.value, 0) || 1;
@@ -1027,12 +1099,12 @@ function brief3(m, s, turns, nMain){
 // 질의 차례 카드: 위원별 묶음, 질문 핵심 문장 → 답변 요지(짧은 답은 그대로), 줄을 누르면 원문 발언으로
 function turnsHtml(mid, turns){
   if(!turns.length) return '<div class="empty">질의 차례가 없습니다.</div>';
-  const nav = `<div class="turnnav">${turns.map((t, i) => `<button onclick="document.getElementById('tc${i}').scrollIntoView({block:'nearest',behavior:'smooth'})">${esc(t.member)} ${fmt(t.questions)}</button>`).join("")}</div>`;
+  const nav = `<div class="turnnav">${turns.map((t, i) => `<button onclick="document.getElementById('tc${i}').scrollIntoView({block:'nearest',behavior:'smooth'})">${esc(t.member)}<b>${fmt(t.questions)}</b></button>`).join("")}</div>`;
   const cards = turns.map((t, i) => `<div class="tcard" id="tc${i}">
-      <div class="th"><b>${esc(t.member)} 위원</b>${chips(t.issues)}<span class="meta">질문 ${fmt(t.questions)}${t.commitments ? ` · 약속 ${fmt(t.commitments)}` : ""}${t.data_requests ? ` · 자료요구 ${fmt(t.data_requests)}` : ""}</span>
+      <div class="th"><b>${esc(t.member)} 위원</b>${chips(t.issues)}<span class="meta">질문 ${fmt(t.questions)}${t.commitments ? `<span class="sep"></span>약속 ${fmt(t.commitments)}` : ""}${t.data_requests ? `<span class="sep"></span>자료요구 ${fmt(t.data_requests)}` : ""}</span>
         <button class="link" onclick="gotoUtt('${esc(mid)}', ${t.start_idx})">원문 보기</button></div>
       <ol>${t.items.map(x => `<li class="${x.short ? "short" : ""}${x.commitment ? " promise" : ""}" onclick="gotoUtt('${esc(mid)}', ${x.idx})">
-        <div class="q">${easy(x.q)}</div>${x.a ? `<div class="a">→ ${x.short ? "" : `<span class="who">${esc(x.answerer)}</span>`}${easy(x.a)}${x.commitment ? ' <span class="chip warn">약속</span>' : ""}</div>` : ""}</li>`).join("")}</ol></div>`).join("");
+        <div class="q">${easy(x.q)}</div>${x.a ? `<div class="a"><span class="lbl">답</span>${x.short ? "" : `<span class="who">${esc(x.answerer)}</span>`}${easy(x.a)}${x.commitment ? ' <span class="chip warn">약속</span>' : ""}</div>` : ""}</li>`).join("")}</ol></div>`).join("");
   return nav + `<div class="scrollbox tall">${cards}</div>`;
 }
 async function showMeeting(id, useLlm = false){
@@ -1094,14 +1166,14 @@ async function showMeeting(id, useLlm = false){
           <input type="search" id="tFind" placeholder="이 회의록에서 찾기">
           <select id="tSpeaker" aria-label="발언자로 거르기"><option value="">모든 발언자</option></select>
           <select id="tAgenda" aria-label="안건으로 이동"><option value="">안건으로 이동…</option></select>
-          <label class="easytog" title="끊긴 낱말 잇기 · 군말 흐리게 · 진행 기록 표지 · 수치 굵게 · 약칭 풀이 (끄면 원문 그대로)"><input type="checkbox" id="tEasy"> 읽기 쉽게</label>
+          <label class="easytog" title="끊긴 낱말 잇기, 군말 흐리게, 진행 기록 표지, 수치 굵게, 약칭 풀이(끄면 원문 그대로)"><input type="checkbox" id="tEasy"> 읽기 쉽게</label>
         </div>
         <div class="filterchips" id="tFilter"></div>
         <div id="tFlow"></div>
         <div id="tBody" class="muted tscroll scrollbox">불러오는 중…</div>
       </div>
       <div class="segpanel" data-seg="mTabs" data-k="qa">
-        <p class="sub">위원 한 명의 질의를 한 묶음으로 · 질문 핵심 문장 → 정부 답변 요지 · '예', '맞습니다' 같은 짧은 답은 그대로 · 줄을 누르면 원문으로</p>
+        <p class="sub">위원 한 명의 질의를 한 묶음으로 모아, 질문의 핵심 문장과 정부 답변 요지를 한 줄씩 적었습니다. '예', '맞습니다' 같은 짧은 답은 그대로 두었고, 줄을 누르면 원문으로 갑니다.</p>
         ${turnsHtml(id, turns)}
       </div>
       <div class="segpanel scrollbox tall" data-seg="mTabs" data-k="cm">
@@ -1175,7 +1247,7 @@ async function fetchTranscript(t){
   const sp = {};
   t.utts.forEach(u => { const x = sp[u.speaker_name] ||= {n: 0, role: u.speaker_role, type: u.speaker_type}; x.n++ });
   $("#tSpeaker").innerHTML = '<option value="">모든 발언자</option>' + Object.entries(sp).sort((a, b) => b[1].n - a[1].n)
-    .map(([name, x]) => `<option value="${esc(name)}">${esc(name)} ${esc(x.type === "member" ? "위원" : x.role)} · ${fmt(x.n)}</option>`).join("");
+    .map(([name, x]) => `<option value="${esc(name)}">${esc(name)} ${esc(x.type === "member" ? "위원" : x.role)} (${fmt(x.n)})</option>`).join("");
   const firstOf = {};
   t.utts.forEach(u => { if(u.agenda_idx != null && !(u.agenda_idx in firstOf)) firstOf[u.agenda_idx] = u.idx });
   const ags = Object.keys(firstOf).map(Number).sort((a, b) => a - b).filter(i => t.agendas[i]);
@@ -1267,7 +1339,7 @@ function turnHtml(u, hl = ""){
     <div class="av" aria-hidden="true">${esc((u.speaker_name || "?").slice(0, 1))}</div>
     <div><div class="tw"><b>${esc(u.speaker_name)}</b><span class="role">${esc(member ? "위원" : u.speaker_role)}</span>${flags}</div>
       <div class="tx${fold ? " clamp" : ""}">${paragraphs(u.text).map(p => `<p>${easy(p, hl)}</p>`).join("")}</div>
-      ${fold ? `<button class="link more" onclick="this.previousElementSibling.classList.remove('clamp');this.remove()">전체 보기 ▾</button>` : ""}</div></article>`;
+      ${fold ? `<button class="link more" onclick="this.previousElementSibling.classList.remove('clamp');this.remove()">전체 보기</button>` : ""}</div></article>`;
 }
 function renderTranscript(){
   const t = transcript, all = t.utts || [];
@@ -2171,7 +2243,7 @@ $("#bBtn").onclick = async () => {
   const c = b.counts;
   const orgs = {}; b.commitments.forEach(x => (orgs[x.org || "기타"] ||= []).push(x));
   $("#bOut").innerHTML = `
-  <div class="grid kpis">${[["관련 회의", c.meetings], ["관련 발언", c.utterances], ["질의·답변", c.qa_pairs], ["구체적 정부 약속", b.commitments.length]].map(([l, v]) => `<div class="card stat"><span class="l">${l}</span><span class="v">${fmt(v)}</span></div>`).join("")}</div>
+  <div class="mini" style="margin:0 0 16px">${[["관련 회의", c.meetings], ["관련 발언", c.utterances], ["질의·답변", c.qa_pairs], ["구체적 정부 약속", b.commitments.length]].map(([l, v]) => `<div><b>${fmt(v)}</b><span>${l}</span></div>`).join("")}</div>
   <div class="card"><div class="muted" style="font-size:13px">${scopeLabel()}</div><h2 style="font-size:19px">${esc(b.target)}</h2>
     ${segTabs("bTabs", [["sum", "요약"], ["qa", `질의와 답변 ${b.top_questions.length}`], ["cm", `약속 추적 ${b.commitments.length}`], ["mt", `위원·회의 ${b.meetings.length}`],
       ...(b.programs ? [["pg", `지원사업 공고 ${b.programs.total}`]] : [])])}
