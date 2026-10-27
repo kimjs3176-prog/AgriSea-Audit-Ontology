@@ -516,8 +516,6 @@ a.law{color:inherit;text-decoration:underline;text-decoration-color:color-mix(in
 .fugrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:24px;margin-top:12px;align-items:start}
 @media (max-width:1100px){.fugrid{grid-template-columns:minmax(0,1fr)}}
 .fumeta{margin-top:8px}
-.fuext{border:1px dashed var(--line);border-radius:10px;padding:12px 12px;margin-top:12px;font-size:13.5px}
-.fusrc{margin:8px 0 4px;padding-left:20px;font-size:13px;color:var(--ink-2)}
 .timeline{list-style:none;margin:0;padding:0 4px 0 0}
 .tl{position:relative;padding:0 0 16px 24px;border-left:2px solid var(--line);margin-left:8px}
 .tl:last-child{border-left-color:transparent}
@@ -543,7 +541,7 @@ h2{font-size:17px} h2::before{display:none}
 .pagehead h2{font-size:24px}
 /* 카드: 종이 위 흰 장 한 가지(괘선 테두리, 그림자 거의 없음) */
 .card{background:var(--color-paper-2);border:1px solid var(--color-rule);border-radius:var(--radius-card);box-shadow:var(--shadow-card)}
-.netside,.mcard,.eq,.pt,.mini div,.fuext{border-radius:var(--radius-pill)}
+.netside,.mcard,.eq,.pt,.mini div{border-radius:var(--radius-pill)}
 /* 숫자는 제목과 같은 서체로 */
 .kpirow b,.mini b{font-family:var(--font-display);font-weight:var(--display-weight);font-variant-numeric:tabular-nums;letter-spacing:var(--tracking-display)}
 .site-footer{display:flex;flex-wrap:wrap;justify-content:center;gap:4px 16px}
@@ -641,7 +639,6 @@ table.ledger td.iss{max-width:260px}
 @media (max-width:640px){.mini div:nth-child(3){border-left:0;padding-left:0}}
 .netside{border:0;border-left:1px solid var(--color-rule);border-radius:0;padding:0 0 0 16px}
 @media (max-width:1000px){.netside{border-left:0;border-top:1px solid var(--color-rule);padding:12px 0 0}}
-.fuext{border:0;border-top:1px solid var(--color-rule);border-radius:0;padding:12px 0 0}
 /* 질의 차례: 위원 한 명 = 한 구획(먹 괘선 아래 질문 줄) */
 .tcard{border:0;border-radius:0;background:none;padding:12px 0 4px;margin:0;border-top:2px solid var(--color-ink)}
 .tcard+.tcard{margin-top:12px}
@@ -816,7 +813,7 @@ button.link:hover{text-decoration:underline;text-underline-offset:.2em}
   <div class="card">
     <h2>정부 약속 이행 추적</h2>
     <p class="sub">회의에서 정부·기관이 "하겠습니다"라고 한 약속마다 <b>무엇을 하겠다는지</b>(앞선 위원 질의·약속 문장의 대상어·법률명)를 뽑고,
-      그 뒤 회의록(같은 기관의 이행 보고·진행 답변, 위원 재지적)과 후속 안건에서 근거를 찾습니다. 약속마다 <b>국회 의안·지원사업 공고 API</b>로 한 번 더 확인할 수 있습니다.
+      그 뒤 회의록(같은 기관의 이행 보고·진행 답변, 위원 재지적)과 후속 안건에서 근거를 찾습니다.
       판정은 기록에서 찾은 신호이며, 공식 이행 여부는 정부 서면 답변·시정조치 결과로 확인하세요.</p>
     <div id="fuStatus"></div>
     <div class="row" style="margin-top:10px">
@@ -859,7 +856,7 @@ button.link:hover{text-decoration:underline;text-underline-offset:.2em}
   <div class="card tablewrap" id="sOut"></div>
 </section>
 </main>
-<footer class="site-footer"><span>국회 농해수위 온톨로지</span><span>자료: 열린국회정보 위원회 회의록·의안, 공공데이터포털 K-Startup 지원사업 공고</span><span>제작자 kimjs1408</span><button class="link" onclick="openTab('sparql')">지식그래프 질의(고급)</button></footer>
+<footer class="site-footer"><span>국회 농해수위 온톨로지</span><span>자료: 열린국회정보 위원회 회의록, 공공데이터포털 K-Startup 지원사업 공고</span><span>제작자 kimjs1408</span><button class="link" onclick="openTab('sparql')">지식그래프 질의(고급)</button></footer>
 
 <script>
 const $ = s => document.querySelector(s);
@@ -2055,7 +2052,7 @@ function buildNet3d(THREE, stage, data){
 // ── 정부 약속 이행 추적 ──
 let fuState = {data: null, status: "", sel: null, filled: false};
 const FU_COLOR = {done: "var(--brand)", progress: "var(--seq)", reraised: "var(--bad)", early: "var(--muted)", none: "var(--warn)", excluded: "var(--line)"};
-const FU_SRC = {minutes: "후속 회의록", agenda: "후속 안건", bill: "국회 의안", program: "지원사업 공고"};
+const FU_SRC = {minutes: "후속 회의록", agenda: "후속 안건"};
 const FU_KIND = {done: "이행", progress: "진행", reraised: "재지적", related: "참고"};
 const fuChip = (st, label) => `<span class="fuchip st-${st}">${esc(label)}</span>`;
 let fuTimer = null;
@@ -2099,7 +2096,7 @@ function fuKeepSelection(){
 function renderFuList(){
   const rows = fuRows();
   $("#fuList").innerHTML = rows.map(x => `<div class="item fuitem ${x.id === fuState.sel ? "sel" : ""}" data-id="${x.id}">
-      <div class="d">${fuChip(x.status, x.status_label)} ${dot(x.date)}<span class="sep"></span>${esc(x.org || x.speaker)}${x.n_evidence ? `<span class="sep"></span>근거 ${x.n_evidence}` : ""}${x.checked ? '<span class="sep"></span><span title="외부 근거 확인함">외부 확인✓</span>' : ""}</div>
+      <div class="d">${fuChip(x.status, x.status_label)} ${dot(x.date)}<span class="sep"></span>${esc(x.org || x.speaker)}${x.n_evidence ? `<span class="sep"></span>근거 ${x.n_evidence}` : ""}</div>
       <div class="t fut">${esc(cut(x.text, 110))}</div>
       <div class="h muted" style="font-size:12px">${esc(x.action_label)}${x.laws.length ? ", " + esc(x.laws.join(", ")) : ""}${x.keywords.length ? ", " + esc(x.keywords.slice(0, 3).join(", ")) : ""}</div></div>`).join("")
     || '<div class="empty">조건에 맞는 약속이 없습니다.</div>';
@@ -2126,21 +2123,10 @@ function progCard(p, title = "지원사업 공고"){
     <div class="points scrollbox" style="--box-h:520px">${progList(p.items) || '<div class="empty">관련 공고가 없습니다.</div>'}</div></div>`;
 }
 function fuEvidence(e){
-  const url = /^https?:\/\//.test(e.url || "") ? e.url : "";
-  const link = e.meeting_id ? `<button class="link" onclick="gotoUtt('${esc(e.meeting_id)}', ${e.idx ?? -1})">회의록에서 보기</button>`
-    : url ? `<a href="${esc(url)}" target="_blank" rel="noopener">공고 원문 보기(새 창)</a>` : "";
+  const link = e.meeting_id ? `<button class="link" onclick="gotoUtt('${esc(e.meeting_id)}', ${e.idx ?? -1})">회의록에서 보기</button>` : "";
   return `<li class="tl k-${e.kind}"><span class="tl-dot"></span><div class="tl-d">${dot(e.date)}</div>
     <div class="tl-h"><span class="chip line">${esc(FU_SRC[e.source] || e.source)}</span><span class="fukind k-${e.kind}">${esc(FU_KIND[e.kind] || e.kind)}</span><b>${esc(e.title)}</b></div>
     <div class="tl-t">${esc(e.text)}</div>${link}</li>`;
-}
-function fuExternal(x){
-  const ext = x.external;
-  const srcs = ext ? ext.sources.map(s => `<li><b>${esc(s.label)}</b>: ${s.status === "ok" ? `근거 ${fmt(s.count)}건` : s.status === "skipped" ? `건너뜀 — ${esc(s.message)}` : `<span style="color:var(--bad)">오류 — ${esc(s.message)}</span>`}</li>`).join("") : "";
-  return `<div class="fuext">
-    <div class="row" style="justify-content:space-between;gap:8px"><b>외부 근거 확인</b>
-      <button class="ghost" id="fuExtBtn" onclick="checkFollowupExternal(${x.id}, ${ext ? "true" : "false"})">${ext ? "다시 확인" : "국회 의안 처리 현황 확인"}</button></div>
-    <p class="muted" style="font-size:12px;margin:4px 0 0">약속 뒤 발의된 같은 법률의 개정안과 처리 결과(열린국회정보 의안 API), 약속 뒤 게시된 같은 주제의 지원사업 공고(K-Startup API)를 찾습니다.</p>
-    ${ext ? `<ul class="fusrc">${srcs}</ul><p class="muted" style="font-size:12px;margin:0">확인 시각 ${esc((ext.fetched_at || "").replace("T", " ").slice(0, 16))} (UTC)</p>` : ""}</div>`;
 }
 async function showFollowup(id){
   fuState.sel = id; setHash("followups/" + id);
@@ -2162,7 +2148,6 @@ function renderFollowup(x){
         <div class="bubble a promise" style="max-width:100%"><div class="who">${esc(x.speaker)} <span class="chip warn">약속</span></div>${esc(x.text)}</div>
         <div class="fumeta"><span class="chip">${esc(x.action_label)}</span>${x.laws.map(l => `<span class="chip gov">${esc(l)}</span>`).join("")}${chips(x.issues, "member")}</div>
         <div class="muted" style="font-size:12px;margin-top:6px">근거를 찾은 대상어, ${esc(x.keywords.join(", ") || "-")}</div>
-        ${fuExternal(x)}
       </div>
       <div>
         <h3 style="margin-top:0">이행 근거 타임라인 <span class="muted" style="font-weight:400;font-size:12px">약속 뒤 기록, 오래된 순</span></h3>
@@ -2173,21 +2158,6 @@ function renderFollowup(x){
       </div>
     </div></div>`;
 }
-async function checkFollowupExternal(id, refresh){
-  const b = $("#fuExtBtn"); if(b){ b.disabled = true; b.textContent = "확인하는 중…" }
-  try{
-    const x = await api(`/api/followups/${id}/external?refresh=${refresh}`);
-    if(fuState.sel !== id) return;
-    renderFollowup(x);
-    const row = fuState.data?.items.find(r => r.id === id);
-    if(row && row.status !== x.status){   // 상태가 바뀌면 위쪽 상태별 개수·막대도 함께 고친다
-      fuState.data.counts[row.status]--; fuState.data.counts[x.status]++;
-      row.status = x.status; row.status_label = x.status_label; renderFuStatus();
-    }
-    if(row){ row.checked = true; row.n_evidence = x.evidence.length; renderFuList() }
-  }catch(e){ toast("외부 근거 확인 실패: " + e.message); if(b){ b.disabled = false; b.textContent = "다시 시도" } }
-}
-
 // ── 브리핑 ──
 async function fillBriefSelectors(){
   const [orgs, tax, sp] = await Promise.all([api("/api/orgs"), api("/api/taxonomy"), api("/api/speakers")]);
