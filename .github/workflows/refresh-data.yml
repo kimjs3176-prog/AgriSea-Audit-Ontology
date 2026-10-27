@@ -37,6 +37,7 @@ on:
       - "agrisea/followup.py"
       - "agrisea/governance.py"
       - "agrisea/programs.py"
+      - "agrisea/readable.py"
 
 permissions:
   contents: write
