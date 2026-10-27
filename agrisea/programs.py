@@ -4,13 +4,15 @@
 `programs` 표에 저장한다. 관련 여부와 쟁점은 회의록과 같은 쟁점 체계(lexicon.ISSUES)로 정하고,
 분야는 창업 지원 공고에 맞춘 말(TOPICS: 푸드테크·그린바이오 등)로 정한다. 회의록용 쟁점 말('R&D'·'관세'·'물류')은
 창업 공고에서는 너무 넓어 쓰지 않는다.
-저장한 공고는 쟁점 상세(국회 관심 대비 공고 공급), 이행 추적(약속 뒤 공고), 기관 브리핑, 대시보드,
+저장한 공고는 쟁점 상세(국회 관심 대비 공고 공급), 기관 브리핑, 대시보드,
 지식그래프(ag:SupportProgram)에서 쓴다.
 """
 from __future__ import annotations
 
+import json
 import re
 import time
+import xml.etree.ElementTree as ET
 from datetime import date
 from typing import Any, Callable
 
@@ -18,7 +20,6 @@ import requests
 
 from .api_client import normalize_date
 from .config import TERM_START, Settings
-from .external import parse_kstartup
 from .lexicon import ISSUES, ORGANIZATIONS
 
 API_URL = "https://apis.data.go.kr/B552735/kisedKstartupService01/getAnnouncementInformation01"
@@ -132,6 +133,49 @@ def status(a: dict, today: str | None = None) -> str:
     return "open" if a.get("end") else "closed"
 
 
+def parse_kstartup(text: str) -> list[dict[str, Any]]:
+    """K-Startup 응답의 레코드 목록. 공공데이터포털은 JSON(`data` 또는 `response.body.items.item`)과
+    XML(`<item><col name=…>` 또는 `<item><필드>`)을 섞어 돌려준다."""
+    body = (text or "").strip().lstrip("\ufeff")
+    if not body:
+        raise RuntimeError("K-Startup 빈 응답")
+    if body.startswith("<"):
+        try:
+            root = ET.fromstring(body)
+        except ET.ParseError:
+            raise RuntimeError(f"K-Startup XML 해석 실패: {body[:120]}") from None
+        auth = root.find(".//returnAuthMsg")  # 공공데이터포털 게이트웨이 오류(인증키 등)
+        if auth is not None:
+            raise RuntimeError(f"공공데이터포털 오류 {root.findtext('.//returnReasonCode') or ''}: {auth.text}")
+        code = root.findtext(".//resultCode")
+        if code and code not in ("00", "0", "200", "INFO-000"):
+            raise RuntimeError(f"K-Startup 오류 {code}: {root.findtext('.//resultMsg') or ''}")
+        rows = []
+        for item in root.iter("item"):
+            cols = item.findall("col")
+            rows.append({c.get("name", ""): (c.text or "") for c in cols} if cols
+                        else {child.tag: (child.text or "") for child in item})
+        return rows
+    try:
+        doc = json.loads(body)
+    except ValueError:
+        raise RuntimeError(f"K-Startup 응답 해석 실패: {body[:120]}") from None
+    if isinstance(doc, dict) and "data" in doc:
+        data = doc["data"] or []
+    elif isinstance(doc, dict) and "response" in doc:
+        header = doc["response"].get("header", {})
+        if header.get("resultCode") not in (None, "00", "0"):
+            raise RuntimeError(f"K-Startup 오류 {header.get('resultCode')}: {header.get('resultMsg', '')}")
+        items = doc["response"].get("body", {}).get("items") or {}
+        data = items.get("item", []) if isinstance(items, dict) else items
+        data = [data] if isinstance(data, dict) else data
+    elif isinstance(doc, dict) and "code" in doc and "msg" in doc:
+        raise RuntimeError(f"K-Startup 오류 {doc.get('code')}: {doc.get('msg')}")
+    else:
+        raise RuntimeError(f"K-Startup 응답 형식을 알 수 없음: {body[:120]}")
+    return [d for d in data if isinstance(d, dict)]
+
+
 def fetch(settings: Settings, since: str = TERM_START, http: requests.Session | None = None,
           progress: Callable[[str], None] = print, sleep: Callable[[float], None] = time.sleep) -> list[dict]:
     """since 이후 접수를 시작한 공고 중 농림·해양수산 관련 공고. 최신순으로 받다가 since보다 오래되면 멈춘다.
@@ -193,40 +237,6 @@ def brief(a: dict, today: str | None = None) -> dict:
 
 
 # 공고 제목에 흔한 말이라 대상어로 맞춰도 근거가 안 되는 말
-GENERIC = {"지원사업", "지원", "사업", "창업", "육성", "고도화", "활성화", "경진대회", "공모전", "프로그램",
-           "기업", "스타트업", "모집", "참여기업", "지적하시", "말씀하신", "분야별", "관리체계", "강화"}
-_LABEL_ID = {v[0]: k for k, v in ISSUES.items()}
-
-
-def search_terms(item: dict) -> list[str]:
-    """약속의 대상어 중 공고 제목에서 찾을 말: 세 글자 이상, 흔한 말 제외(두 글자 말은 엉뚱한 공고가 많이 걸린다)."""
-    return [k for k in item.get("keywords", []) if len(k) >= 3 and k not in GENERIC][:3]
-
-
-def evidence_for(item: dict, programs: list[dict]) -> list[dict]:
-    """약속 뒤에 나온, 약속의 대상어가 제목·사업명에 든 공고(이행 추적 근거).
-
-    예산·지원 약속이면 진행 근거(progress), 그 밖의 약속이면 참고(related)."""
-    terms = [_SPACE.sub("", t) for t in search_terms(item)]
-    if not terms or item.get("action") not in ("budget", "improve", "review"):
-        return []
-    # 같은 쟁점의 공고만(대상어가 겹쳐도 다른 분야 공고면 근거로 삼지 않는다)
-    ids = {_LABEL_ID[x] for x in item.get("issues", []) if x in _LABEL_ID}
-    ids |= {ISSUES[i][1] for i in ids if ISSUES[i][1]}
-    since = item.get("date") or ""
-    out = []
-    for a in programs:
-        if not a["start"] or a["start"] <= since or not (ids & set(a["issues"])):
-            continue
-        head = _SPACE.sub("", f"{a['title']} {a['program']}")
-        hit = next((t for t in terms if t in head), None)
-        if hit:
-            out.append({"source": "program", "kind": "progress" if item["action"] == "budget" else "related",
-                        "date": a["start"], "title": a["title"], "url": a["url"], "program_id": a["id"],
-                        "text": f"{a['org'] or '공고 기관'} · 접수 {a['start']} ~ {a['end'] or '미정'} · 대상어 「{hit}」"})
-    return sorted(out, key=lambda e: e["date"])[:10]
-
-
 QUADRANTS = {
     "gap": ("공백·기회", "국회 관심은 높은데 공고가 적음 → 신규·확대 공고나 후속 조치를 물어볼 만함"),
     "active": ("활발", "국회 관심과 공고가 함께 많음"),

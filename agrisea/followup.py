@@ -6,8 +6,6 @@
 - 후속 회의록(사전 계산): 같은 기관이 뒤 회의에서 그 일을 '마련했다·개정했다'고 보고(이행 보고),
   '추진 중·검토 중'이라 답함(진행 중), 위원이 같은 문제를 다시 따짐(재지적)
 - 후속 안건(사전 계산): 약속에 나온 법률의 개정법률안이 뒤 회의 안건으로 올라옴(진행 중)
-- 국회 의안·지원사업 공고(실시간, external.py): 약속 뒤 발의된 같은 법률 개정안과 처리 결과,
-  약속 뒤 게시된 같은 주제의 지원사업 공고
 
 판정은 기록에서 찾은 '신호'다. 공식 이행 여부는 정부의 서면 답변·시정조치 결과보고서로 확인해야 한다.
 """
@@ -25,7 +23,6 @@ from .analysis import _question_text
 from .lexicon import ORGANIZATIONS, commitment_sentences, issue_label
 from .members import _nouns, vocab
 from .nlp import SENT_SPLIT, WORD, strip_josa, truncate
-from .programs import evidence_for as program_evidence
 from .store import Store
 
 # 조치 유형: 약속 문장에서 무엇을 하겠다는지(위에서부터 먼저 맞는 것)
@@ -337,7 +334,6 @@ def track_all(store: Store, policy: dict | None = None) -> dict[str, Any]:
     policy = policy or {}
     blocked = frozenset(policy.get("keyword_block") or ())
     c = Corpus(store)
-    progs = store.programs()  # 약속 뒤에 나온 지원사업 공고(공공데이터포털 K-Startup)
     items, vague = [], 0
     for pos, u in enumerate(c.utts):
         if not u["is_commitment"] or u["speaker_type"] not in _ANSWERERS:
@@ -346,8 +342,7 @@ def track_all(store: Store, policy: dict | None = None) -> dict[str, Any]:
         if it is None:
             vague += 1
             continue
-        ev = (_minutes_evidence(c, it, pos) + (_agenda_evidence(c, it) if it["laws"] else [])
-              + program_evidence(it, progs))
+        ev = _minutes_evidence(c, it, pos) + (_agenda_evidence(c, it) if it["laws"] else [])
         items.append(finalize(it, ev, c.as_of))
     items.sort(key=lambda x: (x["date"], x["idx"]), reverse=True)
     counts = Counter(x["status"] for x in items)

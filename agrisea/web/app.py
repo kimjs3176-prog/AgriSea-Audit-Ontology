@@ -232,9 +232,7 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
     # ── 정부 약속 이행 추적 + 운영 관문(G1~G7) ──
     from .. import governance as gov
     from ..followup import STATUS as FU_STATUS
-    from ..followup import finalize as fu_finalize
     from ..followup import track_all
-    FOLLOWUP_EXT_TTL = 24 * 3600  # 외부 근거(국회 의안·지원사업 공고)는 하루 동안 다시 묻지 않는다
     FINAL_STATUSES = {**{k: v[0] for k, v in FU_STATUS.items()}, "excluded": "추적 제외(약속 아님)"}
     EXCLUDED_DESC = "약속으로 보기 어려운 발언이라 추적에서 제외"
     ledger = gov.ledger_from_env(settings.data_dir, settings.serverless)
@@ -280,15 +278,9 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
             raise HTTPException(404, "약속을 찾을 수 없습니다.")
         return item
 
-    def followup_view(item: dict, ext: dict | None) -> dict:
-        """사전 계산한 내부 근거에 외부 근거를 더해 다시 판정."""
-        as_of = followups_data()["as_of"]
-        if ext:  # 사전 계산에 이미 든 공고 근거와 겹치는 것은 한 번만
-            have = {(e.get("source"), e.get("title"), e.get("date")) for e in item["evidence"]}
-            extra = [e for e in ext.get("evidence", []) if (e.get("source"), e.get("title"), e.get("date")) not in have]
-        out = fu_finalize(item, item["evidence"] + extra, as_of) if ext else dict(item)
+    def followup_view(item: dict) -> dict:
+        out = dict(item)
         out["status_desc"] = FU_STATUS[out["status"]][1]
-        out["external"] = ext
         return out
 
     def governed(items: list[dict], events: list[dict] | None = None) -> list[dict]:
@@ -305,9 +297,7 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         return out
 
     def current_items() -> list[dict]:
-        """외부 근거를 확인한 약속은 그 근거까지 더해 다시 판정한 상태(상세 화면과 같게)."""
-        d = followups_data()
-        return [followup_view(x, store.kv_get(f"followup_ext:{x['id']}")) for x in d["items"]]
+        return [followup_view(x) for x in followups_data()["items"]]
 
     @app.get("/api/followups")
     def followup_list(q: str = "", org: str = "", action: str = "", session: int | None = None):
@@ -335,32 +325,14 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
                 "counts": {k: counts.get(k, 0) for k in statuses}, "total": len(items),
                 "orgs": [{"name": n, "count": c} for n, c in orgs.most_common()],
                 "items": [{**{k: x[k] for k in keep}, "n_evidence": len(x["evidence"]),
-                           "checked": x.get("external") is not None,
                            "gov": {k: x["gov"][k] for k in ("path", "path_label", "state", "state_label")}
                            | {"risk": x["gov"]["risk"]["score"]}} for x in items]}
 
     @app.get("/api/followups/{cid}")
     def followup_detail(cid: int):
-        """약속 상세: 앞선 질의, 대상어, 근거 타임라인(외부 근거를 확인한 적이 있으면 함께), 관문 상태."""
-        item = followup_view(followup_item(cid), store.kv_get(f"followup_ext:{cid}"))
+        """약속 상세: 앞선 질의, 대상어, 근거 타임라인, 관문 상태."""
+        item = followup_view(followup_item(cid))
         return governed([item])[0]
-
-    @app.get("/api/followups/{cid}/external")
-    def followup_external(cid: int, refresh: bool = False):
-        """국회 의안·지원사업 공고 API로 외부 근거를 찾는다(하루 동안 저장해 재사용)."""
-        import time
-
-        from ..external import external_evidence
-        item = followup_item(cid)
-        key = f"followup_ext:{cid}"
-        ext = store.kv_get(key)
-        if refresh or not ext or time.time() - ext.get("_ts", 0) > FOLLOWUP_EXT_TTL:
-            ext = {**external_evidence(settings, item, programs=store.programs()), "_ts": time.time()}
-            # 모든 출처를 건너뛰었으면(인증키 미설정 등) 저장하지 않는다: '외부 확인' 표시가 붙거나
-            # 키를 넣은 뒤에도 하루 동안 예전 결과가 남지 않게
-            if ext["evidence"] or any(src["status"] != "skipped" for src in ext["sources"]):
-                store.kv_set(key, ext)
-        return governed([followup_view(item, ext)])[0]
 
     # ── 운영 관문 API ──
     loopback = {"127.0.0.1", "::1", "localhost", "testclient"}

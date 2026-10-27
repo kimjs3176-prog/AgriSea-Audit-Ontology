@@ -90,10 +90,6 @@ ag:committedBy a owl:ObjectProperty ; rdfs:label "약속 주체 기관"@ko ;
     rdfs:domain ag:Commitment ; rdfs:range ag:Organization .
 ag:announcedBy a owl:ObjectProperty ; rdfs:label "공고 기관(피감기관)"@ko ;
     rdfs:domain ag:SupportProgram ; rdfs:range ag:Organization .
-ag:followedUpBy a owl:ObjectProperty ; rdfs:label "약속 뒤 공고"@ko ;
-    rdfs:comment "정부 약속 뒤에 같은 쟁점·대상어로 나온 지원사업 공고(이행 추적 근거)."@ko ;
-    rdfs:domain ag:Commitment ; rdfs:range ag:SupportProgram .
-
 ########## 데이터 속성 ##########
 
 ag:meetingDate a owl:DatatypeProperty ; rdfs:label "회의일자"@ko ; rdfs:range xsd:date .

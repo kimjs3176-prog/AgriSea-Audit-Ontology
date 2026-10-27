@@ -12,17 +12,13 @@ def test_graph_contains_core_classes(store):
 
 
 def _with_program(store):
-    """예시 약속 하나에 맞춘 지원사업 공고를 넣고 이행 추적을 다시 계산(약속 → 공고 연결이 생기도록)."""
-    from agrisea import followup, programs
-    item = next(x for x in followup.track_all(store)["items"]
-                if programs.search_terms(x) and x["action"] in ("budget", "improve", "review") and x["issues"])
-    issue = next(k for k, v in programs.ISSUES.items() if v[0] == item["issues"][0])
-    a = {"id": "900", "title": f"{programs.search_terms(item)[0]} 지원사업 공고", "program": "", "org": "농식품부",
+    """쟁점이 붙은 지원사업 공고 하나(공고 질의 예시가 결과를 내도록)."""
+    from agrisea import programs
+    a = {"id": "900", "title": "가축분뇨 퇴비화 지원사업 공고", "program": "", "org": "농식품부",
          "supervisor": "", "agency": "농림축산식품부", "category": "사업화", "target": "", "region": "전국",
          "start": "2099-01-01", "end": "2099-02-01", "url": "https://k-startup.go.kr/x", "content": "",
-         "issues": {issue: 1}}
+         "issues": {next(iter(programs.ISSUES)): 1}}
     store.save_programs([a])
-    store.kv_set("followups", followup.track_all(store))
     return store
 
 

@@ -94,3 +94,21 @@ def test_programs_in_issue_briefing_dashboard(tmp_path):
     assert "지원사업 공고" in md and "가축분뇨 퇴비화" in md
     assert c.get("/api/kstartup").status_code == 400  # 배포본에 키가 없으면 중계하지 않음
     assert c.get("/api/stats").json()["programs"] == 1
+
+
+def test_parse_kstartup_envelopes():
+    row = {"pbanc_sn": "7", "biz_pbanc_nm": "가축분뇨 공고"}
+    assert P.parse_kstartup(json.dumps({"data": [row]})) == [row]
+    # 공공데이터포털 표준 봉투: 한 건이면 item이 객체로 온다
+    one = {"response": {"header": {"resultCode": "00"}, "body": {"items": {"item": row}, "totalCount": 1}}}
+    assert P.parse_kstartup(json.dumps(one)) == [row]
+    many = {"response": {"header": {"resultCode": "00"}, "body": {"items": [row, row]}}}
+    assert len(P.parse_kstartup(json.dumps(many))) == 2
+    xml = '<response><header><resultCode>00</resultCode></header><body><items><item>' \
+          '<col name="pbanc_sn">7</col><col name="biz_pbanc_nm">가축분뇨 공고</col></item></items></body></response>'
+    assert P.parse_kstartup(xml) == [row]
+    with pytest.raises(RuntimeError, match="SERVICE_KEY"):
+        P.parse_kstartup("<OpenAPI_ServiceResponse><cmmMsgHeader><returnAuthMsg>SERVICE_KEY_IS_NOT_REGISTERED_ERROR"
+                                "</returnAuthMsg><returnReasonCode>30</returnReasonCode></cmmMsgHeader></OpenAPI_ServiceResponse>")
+    with pytest.raises(RuntimeError):
+        P.parse_kstartup(json.dumps({"response": {"header": {"resultCode": "30", "resultMsg": "키 오류"}}}))

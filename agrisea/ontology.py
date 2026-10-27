@@ -202,7 +202,7 @@ def program_uri(pid: str) -> URIRef:
 
 
 def add_programs(g: Graph, store: Store) -> None:
-    """지원사업 공고와 그 연결: 쟁점(ag:concernsIssue), 공고 기관(ag:announcedBy), 약속 뒤 공고(ag:followedUpBy)."""
+    """지원사업 공고와 그 연결: 쟁점(ag:concernsIssue), 공고 기관(ag:announcedBy)."""
     for a in store.programs():
         pu = program_uri(a["id"])
         g.add((pu, RDF.type, AG.SupportProgram))
@@ -219,13 +219,6 @@ def add_programs(g: Graph, store: Store) -> None:
                 g.add((pu, prop, Literal(a[key], datatype=XSD.date)))
         if a["url"]:
             g.add((pu, AG.announcementURL, Literal(a["url"], datatype=XSD.anyURI)))
-    # 이행 추적이 사전 계산돼 있으면 약속 → 그 뒤 공고를 잇는다
-    fu = store.kv_get("followups") or {}
-    for item in fu.get("items", []):
-        for e in item.get("evidence", []):
-            if e.get("source") == "program" and e.get("program_id"):
-                uu = AGD[f"utt/{_slug(item['meeting_id'])}/{item['idx']}"]
-                g.add((uu, AG.followedUpBy, program_uri(e["program_id"])))
 
 
 def save_graph(g: Graph, path: Path) -> None:
@@ -244,17 +237,6 @@ WHERE {
   ?issue skos:prefLabel ?issueLabel .
 }
 GROUP BY ?issueLabel ORDER BY DESC(?utterances)""",
-    "약속 뒤 나온 지원사업 공고": """
-PREFIX ag: <https://w3id.org/agrisea/ontology#>
-PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-SELECT ?orgLabel ?program ?start ?url
-WHERE {
-  ?c a ag:Commitment ; ag:followedUpBy ?p .
-  OPTIONAL { ?c ag:committedBy ?org . ?org rdfs:label ?orgLabel }
-  ?p rdfs:label ?program ; ag:receptionStart ?start .
-  OPTIONAL { ?p ag:announcementURL ?url }
-}
-ORDER BY DESC(?start)""",
     "쟁점별 지원사업 공고": """
 PREFIX ag: <https://w3id.org/agrisea/ontology#>
 PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
