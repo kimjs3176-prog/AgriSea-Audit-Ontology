@@ -9,14 +9,14 @@ import os
 from pathlib import Path
 from typing import Callable
 
-from . import analysis, followup, governance, members, programs
+from . import analysis, followup, governance, members, programs, readable
 from .ontology import build_graph, to_ntriples_gz
 from .store import Store
 
 # 사전 계산 형식이 바뀌면 올린다(초기 데이터를 다시 만들게 함).
 # 2: 발언자 역할 재분류, 회기별 쟁점·개요 집계 / 3: 띄어쓰기 교정 / 4: 요약에서 의안 목록 제외 / 5: 위원별 분석
 # 6: 정부 약속 이행 추적 / 7: 운영 관문 정책(차단 대상어) 반영
-PRECOMPUTE_VERSION = 8
+PRECOMPUTE_VERSION = 9
 
 
 def current_policy() -> dict:
@@ -35,6 +35,7 @@ CACHED_VIEWS: dict[str, Callable[[Store], object]] = {
     "followups": lambda s: followup.track_all(s, current_policy()),  # 정부 약속 이행 추적(정책 반영)
     analysis.briefing_cache_key(): analysis.briefing,  # 조건 없는 전체 국감 브리핑(가장 무거운 조합)
     "program_signals": programs.supply_signals,   # 쟁점별 국회 관심 대비 지원사업 공고 공급
+    "readable": readable.glossary,                # '읽기 쉽게' 보기: 끊긴 낱말 잇기·기관 약칭·법률 이름
 }
 
 
