@@ -1,4 +1,5 @@
-# GitLab 미러: GitHub(원본)의 main·governance-log 를 기관 GitLab(gitlab.aigov.go.kr)에 그대로 밀어 넣는다.
+# GitLab 미러: GitHub(원본)의 main 을 기관 GitLab(gitlab.aigov.go.kr)에 그대로 밀어 넣는다.
+# governance-log(운영 관문 기록, 예전 코드가 든 브랜치)는 GitLab 보안 검사에 걸려 넘기지 않는다.
 #
 # 기관 GitLab은 GitHub 호스트 러너(해외)에서 접속되지 않는다(443 연결 시간 초과). 그래서 이 작업은
 # 국내 PC·서버에 등록한 self-hosted 러너에서만 돌린다. 설정 방법은 docs/gitlab-mirror.md 참고.
@@ -9,7 +10,7 @@
 name: GitLab 미러
 on:
   push:
-    branches: [main, governance-log]
+    branches: [main]
   # 자동 수집 워크플로가 GITHUB_TOKEN으로 푸시한 커밋은 push 이벤트를 만들지 않으므로 따로 받는다
   workflow_run:
     workflows: ["회의록 데이터 갱신"]
@@ -45,7 +46,7 @@ jobs:
           # 토큰을 주소에 넣지 않고 헤더로 넘긴다(원격 설정·오류 메시지에 남지 않게)
           auth="Authorization: Basic $(printf 'oauth2:%s' "$GITLAB_TOKEN" | base64 | tr -d '\n')"
           echo "::add-mask::$(printf 'oauth2:%s' "$GITLAB_TOKEN" | base64 | tr -d '\n')"
-          for b in main governance-log; do
+          for b in main; do
             git rev-parse -q --verify "origin/$b" >/dev/null || continue
             git -c http.extraHeader="$auth" push "$GITLAB_REPO" "refs/remotes/origin/$b:refs/heads/$b"
             echo "$b → $(git rev-parse --short "origin/$b")" >> "$GITHUB_STEP_SUMMARY"
