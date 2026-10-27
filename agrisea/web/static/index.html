@@ -4,101 +4,142 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>국회 농해수위 온톨로지</title>
+<meta name="description" content="국회 농림축산식품해양수산위원회 회의록을 모아 쟁점, 의원 질의, 정부 약속과 이행을 찾아보는 국정감사 준비 도구">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@600&family=Red+Hat+Text:wght@400;500;600&family=Red+Hat+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <style>
+/* Hallmark · shape: app screen · genre: modern-minimal · theme: Furrow (deal 2/3, seed national-assembly-agriculture-fisheries-742a·f86ecc95·2026-10-27·r0) · redesign: restyle
+ * nav: kept (top bar, five tabs) · signature: kept (the meeting record and its dialogue) · states: loading, empty, error, full
+ * axes: light/grotesk-sans/warm · posture: committed · contrast: pass · modes: light+dark · v2.0.0 */
+/* Hallmark · pre-emit critique: P4 H3 E4 S4 R4 V4 · weakest: H (headings were coloured per section), set every head in ink, one weight */
+/* Hallmark · answered: F15 kept layout (restyle) · 24b spacing moved onto the 4px scale */
+/* 참고: gate 56(sticky 두 개)은 오탐. .agenda-h는 페이지가 아니라 자기 스크롤 상자(.tscroll) 안에서 붙으므로 헤더와 겹치지 않는다 */
 :root{
   color-scheme: light;
-  --bg:#f6f7f5; --panel:#ffffff; --ink:#1d2320; --ink-2:#4b5550; --muted:#6b7570; --line:#e1e5e2;
-  --brand:#2f6b3f; --brand-weak:#e5f0e8;
-  --seq:#2a78d6; --seq-weak:#e4eefb;           /* 데이터 한 가지 색(언급량) */
-  --member:#7a3e8e; --member-weak:#f3e9f6;     /* 위원 */
-  --gov:#1f5f8b; --gov-weak:#e3eef6;           /* 정부·기관 */
-  --warn:#8a5300; --warn-weak:#fbf0dc;         /* 약속 */
-  --bad:#b42318; --bad-weak:#fdecea;           /* 재지적 */
-  --radius:10px;
+  /* Furrow: manila paper, near-black ink in rules, one tangerine signal, grass green for what is in date */
+  --color-paper: oklch(96% 0.011 85); --color-paper-2: oklch(99.5% 0.005 85); --color-paper-3: oklch(92% 0.016 85);
+  --color-ink: oklch(18% 0.006 60); --color-ink-2: oklch(30% 0.008 60); --color-muted: oklch(44% 0.012 60); --color-rule: oklch(88% 0.013 85);
+  --color-accent: oklch(70% 0.19 40); --color-accent-ink: oklch(18% 0.006 60); --color-accent-soft: oklch(91% 0.05 50); --color-focus: oklch(60% 0.19 40);
+  --color-green: oklch(44% 0.1 150); --color-green-soft: oklch(92% 0.04 150);
+  --color-sienna: oklch(45% 0.085 55); --color-sienna-soft: oklch(93% 0.028 60);
+  --color-slate: oklch(43% 0.07 235); --color-slate-soft: oklch(93% 0.02 235);
+  --color-ochre: oklch(47% 0.095 75); --color-ochre-soft: oklch(93% 0.05 82);
+  --color-water: oklch(55% 0.06 232); --color-error: oklch(52% 0.19 27); --color-error-soft: oklch(93% 0.035 27);
+  --color-on-fill: oklch(99.5% 0.005 85);
+  --color-scrim: oklch(18% 0.006 60 / 0.92);
+  /* 관계망(3D) 무대: 먹색 판 위의 세 층 */
+  --net-ground-1: #2b2925; --net-ground-2: #1d1b18; --net-ground-3: #12110f;
+  --net-ink: #f3efe6; --net-ink-2: #c9c1b2; --net-ink-3: #9a9183; --net-rule: #4a463f;
+  --net-member: #e0a477; --net-issue: #9fcf98; --net-org: #9cc3dc;
+  --font-display: "Red Hat Display", "Pretendard Variable", Pretendard, ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Red Hat Text", "Pretendard Variable", Pretendard, ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Red Hat Mono", ui-monospace, Menlo, monospace;
+  --radius-card: 10px; --radius-entry: 14px; --radius-pill: 6px; --rule-hair: 1px;
+  --shadow-card: 0 1px 2px oklch(18% 0.006 60 / 0.06);
+  --shadow-lift: 0 1px 1px oklch(18% 0.006 60 / 0.1), 0 2px 4px -1px oklch(18% 0.006 60 / 0.1), 0 24px 44px -20px oklch(18% 0.006 60 / 0.42);
+  --tracking-display: -0.025em; --display-weight: 600;
+  --dur-micro: 120ms; --dur-short: 220ms; --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --header-h: 128px;
+  /* 화면 전체가 쓰는 이름(기존 규칙과 스크립트가 읽음) → Furrow 토큰 */
+  --bg: var(--color-paper); --panel: var(--color-paper-2); --ink: var(--color-ink); --ink-2: var(--color-ink-2);
+  --muted: var(--color-muted); --line: var(--color-rule);
+  --brand: var(--color-green); --brand-weak: var(--color-green-soft);
+  --seq: var(--color-water); --seq-weak: var(--color-slate-soft);
+  --member: var(--color-sienna); --member-weak: var(--color-sienna-soft);
+  --gov: var(--color-slate); --gov-weak: var(--color-slate-soft);
+  --warn: var(--color-ochre); --warn-weak: var(--color-ochre-soft);
+  --bad: var(--color-error); --bad-weak: var(--color-error-soft);
+  --radius: var(--radius-card); --shadow: var(--shadow-card);
 }
-@media (prefers-color-scheme: dark){
-  :root:where(:not([data-theme="light"])){
-    color-scheme: dark;
-    --bg:#131715; --panel:#1b201d; --ink:#e9eeeb; --ink-2:#c3cbc6; --muted:#9aa7a0; --line:#2d3531;
-    --brand:#79c08b; --brand-weak:#1f3326;
-    --seq:#3987e5; --seq-weak:#1a2a3d;
-    --member:#cf9be0; --member-weak:#33253a;
-    --gov:#79b4de; --gov-weak:#18293a;
-    --warn:#e3b35b; --warn-weak:#3a2e17;
-    --bad:#f4978e; --bad-weak:#3d1f1c;
-  }
-}
+/* 어두운 화면: 같은 체계를 다시 계산(반전 아님). 색상 각도는 그대로, 종이는 어둡게·먹은 밝게, 강조는 채도를 낮춤 */
 :root[data-theme="dark"]{
   color-scheme: dark;
-  --bg:#131715; --panel:#1b201d; --ink:#e9eeeb; --ink-2:#c3cbc6; --muted:#9aa7a0; --line:#2d3531;
-  --brand:#79c08b; --brand-weak:#1f3326;
-  --seq:#3987e5; --seq-weak:#1a2a3d;
-  --member:#cf9be0; --member-weak:#33253a;
-  --gov:#79b4de; --gov-weak:#18293a;
-  --warn:#e3b35b; --warn-weak:#3a2e17;
-  --bad:#f4978e; --bad-weak:#3d1f1c;
+  --color-paper: oklch(16% 0.01 85); --color-paper-2: oklch(19% 0.01 85); --color-paper-3: oklch(22% 0.012 85);
+  --color-ink: oklch(94% 0.008 85); --color-ink-2: oklch(84% 0.01 85); --color-muted: oklch(70% 0.012 70); --color-rule: oklch(31% 0.012 85);
+  --color-accent: oklch(76% 0.15 40); --color-accent-soft: oklch(30% 0.06 45); --color-focus: oklch(76% 0.15 40);
+  --color-green: oklch(78% 0.1 150); --color-green-soft: oklch(28% 0.04 150);
+  --color-sienna: oklch(80% 0.07 60); --color-sienna-soft: oklch(28% 0.03 60);
+  --color-slate: oklch(80% 0.06 235); --color-slate-soft: oklch(27% 0.025 235);
+  --color-ochre: oklch(82% 0.1 80); --color-ochre-soft: oklch(29% 0.045 80);
+  --color-water: oklch(72% 0.07 232); --color-error: oklch(76% 0.13 27); --color-error-soft: oklch(29% 0.05 27);
+  --color-on-fill: oklch(16% 0.01 85);
+  --shadow-card: none;
 }
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --color-paper: oklch(16% 0.01 85); --color-paper-2: oklch(19% 0.01 85); --color-paper-3: oklch(22% 0.012 85);
+    --color-ink: oklch(94% 0.008 85); --color-ink-2: oklch(84% 0.01 85); --color-muted: oklch(70% 0.012 70); --color-rule: oklch(31% 0.012 85);
+    --color-accent: oklch(76% 0.15 40); --color-accent-soft: oklch(30% 0.06 45); --color-focus: oklch(76% 0.15 40);
+    --color-green: oklch(78% 0.1 150); --color-green-soft: oklch(28% 0.04 150);
+    --color-sienna: oklch(80% 0.07 60); --color-sienna-soft: oklch(28% 0.03 60);
+    --color-slate: oklch(80% 0.06 235); --color-slate-soft: oklch(27% 0.025 235);
+    --color-ochre: oklch(82% 0.1 80); --color-ochre-soft: oklch(29% 0.045 80);
+    --color-water: oklch(72% 0.07 232); --color-error: oklch(76% 0.13 27); --color-error-soft: oklch(29% 0.05 27);
+    --color-on-fill: oklch(16% 0.01 85);
+    --shadow-card: none;
+  }
+}
+html,body{overflow-x:clip}
+::selection{background:color-mix(in oklab,var(--color-accent) 24%,transparent);color:var(--ink)}
+body{caret-color:var(--color-accent)}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.65 "Noto Sans KR",system-ui,sans-serif}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.65}
 a{color:var(--gov)}
 header{background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
 .wrap{max-width:1200px;margin:0 auto;padding:0 16px}
-.top{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between;padding:12px 0 6px}
+.top{display:flex;flex-wrap:wrap;gap:12px 16px;align-items:center;justify-content:space-between;padding:12px 0 8px}
 h1{font-size:18px;margin:0}
-h1 small{font-weight:400;color:var(--muted);font-size:13px;margin-left:6px}
+h1 small{font-weight:400;color:var(--muted);font-size:13px;margin-left:8px}
 .sessionbar{display:flex;align-items:center;gap:8px;font-size:14px;max-width:100%}
 .sessionbar select{min-width:0;max-width:calc(100vw - 80px)}
 nav{display:flex;gap:2px;flex-wrap:wrap;padding-bottom:8px}
-nav button{border:0;background:none;color:var(--muted);padding:6px 12px;border-radius:999px;cursor:pointer;font:inherit}
+nav button{border:0;background:none;color:var(--muted);padding:8px 12px;border-radius:999px;cursor:pointer;font:inherit}
 nav button.on{background:var(--brand-weak);color:var(--brand);font-weight:700}
 nav button.adv{margin-left:auto}
-main{padding:18px 0 24px}
-.site-footer{text-align:center;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding:18px 16px 28px}
+main{padding:20px 0 24px}
+.site-footer{text-align:center;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding:20px 16px 28px}
 section{display:none} section.on{display:block}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;margin-bottom:14px;min-width:0}
-.grid{display:grid;gap:14px}
+.card{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:var(--radius);padding:16px 20px;margin-bottom:16px;min-width:0}
+.grid{display:grid;gap:16px}
 .kpis{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
 .g2{grid-template-columns:repeat(auto-fit,minmax(min(340px,100%),1fr))}
-.two{display:grid;grid-template-columns:340px minmax(0,1fr);gap:14px;align-items:start}
-.pbar{display:grid;grid-template-columns:110px minmax(0,1fr) 92px;gap:8px;align-items:center;font-size:13px;margin:5px 0}
+.two{display:grid;grid-template-columns:340px minmax(0,1fr);gap:16px;align-items:start}
+.pbar{display:grid;grid-template-columns:110px minmax(0,1fr) 92px;gap:8px;align-items:center;font-size:13px;margin:4px 0}
 .pbar .track{height:8px;border-radius:4px;background:var(--line);overflow:hidden}
 .pbar .track i{display:block;height:100%;background:var(--member);border-radius:4px}
 .pbar .v{font-variant-numeric:tabular-nums;color:var(--ink-2);text-align:right;white-space:nowrap}
 .pbar .v b{color:var(--member);font-weight:700}
-.kwcloud{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:baseline}
-.kwcloud span{color:var(--member);background:var(--member-weak);border-radius:8px;padding:2px 9px;line-height:1.5}
-.kwcloud small{color:var(--muted);font-size:11px;margin-left:3px}
-.eqs{display:grid;gap:10px}
-.eq{border:1px solid var(--line);border-left:4px solid var(--member);border-radius:10px;padding:10px 12px;background:var(--panel)}
+.kwcloud{display:flex;flex-wrap:wrap;gap:8px 8px;align-items:baseline}
+.kwcloud span{color:var(--member);background:var(--member-weak);border-radius:8px;padding:2px 8px;line-height:1.5}
+.kwcloud small{color:var(--muted);font-size:11px;margin-left:4px}
+.eqs{display:grid;gap:12px}
+.eq{border:1px solid var(--line);border-radius:10px;padding:12px 12px;background:var(--panel)}
 .eq.follow{border-left-color:var(--warn)} .eq.repeat{border-left-color:var(--gov)}
 .eq .q{font-weight:600;line-height:1.55;margin:4px 0}
 .eq .why{font-size:12px;color:var(--muted)}
 .eq details{font-size:13px;color:var(--ink-2);margin-top:4px}
 .eq details summary{cursor:pointer;color:var(--gov);font-size:12px}
-.mcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px}
-.mcard{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--panel);font-size:13px}
+.mcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.mcard{border:1px solid var(--line);border-radius:10px;padding:12px 12px;background:var(--panel);color:var(--ink);font-size:13px}
 .mcard .n{font-weight:700;font-size:15px;color:var(--member)}
 @media (max-width:860px){.two{grid-template-columns:minmax(0,1fr)}}
-.stat .v{display:block;font-size:26px;font-weight:700;line-height:1.2}
+.stat .v{display:block;font-size:26px;font-weight:700;line-height:1.2;font-variant-numeric:tabular-nums}
 .stat .l{color:var(--muted);font-size:13px}
 .stat .s{color:var(--ink-2);font-size:12px;margin-top:2px}
 h2{font-size:16px;margin:0 0 4px}
 .sub{color:var(--muted);font-size:13px;margin:0 0 12px}
-h3{font-size:14px;margin:16px 0 6px;color:var(--ink-2)}
+h3{font-size:14px;margin:16px 0 8px;color:var(--ink-2)}
 .muted{color:var(--muted)}
 .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-input,select,textarea{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:7px 10px;min-width:0}
+input,select,textarea{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 12px;min-width:0}
 input[type=search]{flex:1 1 260px}
-textarea{width:100%;min-height:170px;font-family:ui-monospace,Menlo,monospace;font-size:13px}
-button.primary{background:var(--brand);color:#fff;border:0;border-radius:8px;padding:8px 14px;cursor:pointer;font:inherit;font-weight:500}
-:root[data-theme="dark"] button.primary{color:#0d1a11}
-@media (prefers-color-scheme: dark){:root:where(:not([data-theme="light"])) button.primary{color:#0d1a11}}
-button.ghost{background:none;border:1px solid var(--line);border-radius:8px;padding:6px 12px;cursor:pointer;color:var(--ink);font:inherit}
+textarea{width:100%;min-height:170px;font-family:var(--font-mono);font-size:13px}
+button.primary{background:var(--color-accent);color:var(--color-accent-ink);border:1px solid color-mix(in oklab,var(--color-accent) 78%,var(--color-ink));border-radius:var(--radius-pill);padding:8px 16px;cursor:pointer;font:inherit;font-weight:600;box-shadow:inset 0 1px 0 color-mix(in oklab,var(--color-paper-2) 32%,transparent),inset 0 -1px 0 color-mix(in oklab,var(--color-ink) 10%,transparent)}
+button.ghost{background:none;border:1px solid var(--line);border-radius:8px;padding:8px 12px;cursor:pointer;color:var(--ink);font:inherit}
 button.link{background:none;border:0;color:var(--gov);cursor:pointer;font:inherit;padding:0}
-.chip{display:inline-block;padding:1px 9px;border-radius:999px;font-size:12px;background:var(--brand-weak);color:var(--brand);margin:2px 4px 2px 0;white-space:nowrap}
+.chip{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;background:var(--brand-weak);color:var(--brand);margin:2px 4px 2px 0;white-space:nowrap}
 .chip.gov{background:var(--gov-weak);color:var(--gov)}
 .chip.member{background:var(--member-weak);color:var(--member)}
 .chip.warn{background:var(--warn-weak);color:var(--warn)}
@@ -106,9 +147,9 @@ button.link{background:none;border:0;color:var(--gov);cursor:pointer;font:inheri
 .notice{background:var(--warn-weak);color:var(--warn);border-radius:8px;padding:8px 12px;font-size:13px;margin-bottom:12px}
 mark{background:var(--warn-weak);color:inherit;padding:0 2px;border-radius:3px}
 /* 막대 */
-.bars{display:grid;grid-template-columns:minmax(90px,max-content) 1fr auto;gap:6px 10px;align-items:center}
+.bars{display:grid;grid-template-columns:minmax(90px,max-content) 1fr auto;gap:8px 12px;align-items:center}
 .bars .name{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px}
-.bars .name.parent{font-weight:700;padding-top:6px}
+.bars .name.parent{font-weight:700;padding-top:8px}
 .bars .fill{display:block;height:10px;border-radius:0 4px 4px 0;background:var(--seq)}
 .bars .num{font-size:13px;color:var(--ink-2);font-variant-numeric:tabular-nums;text-align:right}
 .bars .hit{display:contents}
@@ -127,14 +168,14 @@ mark{background:var(--warn-weak);color:inherit;padding:0 2px;border-radius:3px}
 .scale{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);margin-top:8px}
 .scale .grad{width:140px;height:10px;border-radius:5px;background:linear-gradient(90deg,color-mix(in oklab,var(--seq) 8%,var(--panel)),var(--seq))}
 /* 기둥(회기 추이) */
-.cols{display:flex;align-items:flex-end;gap:3px;height:120px;border-bottom:1px solid var(--line);padding-top:6px}
+.cols{display:flex;align-items:flex-end;gap:4px;height:120px;border-bottom:1px solid var(--line);padding-top:8px}
 .cols .c{flex:1;min-width:4px;background:var(--seq);border-radius:4px 4px 0 0}
 .cols .c:hover{filter:brightness(1.15)}
 .cols .c.zero{background:transparent}
-.colx{display:flex;gap:3px;font-size:10px;color:var(--muted)}
+.colx{display:flex;gap:4px;font-size:10px;color:var(--muted)}
 .colx span{flex:1;min-width:4px;text-align:center;overflow:visible;white-space:nowrap}
 /* 목록 */
-.item{padding:10px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.item{padding:12px 0;border-bottom:1px solid var(--line);cursor:pointer}
 .item:last-child{border-bottom:0}
 .item:hover .t{color:var(--brand)}
 .item .d{font-size:12px;color:var(--muted)}
@@ -144,55 +185,55 @@ mark{background:var(--warn-weak);color:inherit;padding:0 2px;border-radius:3px}
 .item.sel .t{color:var(--brand);font-weight:700}
 #mList{max-height:75vh;overflow:auto}
 /* 대화형 질의·답변 */
-.qa{margin:14px 0}
-.bubble{max-width:88%;padding:10px 14px;border-radius:12px;margin:6px 0;font-size:14px}
+.qa{margin:16px 0}
+.bubble{max-width:88%;padding:12px 16px;border-radius:12px;margin:8px 0;font-size:14px}
 .bubble .who{font-size:12px;font-weight:700;margin-bottom:2px}
 .bubble.q{background:var(--member-weak);border-top-left-radius:2px}
 .bubble.q .who{color:var(--member)}
 .bubble.a{background:var(--gov-weak);margin-left:auto;border-top-right-radius:2px}
 .bubble.a .who{color:var(--gov)}
 .bubble.a.promise{background:var(--warn-weak);box-shadow:inset 3px 0 0 var(--warn)}
-.quote .ctx{font-size:12px;color:var(--muted);margin:2px 0 4px;border-left:2px solid var(--member);padding-left:6px}
+.quote .ctx{font-size:12px;color:var(--muted);margin:2px 0 4px;border-left:2px solid var(--member);padding-left:8px}
 
 /* 카드형 요약·접기·구성 막대 */
-.points{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px;margin-top:6px}
-.pt{border:1px solid var(--line);border-left:4px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--panel);font-size:14px;line-height:1.55}
-.pt.member{border-left-color:var(--member)} .pt.gov{border-left-color:var(--gov)} .pt.staff{border-left-color:var(--muted)} .pt.warn{border-left-color:var(--warn);background:var(--warn-weak)}
-.pt .who{font-size:12px;font-weight:700;color:var(--ink-2);margin-bottom:4px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.points{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-top:8px}
+.pt{border:1px solid var(--line);border-radius:10px;padding:12px 12px;background:var(--panel);font-size:14px;line-height:1.55}
+.pt.warn{background:var(--warn-weak)}
+.pt .who{font-size:12px;font-weight:700;color:var(--ink-2);margin-bottom:4px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .pt .who .meta{font-weight:400;color:var(--muted)}
 .pt .txt{display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden}
 .pt.open .txt{-webkit-line-clamp:unset}
-.mini{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:10px 0}
-.mini div{background:var(--bg);border-radius:8px;padding:8px 10px}
+.mini{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}
+.mini div{background:var(--bg);border-radius:8px;padding:8px 12px}
 .mini b{display:block;font-size:20px;line-height:1.2}
 .mini span{font-size:12px;color:var(--muted)}
-.stack{display:flex;height:12px;border-radius:6px;overflow:hidden;gap:2px;margin:6px 0 4px}
+.stack{display:flex;height:12px;border-radius:6px;overflow:hidden;gap:2px;margin:8px 0 4px}
 .stack i{display:block;height:100%}
 .legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--ink-2)}
 .legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;vertical-align:-1px}
-details.more{margin-top:6px}
+details.more{margin-top:8px}
 .points>details.more{grid-column:1/-1;margin-top:0}
-details.more>summary{cursor:pointer;color:var(--seq);font-size:13px;list-style:none;padding:6px 0}
+details.more>summary{cursor:pointer;color:var(--seq);font-size:13px;list-style:none;padding:8px 0}
 details.more>summary::-webkit-details-marker{display:none}
 details.more[open]>summary{display:none}
 .segtabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:4px 0 12px;overflow-x:auto}
 .segtabs button{background:none;border:0;border-bottom:2px solid transparent;padding:8px 12px;color:var(--ink-2);cursor:pointer;white-space:nowrap;font:inherit}
 .segtabs button.on{color:var(--ink);border-bottom-color:var(--seq);font-weight:700}
 .segpanel{display:none}.segpanel.on{display:block}
-.filterchips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
-.filterchips button{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:4px 10px;font-size:13px;cursor:pointer;color:var(--ink-2)}
-.filterchips button.on{background:var(--seq);border-color:var(--seq);color:#fff}
-.rowlist .r{display:grid;grid-template-columns:86px 1fr auto;gap:10px;align-items:center;padding:8px 2px;border-bottom:1px solid var(--line);cursor:pointer;font-size:14px}
+.filterchips{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.filterchips button{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:4px 12px;font-size:13px;cursor:pointer;color:var(--ink-2)}
+.filterchips button.on{background:var(--color-paper-3);border-color:var(--color-ink);box-shadow:inset 0 0 0 1px var(--color-ink);color:var(--ink);font-weight:600}
+.rowlist .r{display:grid;grid-template-columns:86px 1fr auto;gap:12px;align-items:center;padding:8px 2px;border-bottom:1px solid var(--line);cursor:pointer;font-size:14px}
 .rowlist .r:hover{background:var(--bg)}
 .rowlist .r .d{color:var(--muted);font-size:12px}
 .rowlist .r .n{font-size:12px;color:var(--ink-2);min-width:60px;text-align:right}
 .hit-snip{font-size:14px;line-height:1.55;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 @media (max-width:640px){.mini{grid-template-columns:repeat(2,1fr)}.rowlist .r{grid-template-columns:70px 1fr}.rowlist .r .n{display:none}}
-.toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:var(--ink);color:var(--panel);padding:8px 14px;border-radius:999px;font-size:13px;z-index:30}
+.toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:var(--ink);color:var(--panel);padding:8px 16px;border-radius:var(--radius-pill);font-size:13px;z-index:30}
 .searchbar{margin-bottom:16px}
-.chat-day{display:flex;justify-content:center;margin:18px 0 4px}
-.chat-day span{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 12px}
-.quote{border-left:3px solid var(--line);padding:6px 12px;margin:8px 0;font-size:14px}
+.chat-day{display:flex;justify-content:center;margin:20px 0 4px}
+.chat-day span{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:4px 12px}
+.quote{border-top:1px solid var(--line);padding:8px 12px;margin:8px 0;font-size:14px}
 .quote.member{border-color:var(--member)}
 .quote.gov{border-color:var(--gov)}
 .quote.warn{border-color:var(--warn);background:var(--warn-weak)}
@@ -200,68 +241,61 @@ details.more[open]>summary{display:none}
 .quote .meta{font-size:12px;color:var(--muted);font-weight:400}
 details>summary{cursor:pointer;color:var(--ink-2);font-size:14px}
 table.t{width:100%;border-collapse:collapse;font-size:14px}
-table.t th,table.t td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+table.t th,table.t td{text-align:left;padding:8px 8px;border-bottom:1px solid var(--line);vertical-align:top}
 table.t th{color:var(--muted);font-weight:500;font-size:13px;white-space:nowrap}
 .tablewrap{overflow-x:auto}
 pre{white-space:pre-wrap;font-size:13px}
-#tip{position:fixed;pointer-events:none;background:var(--ink);color:var(--panel);font-size:12px;padding:6px 9px;border-radius:6px;z-index:20;display:none;max-width:260px}
+#tip{position:fixed;pointer-events:none;background:var(--ink);color:var(--panel);font-size:12px;padding:8px 8px;border-radius:6px;z-index:20;display:none;max-width:260px}
 .net-stage{position:relative;height:560px;border-radius:var(--radius);overflow:hidden;touch-action:pan-y;cursor:grab;user-select:none;
-  background:radial-gradient(ellipse at 50% 45%,#16233d 0%,#0a1020 55%,#05070d 100%)}
+  background:radial-gradient(ellipse at 50% 45%,var(--net-ground-1) 0%,var(--net-ground-2) 55%,var(--net-ground-3) 100%)}
 .net-stage.drag{cursor:grabbing}
 .net-stage canvas{display:block;width:100%;height:100%}
 .net-labels{position:absolute;inset:0;pointer-events:none;overflow:hidden}
-.net-labels .lb{position:absolute;left:0;top:0;white-space:nowrap;font-size:12px;color:#e8eef8;text-shadow:0 0 6px #000,0 0 2px #000;will-change:transform}
-.net-labels .lb.issue{font-weight:700;font-size:13px;color:#d9f5e1}
-.net-labels .lb.layer{font-size:11px;letter-spacing:.06em;color:#8fa3c4}
-.net-tip{position:absolute;display:none;pointer-events:none;background:rgba(8,12,22,.92);border:1px solid #2b3a57;color:#e8eef8;font-size:12px;padding:7px 10px;border-radius:8px;max-width:240px;z-index:2}
-.net-legend{position:absolute;left:12px;top:10px;display:flex;gap:12px;font-size:12px;color:#c7d3e6;pointer-events:none}
-.net-legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;box-shadow:0 0 8px currentColor}
-.net-hud{position:absolute;right:12px;bottom:10px;font-size:11px;color:#7f90ad;pointer-events:none}
-.net-loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#8fa3c4;font-size:13px}
+.net-labels .lb{position:absolute;left:0;top:0;white-space:nowrap;font-size:12px;color:var(--net-ink);text-shadow:0 0 6px var(--net-ground-3),0 0 2px var(--net-ground-3);will-change:transform}
+.net-labels .lb.issue{font-weight:600;font-size:13px;color:var(--net-issue)}
+.net-labels .lb.layer{font-size:12px;color:var(--net-ink-3)}
+.net-tip{position:absolute;display:none;pointer-events:none;background:color-mix(in oklab,var(--net-ground-3) 92%,transparent);border:1px solid var(--net-rule);color:var(--net-ink);font-size:12px;padding:8px 12px;border-radius:8px;max-width:240px;z-index:2}
+.net-legend{position:absolute;left:12px;top:12px;display:flex;gap:12px;font-size:12px;color:var(--net-ink-2);pointer-events:none}
+.net-legend i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px}
+.net-hud{position:absolute;right:12px;bottom:12px;font-size:12px;color:var(--net-ink-3);pointer-events:none}
+.net-loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--net-ink-3);font-size:13px}
 @media (max-width:640px){.net-stage{height:440px}.net-hud{display:none}}
 svg text{fill:var(--ink);font-size:11px}
 .empty{color:var(--muted);padding:20px 0;text-align:center}
 
-/* ═══ 디자인 시스템 v2: 브랜드 헤더·넓은 레이아웃·위계 ═══ */
-:root{--radius:14px;--shadow:0 1px 2px rgba(16,40,28,.06),0 4px 16px rgba(16,40,28,.05);--bg:#f3f5f4;
-  --band-1:#0f3d2a;--band-2:#0d4a5c;--band-ink:#eaf4ef;--band-muted:#a8c4b8}
-:root[data-theme="dark"]{--bg:#0f1311;--shadow:0 1px 2px rgba(0,0,0,.4)}
-@media (prefers-color-scheme: dark){:root:where(:not([data-theme="light"])){--bg:#0f1311;--shadow:0 1px 2px rgba(0,0,0,.4)}}
-body{font-family:"Pretendard Variable",Pretendard,"Noto Sans KR",system-ui,sans-serif;letter-spacing:-.01em;-webkit-font-smoothing:antialiased}
+/* ═══ 디자인 시스템 v2: 넓은 레이아웃·위계 ═══ */
+body{font-family:var(--font-body);-webkit-font-smoothing:antialiased}
 .wrap{max-width:1320px;padding:0 24px}
-header{background:linear-gradient(100deg,var(--band-1) 0%,var(--band-2) 100%);border-bottom:0;color:var(--band-ink);box-shadow:0 2px 12px rgba(10,40,30,.18)}
-.top{padding:14px 0 10px}
+header{background:var(--color-paper);border-bottom:1px solid var(--color-ink);color:var(--ink);box-shadow:none}
+.top{padding:16px 0 12px}
 .brand{display:flex;align-items:center;gap:12px;min-width:0}
 .brand svg{flex:none}
-h1{font-size:19px;letter-spacing:-.02em;color:#fff;line-height:1.25}
-h1 small{display:block;margin:2px 0 0;color:var(--band-muted);font-size:12px;font-weight:400;letter-spacing:0}
-.sessionbar{color:var(--band-muted);font-size:13px}
-.sessionbar select{background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.22);border-radius:999px;padding:7px 14px;font-weight:600;max-width:min(340px,calc(100vw - 110px))}
-.sessionbar select option{color:#111}
+h1{font-family:var(--font-display);font-weight:var(--display-weight);font-size:20px;letter-spacing:var(--tracking-display);color:var(--ink);line-height:1.25}
+h1 small{display:block;margin:2px 0 0;color:var(--muted);font-family:var(--font-body);font-size:12px;font-weight:400;letter-spacing:0}
+.sessionbar{color:var(--muted);font-size:13px}
+.sessionbar select{background:var(--color-paper-2);color:var(--ink);border:1px solid var(--color-rule);border-radius:var(--radius-pill);padding:8px 12px;font-weight:600;max-width:min(340px,calc(100vw - 112px))}
 nav{flex-wrap:nowrap;overflow-x:auto;gap:4px;padding-bottom:0;scrollbar-width:none;margin:0 -4px}
 nav::-webkit-scrollbar{display:none}
-nav button{color:var(--band-muted);border-radius:0;padding:10px 12px 12px;border-bottom:3px solid transparent;white-space:nowrap;font-weight:500}
-nav button:hover{color:#fff}
-nav button.on{background:none;color:#fff;border-bottom-color:#7fd49a;font-weight:700}
-main.wrap{padding-top:22px;padding-bottom:28px}
+nav button{color:var(--muted);border-radius:0;padding:12px 12px;border-bottom:3px solid transparent;white-space:nowrap;font-weight:500}
+nav button:hover{color:var(--ink)}
+nav button.on{background:none;color:var(--ink);border-bottom-color:var(--color-accent);font-weight:600}
+main.wrap{padding-top:24px;padding-bottom:28px}
 .heat table{width:100%;min-width:640px}
 @media (min-width:861px){.two>.card:first-child{position:sticky;top:132px;max-height:calc(100vh - 150px);overflow:auto}}
 /* 좁은 화면: 목록은 상자 안에서 스크롤(수백 건 목록이 페이지를 끝없이 늘이지 않게), 상세는 그 아래 */
 @media (max-width:860px){.two>.card:first-child{max-height:45vh;overflow:auto}}
 .heat td{min-width:20px;height:26px}
-.card{border:1px solid color-mix(in oklab,var(--line) 70%,transparent);box-shadow:var(--shadow);padding:18px 20px;margin-bottom:16px}
+.card{border:1px solid color-mix(in oklab,var(--line) 70%,transparent);box-shadow:var(--shadow);padding:20px 20px;margin-bottom:16px}
 .grid{gap:16px}
 h2{font-size:16px;letter-spacing:-.02em;display:flex;align-items:center;gap:8px}
 h2::before{content:"";width:4px;height:15px;border-radius:2px;background:var(--brand);flex:none}
-.sub{margin-bottom:14px}
+.sub{margin-bottom:16px}
 /* 대시보드 첫 화면: 한 줄 요약 + 핵심 수치 */
-.hero{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,2fr);gap:24px;align-items:center;padding:22px 24px}
-.hero .eyebrow{font-size:12px;font-weight:700;color:var(--brand);letter-spacing:.04em}
-.hero .headline{font-size:22px;font-weight:800;letter-spacing:-.03em;line-height:1.35;margin:4px 0 6px}
-.hero .headline em{font-style:normal;color:var(--brand)}
+.hero{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,2fr);gap:24px;align-items:center;padding:24px 24px}
+.hero .headline{font-size:22px;font-weight:800;letter-spacing:-.03em;line-height:1.35;margin:4px 0 8px}
 .hero .meta{font-size:13px;color:var(--muted)}
 .kpirow{display:grid;grid-template-columns:repeat(4,1fr)}
-.kpirow div{padding:4px 18px;border-left:1px solid var(--line)}
+.kpirow div{padding:4px 20px;border-left:1px solid var(--line)}
 .kpirow b{display:block;font-size:30px;font-weight:800;letter-spacing:-.03em;line-height:1.15;font-variant-numeric:tabular-nums}
 .kpirow span{font-size:13px;color:var(--ink-2)}
 .kpirow small{display:block;font-size:11px;color:var(--muted)}
@@ -270,11 +304,11 @@ h2::before{content:"";width:4px;height:15px;border-radius:2px;background:var(--b
 @media (max-width:900px){.hero{grid-template-columns:1fr}.kpirow div:first-child{border-left:0;padding-left:0}}
 @media (max-width:640px){
   .wrap{padding:0 16px}
-  .top{padding:10px 0 6px;gap:8px}
+  .top{padding:12px 0 8px;gap:8px}
   h1{font-size:16px} h1 small{display:none}
   .brand svg{width:26px;height:26px}
   .sessionbar{width:100%} .sessionbar select{flex:1;max-width:none}
-  .hero{padding:18px}
+  .hero{padding:20px}
   .hero .headline{font-size:19px}
   .kpirow{grid-template-columns:repeat(2,1fr);row-gap:12px}
   .kpirow div:nth-child(3){border-left:0;padding-left:0}
@@ -282,70 +316,67 @@ h2::before{content:"";width:4px;height:15px;border-radius:2px;background:var(--b
   .card{padding:16px}
 }
 /* 최근 약속(대시보드): 촘촘한 목록 */
-.clist .ci{padding:10px 0;border-bottom:1px solid var(--line)}
+.clist .ci{padding:12px 0;border-bottom:1px solid var(--line)}
 .clist .ci:last-child{border-bottom:0}
 .clist .ci .who{font-size:12px;color:var(--muted)}
 .clist .ci .who b{color:var(--ink-2)}
 .clist .ci .t{font-size:14px;font-weight:600;line-height:1.5;margin:2px 0}
 .clist .ci .q{font-size:12px;color:var(--muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-#recent .item{padding:11px 0}
+#recent .item{padding:12px 0}
 
 .netwrap{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:stretch}
 .netwrap .net-stage{height:520px}
-.netside{border:1px solid var(--line);border-radius:12px;padding:12px 14px;overflow:auto;max-height:520px}
-.netside h3{margin:12px 0 6px;font-size:13px}
-.netside .nl{padding:5px 0;cursor:pointer}
+.netside{border:1px solid var(--line);border-radius:12px;padding:12px 16px;overflow:auto;max-height:520px}
+.netside h3{margin:12px 0 8px;font-size:13px}
+.netside .nl{padding:4px 0;cursor:pointer}
 .netside .nl:hover .nl-t span{color:var(--seq)}
-.netside .nl-t{display:flex;gap:6px;align-items:baseline;font-size:13px;min-width:0}
+.netside .nl-t{display:flex;gap:8px;align-items:baseline;font-size:13px;min-width:0}
 .netside .nl-t span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:46%}
 .netside .nl-t i{font-style:normal;color:var(--muted)}
 .netside .nl-t b{margin-left:auto;font-size:12px;color:var(--ink-2);font-weight:500;font-variant-numeric:tabular-nums}
-.netside .nl-bar{display:block;height:4px;border-radius:2px;background:var(--seq);opacity:.75;margin-top:3px}
+.netside .nl-bar{display:block;height:4px;border-radius:2px;background:var(--seq);opacity:.75;margin-top:4px}
 @media (max-width:1000px){.netwrap{grid-template-columns:1fr}.netside{max-height:none}}
 @media (max-width:640px){.netwrap .net-stage{height:440px}}
 /* ═══ v3: 가독성·직관성 ═══ */
-:root{--muted:#5c6761;--ink-2:#3c4641}
-:root[data-theme="dark"]{--muted:#a3b0a9;--ink-2:#cdd5d0}
-@media (prefers-color-scheme: dark){:root:where(:not([data-theme="light"])){--muted:#a3b0a9;--ink-2:#cdd5d0}}
 .sub{font-size:13.5px;line-height:1.6}
 .bubble,.quote,.pt{font-size:15px;line-height:1.72}
 .bubble .who,.pt .who{font-size:12.5px}
 .bubble{max-width:82%}
-.bubble.short{padding:5px 12px;font-size:13.5px;color:var(--ink-2);display:table}
-.bubble.short .who{display:inline;margin-right:6px}
+.bubble.short{padding:4px 12px;font-size:13.5px;color:var(--ink-2);display:table}
+.bubble.short .who{display:inline;margin-right:8px}
 .chip{font-size:12.5px}
 h3{font-size:14.5px;color:var(--ink)}
 :focus-visible{outline:2px solid var(--seq);outline-offset:2px;border-radius:6px}
 /* 헤더 검색 */
 .gsearch{flex:1 1 280px;max-width:460px;display:flex}
-.gsearch input{width:100%;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:999px;padding:8px 16px 8px 36px;font:inherit;font-size:14px;
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%23cfe3da' stroke-width='2'%3E%3Ccircle cx='7' cy='7' r='5'/%3E%3Cpath d='m11 11 4 4'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:13px center}
-.gsearch input::placeholder{color:var(--band-muted)}
-.gsearch input:focus{background-color:rgba(255,255,255,.2);outline:none;border-color:#7fd49a}
+.gsearch input{width:100%;background-color:var(--color-paper-2);border:1px solid var(--color-rule);color:var(--ink);border-radius:var(--radius-pill);padding:8px 16px 8px 36px;font:inherit;font-size:14px;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%236b655c' stroke-width='2'%3E%3Ccircle cx='7' cy='7' r='5'/%3E%3Cpath d='m11 11 4 4'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:13px center}
+.gsearch input::placeholder{color:var(--muted)}
+.gsearch input:focus-visible{outline:2px solid var(--color-focus);outline-offset:0;border-color:var(--color-ink)}
 /* 화면 머리말 */
-.pagehead{margin:0 0 14px}
+.pagehead{margin:0 0 16px}
 .pagehead h2{font-size:20px;margin:0 0 2px}
 .pagehead h2::before{height:18px}
 .pagehead p{margin:0;color:var(--ink-2);font-size:14px}
 /* 회의 상세 동작 버튼 */
 .actbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:4px 0 2px}
-.actbar a,.actbar button,.dd>summary{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:6px 12px;font:inherit;font-size:13.5px;cursor:pointer;text-decoration:none;list-style:none}
+.actbar a,.actbar button,.dd>summary{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:8px 12px;font:inherit;font-size:13.5px;cursor:pointer;text-decoration:none;list-style:none}
 .actbar a:hover,.actbar button:hover,.dd>summary:hover{border-color:var(--brand);color:var(--brand)}
 .dd{position:relative}
 .dd>summary::-webkit-details-marker{display:none}
-.dd>summary.ai{background:var(--brand);border-color:var(--brand);color:#fff;font-weight:600}
-.dd>summary.ai:hover{color:#fff;filter:brightness(1.08)}
-.dd .menu{position:absolute;z-index:20;top:calc(100% + 6px);left:0;width:min(320px,86vw);background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.14);padding:6px}
-.dd .menu button,.dd .menu a{display:block;width:100%;text-align:left;border:0;background:none;padding:9px 10px;border-radius:8px;font:inherit;font-size:14px;color:var(--ink);cursor:pointer;text-decoration:none}
+.dd>summary.ai{background:var(--color-accent);border-color:color-mix(in oklab,var(--color-accent) 78%,var(--color-ink));color:var(--color-accent-ink);font-weight:600}
+.dd>summary.ai:hover{color:var(--color-accent-ink);border-color:var(--color-ink)}
+.dd .menu{position:absolute;z-index:20;top:calc(100% + 8px);left:0;width:min(320px,86vw);background:var(--panel);border:0;border-radius:var(--radius-entry);box-shadow:0 0 0 1px var(--color-ink),var(--shadow-lift);padding:8px}
+.dd .menu button,.dd .menu a{display:block;width:100%;text-align:left;border:0;background:none;padding:8px 12px;border-radius:8px;font:inherit;font-size:14px;color:var(--ink);cursor:pointer;text-decoration:none}
 .dd .menu button:hover,.dd .menu a:hover{background:var(--bg)}
 .dd .menu small{display:block;color:var(--muted);font-size:12px}
-.dd .menu p{margin:6px 10px 4px;font-size:12px;color:var(--muted);line-height:1.5}
+.dd .menu p{margin:8px 12px 4px;font-size:12px;color:var(--muted);line-height:1.5}
 /* 브리핑 시작 안내 */
-.starter h3{margin:14px 0 6px}
-.starter .ex{display:flex;flex-wrap:wrap;gap:6px}
-.starter .ex button{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:5px 12px;font:inherit;font-size:13.5px;cursor:pointer;color:var(--ink)}
+.starter h3{margin:16px 0 8px}
+.starter .ex{display:flex;flex-wrap:wrap;gap:8px}
+.starter .ex button{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:4px 12px;font:inherit;font-size:13.5px;cursor:pointer;color:var(--ink)}
 .starter .ex button:hover{border-color:var(--brand);color:var(--brand)}
-.starter ol{margin:6px 0 0;padding-left:20px;color:var(--ink-2);font-size:14px}
+.starter ol{margin:8px 0 0;padding-left:20px;color:var(--ink-2);font-size:14px}
 @media (max-width:640px){.gsearch{order:3;flex-basis:100%;max-width:none}.bubble{max-width:94%}
   .pagehead h2{font-size:18px}.pagehead p{font-size:13.5px}}
 /* ═══ v4: 관계 흐름도 · 읽기 좋은 회의록 ═══ */
@@ -360,7 +391,7 @@ h3{font-size:14.5px;color:var(--ink)}
 .isplit{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.5fr);gap:28px;align-items:start}
 @media (max-width:1200px){.isplit{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:1100px){.sumgrid.on{grid-template-columns:minmax(0,1fr)}}
-.scrollbox{max-height:var(--box-h,440px);overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;padding-right:6px}
+.scrollbox{max-height:var(--box-h,440px);overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;padding-right:8px}
 .dash-a,.dash-b{display:grid;gap:16px;margin-bottom:16px;align-items:stretch}
 .dash-a{grid-template-columns:minmax(0,1.75fr) minmax(300px,1fr)}
 .dash-b{grid-template-columns:repeat(3,minmax(0,1fr))}
@@ -369,16 +400,16 @@ h3{font-size:14.5px;color:var(--ink)}
 .g32{display:grid;gap:16px;grid-template-columns:minmax(0,3fr) minmax(0,2fr);align-items:start}
 .g32>.card{margin:0}
 @media (max-width:1100px){.g32{grid-template-columns:minmax(0,1fr)}}
-.prog{border-left:3px solid var(--line)}
+.prog{border:1px solid var(--line)}
 .prog.open{border-left-color:var(--brand)} .prog.upcoming{border-left-color:var(--member)}
 .prog .txt a{color:inherit;text-decoration:none} .prog .txt a:hover{text-decoration:underline}
-.sigbox{border-radius:10px;padding:10px 12px;background:var(--brand-weak);margin-bottom:10px;font-size:13px}
-.sigbox b{font-size:15px;margin-right:6px}
+.sigbox{border-radius:10px;padding:12px 12px;background:var(--brand-weak);margin-bottom:12px;font-size:13px}
+.sigbox b{font-size:15px;margin-right:8px}
 .sigbox.gap{background:var(--warn-weak)} .sigbox.gap b{color:var(--warn)}
 .dash-a>.card,.dash-b>.card{margin:0}
-#rank .bars{gap:4px 10px}
+#rank .bars{gap:4px 12px}
 @media (max-width:1000px){.dash-a,.dash-b{grid-template-columns:minmax(0,1fr)}}
-.qlinks{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.qlinks{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
 .qlinks button{border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:4px 12px;font:inherit;font-size:13px;cursor:pointer;color:var(--ink)}
 .qlinks button:hover{border-color:var(--brand);color:var(--brand)}
 /* 흐름도(3열 리본): 굵기 = 함께 언급된 횟수 */
@@ -404,45 +435,45 @@ h3{font-size:14.5px;color:var(--ink)}
 .netwrap .net-stage[hidden]{display:none}
 /* 히트맵: 칸 안에 숫자 */
 .heat td{font-size:11px;color:var(--ink-2);text-align:center;font-variant-numeric:tabular-nums}
-.heat td.hi{color:#fff}
+.heat td.hi{color:var(--color-on-fill)}
 .heat td.tot{background:none!important;border:0!important;color:var(--ink);font-weight:700;text-align:right;padding-left:8px}
 .heat tr:hover th.rowh{color:var(--seq)}
 .heat tr:hover td:not(.tot){box-shadow:inset 0 0 0 1px color-mix(in oklab,var(--ink) 25%,transparent)}
 /* 기둥 위 숫자 */
-.cols{padding-top:18px}
+.cols{padding-top:20px}
 .cols .c{position:relative}
 .cols .c b{position:absolute;bottom:100%;left:50%;transform:translateX(-50%);font-size:10px;font-weight:500;color:var(--ink-2);white-space:nowrap;padding-bottom:1px}
 /* 전체 회의록: 발언 흐름 미니맵 */
 .tools{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;gap:8px;align-items:center}
 @media (max-width:640px){.tools{grid-template-columns:minmax(0,1fr) auto}}
 /* 읽기 쉽게: 군말은 흐리게, 진행 기록은 작은 표지, 수치는 굵게, 약칭·법률은 풀이 */
-.easytog{display:flex;align-items:center;gap:6px;font-size:13px;white-space:nowrap;cursor:pointer}
+.easytog{display:flex;align-items:center;gap:8px;font-size:13px;white-space:nowrap;cursor:pointer}
 .filler{opacity:.4}
-.sd{display:inline-block;font-size:11.5px;line-height:1.6;padding:0 7px;border-radius:999px;background:var(--bg);border:1px solid var(--line);color:var(--muted);margin:0 3px;white-space:nowrap;vertical-align:1px}
+.sd{display:inline-block;font-size:11.5px;line-height:1.6;padding:0 8px;border-radius:999px;background:var(--bg);border:1px solid var(--line);color:var(--muted);margin:0 4px;white-space:nowrap;vertical-align:1px}
 b.num{font-weight:700;color:var(--ink)}
 abbr[title]{text-decoration:underline dotted;text-underline-offset:3px;cursor:help}
 a.law{color:inherit;text-decoration:underline;text-decoration-color:color-mix(in oklab,var(--brand) 60%,transparent);text-underline-offset:3px}
 /* 회의 3줄 브리핑 · 질의 차례 */
-.brief3{list-style:none;margin:12px 0 4px;padding:10px 14px;border-radius:10px;background:var(--brand-weak);font-size:14px;line-height:1.75}
+.brief3{list-style:none;margin:12px 0 4px;padding:12px 16px;border-radius:10px;background:var(--brand-weak);font-size:14px;line-height:1.75}
 .brief3 li{display:flex;gap:8px} .brief3 b{white-space:nowrap}
-.turnnav{display:flex;gap:6px;margin:4px 0 10px;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}
-.turnnav button{flex:0 0 auto;border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:2px 10px;font-size:12.5px;cursor:pointer}
-.tcard{border:1px solid color-mix(in oklab,var(--line) 80%,transparent);border-radius:12px;padding:12px 14px;margin-bottom:12px;background:var(--panel)}
-.tcard .th{display:flex;flex-wrap:wrap;gap:6px;align-items:baseline;margin-bottom:4px}
+.turnnav{display:flex;gap:8px;margin:4px 0 12px;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}
+.turnnav button{flex:0 0 auto;border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:2px 12px;font-size:12.5px;cursor:pointer}
+.tcard{color:var(--ink);border:1px solid color-mix(in oklab,var(--line) 80%,transparent);border-radius:12px;padding:12px 16px;margin-bottom:12px;background:var(--panel)}
+.tcard .th{display:flex;flex-wrap:wrap;gap:8px;align-items:baseline;margin-bottom:4px}
 .tcard .th b{font-size:15.5px} .tcard .th .meta{color:var(--muted);font-size:12.5px}
 .tcard .th .link{margin-left:auto;font-size:12.5px}
 .tcard ol{margin:0;padding-left:24px}
-.tcard li{padding:7px 4px;border-top:1px dashed color-mix(in oklab,var(--line) 80%,transparent);cursor:pointer;border-radius:6px}
+.tcard li{padding:8px 4px;border-top:1px dashed color-mix(in oklab,var(--line) 80%,transparent);cursor:pointer;border-radius:6px}
 .tcard li:first-child{border-top:0} .tcard li:hover{background:var(--bg)}
 .tcard .q{line-height:1.6}
 .tcard .a{color:var(--ink-2);font-size:14px;line-height:1.6;margin-top:2px}
 .tcard .a .who{color:var(--gov);font-weight:600;margin-right:4px}
-.tcard li.short .q,.tcard li.short .a{display:inline} .tcard li.short .a{margin-left:6px}
+.tcard li.short .q,.tcard li.short .a{display:inline} .tcard li.short .a{margin-left:8px}
 .tcard li.promise .a{color:var(--warn)}
 .tools select{max-width:260px}
 @media (max-width:760px){.tools{grid-template-columns:1fr 1fr}.tools input{grid-column:1/-1}.tools select{max-width:none}}
 /* 발언이 수천 개여도 회의 전체가 한 줄에 들어가도록 간격·최소 폭 없이(있으면 넘친 뒷부분이 잘림) */
-.flowbar{display:flex;height:26px;border-radius:6px;overflow:hidden;background:var(--line);cursor:pointer;margin:12px 0 6px}
+.flowbar{display:flex;height:26px;border-radius:6px;overflow:hidden;background:var(--line);cursor:pointer;margin:12px 0 8px}
 .flowbar i{display:block;min-width:0;background:color-mix(in oklab,var(--muted) 35%,var(--panel))}
 .flowbar i.member{background:var(--member)} .flowbar i.gov{background:var(--gov)}
 .flowbar i.chair{background:color-mix(in oklab,var(--brand) 45%,var(--panel))}
@@ -450,15 +481,15 @@ a.law{color:inherit;text-decoration:underline;text-decoration-color:color-mix(in
 .flowbar i.ag{flex:0 0 3px!important;background:var(--ink)}
 .flowbar i:hover{filter:brightness(1.25)}
 .flowbar i.dim{opacity:.25}
-.flowlegend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--ink-2);margin-bottom:6px}
+.flowlegend{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:12px;color:var(--ink-2);margin-bottom:8px}
 .flowlegend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
 /* 전체 회의록: 발언 */
-.turn{display:grid;grid-template-columns:36px minmax(0,1fr);gap:12px;padding:14px 6px;border-bottom:1px solid color-mix(in oklab,var(--line) 70%,transparent);border-radius:8px}
+.turn{display:grid;grid-template-columns:36px minmax(0,1fr);gap:12px;padding:16px 8px;border-bottom:1px solid color-mix(in oklab,var(--line) 70%,transparent);border-radius:8px}
 .turn .av{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:14px;background:var(--bg);color:var(--ink-2);border:1px solid var(--line)}
 .turn.member .av{background:var(--member-weak);color:var(--member);border-color:transparent}
 .turn.gov .av{background:var(--gov-weak);color:var(--gov);border-color:transparent}
 .turn.chair .av{background:var(--brand-weak);color:var(--brand);border-color:transparent}
-.turn .tw{display:flex;gap:6px;align-items:baseline;flex-wrap:wrap;margin-bottom:3px;font-size:13px}
+.turn .tw{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;margin-bottom:4px;font-size:13px}
 .turn .tw b{font-size:15px;letter-spacing:-.01em}
 .turn.member .tw b{color:var(--member)} .turn.gov .tw b{color:var(--gov)} .turn.chair .tw b{color:var(--brand)}
 .turn .tw .role{color:var(--muted)}
@@ -466,52 +497,100 @@ a.law{color:inherit;text-decoration:underline;text-decoration-color:color-mix(in
 .turn .tx{max-width:44em;font-size:15.5px;line-height:1.82;word-break:keep-all;overflow-wrap:anywhere}
 .turn .tx p{margin:0 0 .6em} .turn .tx p:last-child{margin-bottom:0}
 .turn.chair .tx,.turn.other .tx{font-size:14.5px;color:var(--ink-2)}
-.turn .tx.clamp{max-height:7.4em;overflow:hidden;-webkit-mask-image:linear-gradient(#000 55%,transparent);mask-image:linear-gradient(#000 55%,transparent)}
+.turn .tx.clamp{max-height:7.4em;overflow:hidden;-webkit-mask-image:linear-gradient(var(--ink) 55%,transparent);mask-image:linear-gradient(var(--ink) 55%,transparent)}
 .turn .more{font-size:13px;margin-top:4px}
 .turn.promise{background:var(--warn-weak);box-shadow:inset 3px 0 0 var(--warn)}
 .turn.flash{animation:turnflash 1.8s ease-out}
 @keyframes turnflash{0%{background:color-mix(in oklab,var(--seq) 28%,transparent)}100%{background:transparent}}
-.agenda-h{position:sticky;top:0;z-index:3;background:var(--panel);margin:18px 0 0;padding:10px 6px 9px;border-bottom:2px solid var(--brand);font-weight:700;font-size:14.5px;display:flex;gap:10px;align-items:baseline;line-height:1.45}
+.agenda-h{position:sticky;top:0;z-index:3;background:var(--panel);margin:20px 0 0;padding:12px 8px 8px;border-bottom:2px solid var(--brand);font-weight:700;font-size:14.5px;display:flex;gap:12px;align-items:baseline;line-height:1.45}
 .agenda-h .no{flex:none;font-size:12px;color:var(--brand);background:var(--brand-weak);border-radius:6px;padding:1px 8px}
 .agenda-h .n{margin-left:auto;flex:none;font-size:12px;font-weight:400;color:var(--muted)}
-.flowhint{display:none;font-size:12px;color:var(--muted);margin:0 0 6px}
+.flowhint{display:none;font-size:12px;color:var(--muted);margin:0 0 8px}
 @media (max-width:700px){.flowhint{display:block}}
 /* 모바일: 헤더가 화면을 절반 가까이 가리지 않도록 고정하지 않는다 */
 @media (max-width:640px){header{position:static}}
-@media (max-width:640px){.turn{grid-template-columns:28px minmax(0,1fr);gap:9px;padding:12px 2px}.turn .av{width:28px;height:28px;font-size:12px}.turn .tx{font-size:15px}}
+@media (max-width:640px){.turn{grid-template-columns:28px minmax(0,1fr);gap:8px;padding:12px 2px}.turn .av{width:28px;height:28px;font-size:12px}.turn .tx{font-size:15px}}
 /* 정부 약속 이행 추적 */
-.fustat{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 8px}
-.fustat button{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:5px 12px;font:inherit;font-size:13px;cursor:pointer;color:var(--ink-2)}
+.fustat{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 8px}
+.fustat button{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:4px 12px;font:inherit;font-size:13px;cursor:pointer;color:var(--ink-2)}
 .fustat button b{color:var(--ink);font-variant-numeric:tabular-nums}
 .fustat button i{width:9px;height:9px;border-radius:50%;display:inline-block}
 .fustat button.on{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink);color:var(--ink)}
-.fuchip,.fukind{display:inline-block;border-radius:6px;padding:0 7px;font-size:12px;font-weight:600;line-height:1.6;white-space:nowrap}
+.fuchip,.fukind{display:inline-block;border-radius:6px;padding:0 8px;font-size:12px;font-weight:600;line-height:1.6;white-space:nowrap}
 .st-done{background:var(--brand-weak);color:var(--brand)} .st-progress{background:var(--seq-weak);color:var(--seq)}
 .st-reraised{background:var(--bad-weak);color:var(--bad)} .st-early{background:var(--bg);color:var(--muted);border:1px solid var(--line)}
 .st-none{background:var(--warn-weak);color:var(--warn)}
 .fuitem .fut{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:14px;line-height:1.5;margin-top:2px}
-.fubanner{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;border-radius:10px;padding:10px 14px;font-size:13.5px}
+.fubanner{display:flex;gap:12px;align-items:baseline;flex-wrap:wrap;border-radius:10px;padding:12px 16px;font-size:13.5px}
 .fubanner b{font-size:16px}
 .fubanner.st-early{border:1px solid var(--line)}
-.fugrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:22px;margin-top:10px;align-items:start}
+.fugrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:24px;margin-top:12px;align-items:start}
 @media (max-width:1100px){.fugrid{grid-template-columns:minmax(0,1fr)}}
 .fumeta{margin-top:8px}
-.fuext{border:1px dashed var(--line);border-radius:10px;padding:10px 12px;margin-top:12px;font-size:13.5px}
-.fusrc{margin:8px 0 4px;padding-left:18px;font-size:13px;color:var(--ink-2)}
+.fuext{border:1px dashed var(--line);border-radius:10px;padding:12px 12px;margin-top:12px;font-size:13.5px}
+.fusrc{margin:8px 0 4px;padding-left:20px;font-size:13px;color:var(--ink-2)}
 .timeline{list-style:none;margin:0;padding:0 4px 0 0}
-.tl{position:relative;padding:0 0 14px 22px;border-left:2px solid var(--line);margin-left:6px}
+.tl{position:relative;padding:0 0 16px 24px;border-left:2px solid var(--line);margin-left:8px}
 .tl:last-child{border-left-color:transparent}
 .tl-dot{position:absolute;left:-7px;top:3px;width:12px;height:12px;border-radius:50%;background:var(--panel);border:3px solid var(--muted)}
 .tl.k-start .tl-dot{border-color:var(--warn)} .tl.k-done .tl-dot{border-color:var(--brand);background:var(--brand)}
 .tl.k-progress .tl-dot{border-color:var(--seq)} .tl.k-reraised .tl-dot{border-color:var(--bad);background:var(--bad)}
 .tl-d{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
-.tl-h{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13.5px;margin:2px 0}
+.tl-h{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13.5px;margin:2px 0}
 .tl-t{font-size:14px;line-height:1.65;color:var(--ink-2)}
 .tl a,.tl .link{font-size:12.5px}
 .fukind.k-done{background:var(--brand-weak);color:var(--brand)} .fukind.k-progress{background:var(--seq-weak);color:var(--seq)}
 .fukind.k-reraised{background:var(--bad-weak);color:var(--bad)} .fukind.k-related{background:var(--bg);color:var(--muted);border:1px solid var(--line)}
 /* 숙련자가 약속이 아니라고 정정한 판정 */
 .st-excluded{background:var(--bg);color:var(--muted);border:1px solid var(--line)}
+/* ═══ v5 · Hallmark Furrow 재스타일: 마닐라 종이, 먹 괘선, 주황 신호 하나 ═══ */
+.logo-plate{fill:var(--color-ink)} .logo-leaf{fill:var(--color-accent)} .logo-wave{stroke:var(--color-paper-2)}
+.net-legend .k-member{background:var(--net-member)} .net-legend .k-issue{background:var(--net-issue)} .net-legend .k-org{background:var(--net-org)}
+.net-tip .nt-meta{color:var(--net-ink-3)} .net-tip .nt-link{color:var(--net-ink-2)} .net-tip .nt-hint{color:var(--net-issue);margin-top:4px}
+.sep{display:inline-block;width:12px}
+/* 제목: 먹색 한 가지, 한 굵기(구역마다 색을 바꾸지 않는다) */
+h2,h3,.pagehead h2,.hero .headline{font-family:var(--font-display);font-weight:var(--display-weight);letter-spacing:var(--tracking-display);color:var(--ink);text-wrap:balance}
+h2{font-size:17px} h2::before{display:none}
+.pagehead h2{font-size:24px}
+/* 카드: 종이 위 흰 장 한 가지(괘선 테두리, 그림자 거의 없음) */
+.card{background:var(--color-paper-2);border:1px solid var(--color-rule);border-radius:var(--radius-card);box-shadow:var(--shadow-card)}
+.netside,.mcard,.eq,.pt,.mini div,.fuext{border-radius:var(--radius-pill)}
+/* 대시보드 첫 줄: 쟁점 이름을 크게, 숫자는 같은 서체로 */
+.hero .headline{font-size:30px;line-height:1.15;margin:0 0 4px}
+.hero .lede{margin:0 0 8px;color:var(--ink-2);font-size:15px}
+.kpirow b,.mini b,.stat .v{font-family:var(--font-display);font-weight:var(--display-weight);font-variant-numeric:tabular-nums;letter-spacing:var(--tracking-display)}
+.site-footer{display:flex;flex-wrap:wrap;justify-content:center;gap:4px 16px}
+/* 칩·필터: 6px 모서리, 문장형, 자간 없음 */
+.chip,.fuchip,.fukind{border-radius:var(--radius-pill);font-weight:500}
+.filterchips button,.qlinks button,.netmode button,.fustat button,.starter .ex button,button.ghost,.actbar a,.actbar button,.dd>summary,input,select{border-radius:var(--radius-pill)}
+.chat-day span{border-radius:var(--radius-pill)}
+.netmode button.on{background:var(--color-paper-3);border-color:var(--color-ink);box-shadow:inset 0 0 0 1px var(--color-ink);color:var(--ink);font-weight:600}
+.segtabs button.on{border-bottom-color:var(--color-accent);font-weight:600}
+.flow text.ctitle{letter-spacing:0;font-weight:600}
+/* 컨트롤 상태: 누름·비활성 */
+button:active:not(:disabled),.dd>summary:active{transform:translateY(1px)}
+button:disabled,button[aria-disabled="true"],input:disabled,select:disabled{opacity:.5;cursor:not-allowed}
+button.primary:hover{border-color:var(--color-ink)}
+.filterchips button:hover,.qlinks button:hover,.fustat button:hover,.netmode button:hover{border-color:var(--color-ink);color:var(--ink)}
+/* 왼쪽 색 띠 대신: 테두리는 괘선 한 가지, 누구의 말인지는 이름 색으로 */
+.pt,.pt.member,.pt.gov,.pt.staff{border-left:1px solid var(--color-rule)}
+.pt.warn{border:1px solid color-mix(in oklab,var(--warn) 30%,var(--color-rule))}
+.pt.member .who{color:var(--member)} .pt.gov .who{color:var(--gov)}
+.eq,.eq.follow,.eq.repeat{border-left:1px solid var(--color-rule)}
+.quote,.quote.member,.quote.gov{border-left:0;padding-left:0;border-top:1px solid var(--color-rule);padding-top:8px}
+.quote.warn{border:1px solid color-mix(in oklab,var(--warn) 30%,var(--color-rule));padding:8px 12px;border-radius:var(--radius-pill)}
+.quote.member .who{color:var(--member)} .quote.gov .who{color:var(--gov)}
+.quote .ctx{border-left:0;padding-left:0}
+.prog,.prog.open,.prog.upcoming{border-left:1px solid var(--color-rule)}
+.bubble.a.promise,.turn.promise{box-shadow:none}
+.bubble{border-radius:var(--radius-entry)}
+/* 숫자: 표처럼 맞춤 */
+.heat td,.bars .num,.cols .c b,.tl-d,.kpirow b{font-variant-numeric:tabular-nums}
+/* 다크에서 카드가 바닥보다 어둡지 않게 */
+:root[data-theme="dark"] .card{color:var(--ink)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .card{color:var(--ink)}}
+/* 움직임 줄이기 */
+@media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
 </style>
 </head>
 <body>
@@ -519,8 +598,8 @@ a.law{color:inherit;text-decoration:underline;text-decoration-color:color-mix(in
   <div class="wrap">
     <div class="top">
       <div class="brand">
-        <svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="rgba(255,255,255,.12)"/>
-          <path d="M9 18c0-6 5-10 12-10-1 7-5 11-12 10z" fill="#7fd49a"/><path d="M6 23c3-2 6-2 9 0s6 2 9 0 5-2 6-1" stroke="#7fc0f0" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
+        <svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="logo-plate" width="32" height="32" rx="6"/>
+          <path class="logo-leaf" d="M9 18c0-6 5-10 12-10-1 7-5 11-12 10z"/><path class="logo-wave" d="M6 23c3-2 6-2 9 0s6 2 9 0 5-2 6-1" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
         <h1>국회 농해수위 온톨로지<small>국회 농림축산식품해양수산위원회 회의록 분석</small></h1>
       </div>
       <form class="gsearch" id="gsearch" role="search" onsubmit="event.preventDefault();globalSearch()">
@@ -548,28 +627,28 @@ a.law{color:inherit;text-decoration:underline;text-decoration-color:color-mix(in
   <div class="dash-a">
     <div class="card">
       <h2>회기별 쟁점 흐름</h2>
-      <p class="sub">최근 14개 회기 · 칸의 숫자는 그 회기에 쟁점이 언급된 횟수(색이 진할수록 많음) · <span class="reg">파란 굵은 번호</span>는 정기회 · 쟁점 이름을 누르면 상세</p>
+      <p class="sub">최근 14개 회기에서 쟁점이 언급된 횟수입니다. 색이 진할수록 많고, <span class="reg">굵은 번호</span>는 정기회입니다. 쟁점 이름을 누르면 상세로 갑니다.</p>
       <div class="heat" id="heat"></div>
       <div class="scale"><span>적음</span><span class="grad"></span><span>많음</span><span>· 점선 칸 = 언급 없음</span></div>
     </div>
     <div class="card">
       <h2>많이 논의된 쟁점</h2>
-      <p class="sub">전체 회기 언급 횟수 · 누르면 쟁점 분석</p>
+      <p class="sub">전체 회기 언급 횟수입니다. 누르면 쟁점 분석으로 갑니다.</p>
       <div id="rank" class="scrollbox" style="--box-h:380px"></div>
     </div>
   </div>
   <div class="card">
     <div class="row" style="align-items:baseline"><h2>위원 → 쟁점 → 기관 관계 흐름</h2>
       <div class="netmode" id="netMode"><button class="on" data-k="flow">흐름도</button><button data-k="3d">3D 신경망</button></div></div>
-    <p class="sub" id="netSub">왼쪽 위원이 어떤 쟁점을 따졌고, 그 쟁점이 어느 기관으로 이어졌는지 보여 줍니다. <b>띠가 굵을수록</b> 함께 언급된 발언이 많습니다 · 항목에 마우스를 올리면 연결만 강조 · 누르면 쟁점 분석 / 의원 분석 / 기관 브리핑</p>
+    <p class="sub" id="netSub">왼쪽 위원이 어떤 쟁점을 따졌고, 그 쟁점이 어느 기관으로 이어졌는지 보여 줍니다. <b>띠가 굵을수록</b> 함께 언급된 발언이 많습니다. 항목에 마우스를 올리면 그 연결만 강조되고, 누르면 쟁점·의원 분석이나 기관 브리핑으로 갑니다.</p>
     <div class="netwrap">
     <div class="netmain">
-    <p class="flowhint">← 옆으로 밀어서 전체 보기 →</p><div class="flowscroll"><div id="netFlow" class="flow"><div class="empty">흐름도를 불러오는 중…</div></div></div>
+    <p class="flowhint">옆으로 밀어서 전체를 볼 수 있습니다.</p><div class="flowscroll"><div id="netFlow" class="flow"><div class="empty">흐름도를 불러오는 중…</div></div></div>
     <div id="netStage" class="net-stage" hidden aria-label="위원·쟁점·기관 3D 관계망">
       <div class="net-labels"></div>
       <div class="net-tip"></div>
-      <div class="net-legend"><span><i style="background:#d7a6ea;color:#d7a6ea"></i>위원</span><span><i style="background:#7fd49a;color:#7fd49a"></i>쟁점</span><span><i style="background:#7fc0f0;color:#7fc0f0"></i>기관</span></div>
-      <div class="net-hud">드래그 회전 · 휠 확대 · 노드를 누르면 연결 고정 · 쟁점은 쟁점 분석으로</div>
+      <div class="net-legend"><span><i class="k-member"></i>위원</span><span><i class="k-issue"></i>쟁점</span><span><i class="k-org"></i>기관</span></div>
+      <div class="net-hud">끌어서 회전, 휠로 확대합니다. 노드를 누르면 연결이 고정됩니다.</div>
       <div class="net-loading">신경망을 불러오는 중…</div>
     </div>
     </div>
@@ -579,17 +658,17 @@ a.law{color:inherit;text-decoration:underline;text-decoration-color:color-mix(in
   <div class="dash-b">
     <div class="card">
       <h2>최근 회의</h2>
-      <p class="sub">대표 안건과 핵심 쟁점 · 누르면 요약</p>
+      <p class="sub">대표 안건과 핵심 쟁점입니다. 누르면 요약을 엽니다.</p>
       <div id="recent" class="scrollbox"></div>
     </div>
     <div class="card">
-      <div class="row" style="justify-content:space-between;align-items:baseline"><h2>최근 정부 약속</h2><button class="link" style="font-size:13px" onclick="openTab('followups')">이행 추적 →</button></div>
-      <p class="sub">무엇을 하겠다고 답했는지 · 앞선 위원 질의와 함께 · 국감 사후 점검 대상</p>
+      <div class="row" style="justify-content:space-between;align-items:baseline"><h2>최근 정부 약속</h2><button class="link" style="font-size:13px" onclick="openTab('followups')">이행 추적</button></div>
+      <p class="sub">무엇을 하겠다고 답했는지 앞선 위원 질의와 함께 봅니다. 국감 사후 점검 대상입니다.</p>
       <div id="recentCommit" class="clist scrollbox"></div>
     </div>
     <div class="card">
       <h2>지원사업 공고</h2>
-      <p class="sub" id="progSub">공공데이터포털(K-Startup)의 농림·해양수산 관련 공고 · 마감이 가까운 순</p>
+      <p class="sub" id="progSub">공공데이터포털(K-Startup)의 농림·해양수산 관련 공고를 마감이 가까운 순으로 보여 줍니다.</p>
       <div id="progDash" class="points scrollbox"><div class="empty">불러오는 중…</div></div>
     </div>
   </div>
@@ -619,7 +698,7 @@ a.law{color:inherit;text-decoration:underline;text-decoration-color:color-mix(in
       <select id="qType"><option value="">모든 발언자</option><option value="member">위원 질의만</option><option value="official">정부·기관 답변만</option></select>
       <button class="primary" id="qBtn">검색</button>
     </div>
-    <p class="muted" style="margin:8px 0 0;font-size:13px">여러 단어를 띄어 쓰면 모두 포함된 발언을 찾습니다 · 기간은 상단 <b>회기</b>를 따릅니다.</p>
+    <p class="muted" style="margin:8px 0 0;font-size:13px">여러 단어를 띄어 쓰면 모두 포함된 발언을 찾습니다. 기간은 상단 <b>회기</b>를 따릅니다.</p>
   </div>
   <div class="two">
     <div class="card">
@@ -637,7 +716,7 @@ a.law{color:inherit;text-decoration:underline;text-decoration-color:color-mix(in
   <div class="two">
     <div class="card">
       <h2>쟁점 분류</h2>
-      <p class="sub">전체 회기 언급 횟수 · 쟁점을 누르면 상세</p>
+      <p class="sub">전체 회기 언급 횟수입니다. 쟁점을 누르면 상세가 열립니다.</p>
       <div id="tree"></div>
     </div>
     <div id="iDetail"><div class="card empty">왼쪽에서 쟁점을 선택하세요.</div></div>
@@ -647,7 +726,7 @@ a.law{color:inherit;text-decoration:underline;text-decoration-color:color-mix(in
 <!-- 의원 분석 -->
 <section id="members">
   <div class="card">
-    <h2>의원별 관심사 · 예상 질문</h2>
+    <h2>의원별 관심사와 예상 질문</h2>
     <p class="sub">의원 발언에서 관심 쟁점, 질의 관점(예산·감독·피해 등), 그 의원이 두드러지게 쓰는 핵심어를 뽑고, 과거 질의와 받아낸 정부 약속을 근거로 예상 질문을 만듭니다.</p>
     <div class="row" style="gap:10px">
       <span class="muted" style="font-size:13px">분석 범위</span>
@@ -716,7 +795,7 @@ a.law{color:inherit;text-decoration:underline;text-decoration-color:color-mix(in
   <div class="card tablewrap" id="sOut"></div>
 </section>
 </main>
-<footer class="site-footer">국회 농해수위 온톨로지 · 자료: 열린국회정보 위원회 회의록·의안, 공공데이터포털 K-Startup 지원사업 공고 · 제작자 kimjs1408 · <button class="link" onclick="openTab('sparql')">고급 도구(SPARQL)</button></footer>
+<footer class="site-footer"><span>국회 농해수위 온톨로지</span><span>자료: 열린국회정보 위원회 회의록·의안, 공공데이터포털 K-Startup 지원사업 공고</span><span>제작자 kimjs1408</span><button class="link" onclick="openTab('sparql')">지식그래프 질의(고급)</button></footer>
 
 <script>
 const $ = s => document.querySelector(s);
@@ -814,16 +893,16 @@ async function loadDash(){
   try{ s = await api("/api/stats") }
   catch(e){ $("#noticeArea").innerHTML = `<div class="notice">서버 응답 오류: ${esc(e.message)} — <a href="/api/health" target="_blank">/api/health</a></div>`; return }
   const kst = iso => { const d = new Date(iso); return isNaN(d) ? iso : new Date(d.getTime() + 9 * 3600e3).toISOString().slice(0, 16).replace("T", " ") };
-  const upd = s.data_updated ? `데이터 갱신 ${esc(kst(s.data_updated))} (한국시간) · 자동 수집 하루 3회` : "자동 수집 데이터 없음";
+  const upd = s.data_updated ? `데이터 갱신 ${esc(kst(s.data_updated))} (한국시간)<span class="sep"></span>자동 수집 하루 3회` : "자동 수집 데이터 없음";
   $("#noticeArea").innerHTML = s.samples ? `<div class="notice">가상 예시 회의록 ${s.samples}건이 포함되어 있습니다.</div>` : "";
   $("#sampleBtn").hidden = s.meetings - s.samples > 0;  // 실제 회의록이 있으면 예시 데이터를 섞지 않는다
   const latest = SESSIONS[0];
   const renderHero = (topIssue, recentN) => { $("#kpis").innerHTML = `
     <div>
-      <div class="eyebrow">회의록 현황 · 전체 회기</div>
-      <div class="headline">${topIssue ? `가장 많이 다룬 쟁점은<br><em>${esc(topIssue)}</em>` : "농해수위 회의록 분석"}</div>
-      <div class="meta">${dot(s.date_min)} ~ ${dot(s.date_max)} · 회기 ${SESSIONS.length}개${recentN ? ` · 최근 회기(${esc(latest.label)}) 회의 ${recentN}건` : ""}<br>${upd}</div>
-      <div class="qlinks">${[["meetings", "📄 회의록"], ["issues", "🧭 쟁점"], ["members", "👤 의원"], ["brief", "📋 국감 브리핑"]]
+      <div class="headline">${topIssue ? esc(topIssue) : "농해수위 회의록 분석"}</div>
+      <p class="lede">${topIssue ? "전체 회기에서 가장 많이 다룬 쟁점입니다." : "회의록을 불러오는 중입니다."}</p>
+      <div class="meta">${dot(s.date_min)} ~ ${dot(s.date_max)}<span class="sep"></span>회기 ${SESSIONS.length}개${recentN ? `<span class="sep"></span>최근 회기(${esc(latest.label)}) 회의 ${recentN}건` : ""}<br>${upd}</div>
+      <div class="qlinks">${[["meetings", "회의록"], ["issues", "쟁점"], ["members", "의원"], ["brief", "국감 브리핑"]]
         .map(([t, l]) => `<button onclick="openTab('${t}')">${l}</button>`).join("")}</div>
     </div>
     <div class="kpirow">${[
@@ -844,7 +923,7 @@ async function loadDash(){
 
   $("#recent").innerHTML = ov.meetings.map(m => `
     <div class="item" onclick="gotoMeeting('${esc(m.id)}')">
-      <div class="d">${dot(m.date)} · ${esc(SESS[m.session_no]?.kind || "")} · 안건 ${m.n_agendas}건</div>
+      <div class="d">${dot(m.date)}<span class="sep"></span>${esc(SESS[m.session_no]?.kind || "")}<span class="sep"></span>안건 ${m.n_agendas}건</div>
       <div class="t">${esc(meetingShort(m))}</div>
       ${m.headline ? `<div class="h">${esc(cut(m.headline, 90))}</div>` : ""}
       <div>${chips(m.issues)}</div>
@@ -865,13 +944,13 @@ async function loadDash(){
   $("#heat").scrollLeft = $("#heat").scrollWidth;  // 좁은 화면에서도 최근 회기(오른쪽)부터 보이게
 
   api("/api/programs/overview").then(p => {
-    $("#progSub").textContent = `공공데이터포털(K-Startup)의 농림·해양수산 관련 공고 ${fmt(p.total)}건 · 접수 중 ${fmt(p.open)}건 · 마감이 가까운 순`;
+    $("#progSub").textContent = `공공데이터포털(K-Startup)의 농림·해양수산 관련 공고 ${fmt(p.total)}건, 접수 중 ${fmt(p.open)}건, 마감이 가까운 순`;
     $("#progDash").innerHTML = progList(p.closing.length ? p.closing : p.latest) || '<div class="empty">아직 수집한 공고가 없습니다.</div>';
   }).catch(() => $("#progDash").innerHTML = '<div class="empty">공고를 불러오지 못했습니다.</div>');
   $("#recentCommit").innerHTML = ov.commitments.slice(0, 12).map(c => `
-    <div class="ci"><div class="who"><b>${esc(c.speaker)}</b> · ${dot(c.date)} · <button class="link" onclick="gotoMeeting('${esc(c.meeting_id)}')">회의 보기</button></div>
+    <div class="ci"><div class="who"><b>${esc(c.speaker)}</b><span class="sep"></span>${dot(c.date)}<span class="sep"></span><button class="link" onclick="gotoMeeting('${esc(c.meeting_id)}')">회의 보기</button></div>
       <div class="t">${esc(cut(c.text, 90))}</div>
-      ${c.question ? `<div class="q">↳ ${esc(c.question.member)} 위원: ${esc(c.question.text)}</div>` : ""}</div>`).join("") || '<div class="empty">데이터 없음</div>';
+      ${c.question ? `<div class="q">${esc(c.question.member)} 위원 질의: ${esc(c.question.text)}</div>` : ""}</div>`).join("") || '<div class="empty">데이터 없음</div>';
 }
 function gotoIssue(id){ openTab("issues"); return showIssue(id) }
 function gotoMeeting(id){ openTab("meetings"); return showMeeting(id) }
@@ -918,7 +997,7 @@ function renderMeetingList(){
   for(const m of ms){
     if(m.session_no !== last){ last = m.session_no; html += `<div class="group">${esc(SESS[m.session_no]?.label || "제" + m.session_no + "회")}</div>` }
     html += `<div class="item ${m.id === selMeeting ? "sel" : ""}" data-id="${esc(m.id)}">
-      <div class="d">${dot(m.date)} · 안건 ${m.agendas.length}건 ${m.text_status !== "parsed" ? '<span class="chip warn">본문 미수집</span>' : ""}</div>
+      <div class="d">${dot(m.date)}<span class="sep"></span>안건 ${m.agendas.length}건 ${m.text_status !== "parsed" ? '<span class="chip warn">본문 미수집</span>' : ""}</div>
       <div class="t">${esc(meetingShort(m))}</div></div>`;
   }
   $("#mList").innerHTML = html || '<div class="empty">회의가 없습니다.</div>';
@@ -951,7 +1030,7 @@ function turnsHtml(mid, turns){
   const nav = `<div class="turnnav">${turns.map((t, i) => `<button onclick="document.getElementById('tc${i}').scrollIntoView({block:'nearest',behavior:'smooth'})">${esc(t.member)} ${fmt(t.questions)}</button>`).join("")}</div>`;
   const cards = turns.map((t, i) => `<div class="tcard" id="tc${i}">
       <div class="th"><b>${esc(t.member)} 위원</b>${chips(t.issues)}<span class="meta">질문 ${fmt(t.questions)}${t.commitments ? ` · 약속 ${fmt(t.commitments)}` : ""}${t.data_requests ? ` · 자료요구 ${fmt(t.data_requests)}` : ""}</span>
-        <button class="link" onclick="gotoUtt('${esc(mid)}', ${t.start_idx})">원문 →</button></div>
+        <button class="link" onclick="gotoUtt('${esc(mid)}', ${t.start_idx})">원문 보기</button></div>
       <ol>${t.items.map(x => `<li class="${x.short ? "short" : ""}${x.commitment ? " promise" : ""}" onclick="gotoUtt('${esc(mid)}', ${x.idx})">
         <div class="q">${easy(x.q)}</div>${x.a ? `<div class="a">→ ${x.short ? "" : `<span class="who">${esc(x.answerer)}</span>`}${easy(x.a)}${x.commitment ? ' <span class="chip warn">약속</span>' : ""}</div>` : ""}</li>`).join("")}</ol></div>`).join("");
   return nav + `<div class="scrollbox tall">${cards}</div>`;
@@ -971,11 +1050,11 @@ async function showMeeting(id, useLlm = false){
   const nMain = m.agendas.filter(a => /^\s*\d+\s*\./.test(a)).length || m.agendas.length;
   $("#mDetail").innerHTML = `
     <div class="card">
-      ${searchState ? `<button class="link" style="font-size:13px" onclick="renderSearch()">← 「${esc(searchState.q)}」 검색 결과로</button>` : ""}
-      <div class="muted" style="font-size:13px">${dot(m.date)} · ${esc(SESS[m.session_no]?.label || "")} ${m.is_sample ? '<span class="chip warn">가상 예시</span>' : ""}</div>
+      ${searchState ? `<button class="link" style="font-size:13px" onclick="renderSearch()">「${esc(searchState.q)}」 검색 결과로 돌아가기</button>` : ""}
+      <div class="muted" style="font-size:13px">${dot(m.date)}<span class="sep"></span>${esc(SESS[m.session_no]?.label || "")} ${m.is_sample ? '<span class="chip warn">가상 예시</span>' : ""}</div>
       <h2 style="margin:4px 0 8px;font-size:19px">${esc(meetingShort(m))}</h2>
       <div class="actbar">
-        <details class="dd"><summary class="ai">✨ 내 AI로 분석 ▾</summary><div class="menu">
+        <details class="dd"><summary class="ai">내 AI로 분석</summary><div class="menu">
           <button onclick="openInAI('chatgpt')">ChatGPT에서 열기<small>분석 요청이 입력된 새 창 + 전문은 클립보드로</small></button>
           <button onclick="openInAI('claude')">Claude에서 열기<small>분석 요청이 입력된 새 창 + 전문은 클립보드로</small></button>
           <button onclick="copyMinutes()">분석 요청 + 전문 복사<small>다른 AI에 붙여넣기</small></button>
@@ -1005,7 +1084,7 @@ async function showMeeting(id, useLlm = false){
         ${llm ? `<h3>Claude 서술형 요약</h3><p>${esc(llm.overview)}</p>
           <ul>${llm.key_agendas.map(a => `<li><b>${esc(a.agenda)}</b> — ${esc(a.summary)} ${a.outcome ? `<span class="chip gov">${esc(a.outcome)}</span>` : ""}</li>`).join("")}</ul>
           <h3>국감 후속 점검사항</h3><ul>${llm.audit_followups.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
-        ${s.qa_highlights.length ? `<h3>대표 질의응답</h3>${qaHtml(s.qa_highlights[0])}<button class="link" style="font-size:13px" onclick="segShow('mTabs','qa')">위원별 질의 차례 보기 →</button>` : ""}
+        ${s.qa_highlights.length ? `<h3>대표 질의응답</h3>${qaHtml(s.qa_highlights[0])}<button class="link" style="font-size:13px" onclick="segShow('mTabs','qa')">위원별 질의 차례 보기</button>` : ""}
       </div><div>
         <h3 style="margin-top:0">주요 발언 <span class="muted" style="font-weight:400;font-size:12px">카드를 누르면 전체 문장</span></h3>
         <div class="scrollbox" style="--box-h:560px">${(s.key_point_items || []).length ? pointCards(s.key_point_items) : `<ul style="margin:0;padding-left:20px">${s.key_points.map(p => `<li>${esc(p)}</li>`).join("") || "<li class='muted'>본문 없음</li>"}</ul>`}</div>
@@ -1032,7 +1111,7 @@ async function showMeeting(id, useLlm = false){
         <div class="points">${s.data_requests.map(d => `<div class="pt member" onclick="this.classList.toggle('open')"><div class="who">${esc(d.member)} 위원</div><div class="txt">${esc(d.text)}</div></div>`).join("") || '<div class="muted">-</div>'}</div>
       </div>
       <div class="segpanel" data-seg="mTabs" data-k="mb">
-        <p class="sub">이 회의에서 질의한 의원별 관심 쟁점·질의 관점·핵심어와 예상 질문 · 전체 기간 분석은 의원 분석에서</p>
+        <p class="sub">이 회의에서 질의한 의원별 관심 쟁점·질의 관점·핵심어와 예상 질문, 전체 기간 분석은 의원 분석에서</p>
         <div id="mMembers" class="scrollbox tall"></div>
       </div>
       <div class="segpanel scrollbox tall" data-seg="mTabs" data-k="ag">
@@ -1119,7 +1198,7 @@ function renderFlowbar(){
   $("#tFlow").innerHTML = t.utts.length < 3 ? "" : `<div class="flowbar" id="tFlowbar" role="navigation" aria-label="발언 흐름">${html}</div>
     <div class="flowlegend"><span><i style="background:var(--member)"></i>위원</span><span><i style="background:var(--gov)"></i>정부·기관</span>
       <span><i style="background:color-mix(in oklab,var(--brand) 45%,var(--panel))"></i>위원장</span><span><i style="background:var(--warn)"></i>정부 약속</span>
-      <span><i style="background:var(--ink);width:3px"></i>안건 경계</span><span class="muted">막대 폭 = 발언 길이 · 누르면 그 발언으로 이동</span></div>`;
+      <span><i style="background:var(--ink);width:3px"></i>안건 경계</span><span class="muted">막대 폭 = 발언 길이, 누르면 그 발언으로 이동</span></div>`;
   const bar = $("#tFlowbar"); if(bar) bar.onclick = e => { const i = e.target.dataset?.i; if(i != null) jumpToUtt(+i) };
 }
 const tRows = () => { const t = transcript; return (t.utts || []).filter(u => (!t.filter || typeGroup(u.speaker_type) === t.filter)
@@ -1208,7 +1287,7 @@ function renderTranscript(){
     html += turnHtml(u, t.find);
   }
   $("#tBody").classList.remove("muted");
-  $("#tBody").innerHTML = (filtered ? `<p class="muted" style="font-size:13px;margin:4px 0">${fmt(rows.length)}개 발언 · 미니맵에서 흐리게 보이는 칸은 거른 발언</p>` : "") + (html || '<div class="empty">해당 발언 없음</div>')
+  $("#tBody").innerHTML = (filtered ? `<p class="muted" style="font-size:13px;margin:4px 0">${fmt(rows.length)}개 발언, 미니맵에서 흐리게 보이는 칸은 거른 발언</p>` : "") + (html || '<div class="empty">해당 발언 없음</div>')
     + (rows.length > t.limit ? `<button class="ghost" style="width:100%;margin-top:8px" onclick="transcript.limit+=300;renderTranscript()">발언 ${fmt(Math.min(300, rows.length - t.limit))}개 더 보기 (남은 ${fmt(rows.length - t.limit)}개)</button>` : "");
 }
 function copyLink(){
@@ -1245,12 +1324,12 @@ function renderSearch(){
   const byMeeting = {};
   rows.forEach(u => (byMeeting[u.meeting_id] ||= {date: u.meeting_date, title: u.meeting_title, session: u.session_no, items: []}).items.push(u));
   const groups = Object.entries(byMeeting).map(([mid, g]) => `<div class="card">
-      <div class="muted" style="font-size:13px">${dot(g.date)} · ${esc(SESS[g.session]?.label || "")} · <button class="link" onclick="showMeeting('${esc(mid)}')">회의 보기</button></div>
+      <div class="muted" style="font-size:13px">${dot(g.date)}<span class="sep"></span>${esc(SESS[g.session]?.label || "")}<span class="sep"></span><button class="link" onclick="showMeeting('${esc(mid)}')">회의 보기</button></div>
       <h2 style="margin:2px 0 8px">${esc(meetingShort({title: g.title, session_no: g.session}))} <span class="muted" style="font-size:13px;font-weight:400">${g.items.length}건</span></h2>
       <div class="points">${moreList(g.items.map(u => hitCard(u, q)), 3, "건", "points")}</div></div>`);
   selMeeting = null; document.querySelectorAll("#mList .item").forEach(el => el.classList.remove("sel"));
   $("#mDetail").innerHTML = `<div class="card">
-      <div><b>「${esc(q)}」</b> · ${scopeLabel()}에서 <b>${fmt(r.total ?? r.count)}</b>건${(r.total ?? r.count) > r.count ? ` · 관련도 상위 ${fmt(r.count)}건 표시` : ""} · 회의 ${Object.keys(byMeeting).length}건</div>
+      <div><b>「${esc(q)}」</b><span class="sep"></span>${scopeLabel()}에서 <b>${fmt(r.total ?? r.count)}</b>건${(r.total ?? r.count) > r.count ? `<span class="sep"></span>관련도 상위 ${fmt(r.count)}건 표시` : ""}<span class="sep"></span>회의 ${Object.keys(byMeeting).length}건</div>
       <div class="filterchips">${[["", "전체", r.results.length], ...Object.keys(TYPE_LABEL).filter(k => byType[k]).map(k => [k, TYPE_LABEL[k], byType[k]])]
         .map(([k, l, n]) => `<button class="${(filter || "") === k ? "on" : ""}" onclick="searchState.filter='${k}';renderSearch()">${l} ${fmt(n)}</button>`).join("")}</div>
       <div class="grid g2" style="margin-top:10px">
@@ -1301,7 +1380,7 @@ async function showIssue(id){
   const step = Math.ceil(allSess.length / 8);
   $("#iDetail").innerHTML = `
     <div class="card">
-      <div class="muted" style="font-size:13px">${d.parent ? esc(d.parent) + " ›" : "상위 쟁점"} · ${scopeLabel()}</div>
+      <div class="muted" style="font-size:13px">${d.parent ? esc(d.parent) + " ›" : "상위 쟁점"}<span class="sep"></span>${scopeLabel()}</div>
       <h2 style="margin:2px 0 8px;font-size:20px">${esc(d.label)}</h2>
       <div class="row" style="gap:6px"><span class="chip line">관련 발언 ${fmt(d.count)}건</span><span class="chip line">회의 ${fmt(d.meetings)}건</span>
         ${d.children.map(c => `<button class="chip" style="border:0;cursor:pointer" onclick="showIssue('${c.id}')">${esc(c.label)} ›</button>`).join("")}</div>
@@ -1312,14 +1391,14 @@ async function showIssue(id){
       <details style="margin-top:10px"><summary>인식 키워드 ${d.keywords.length}개</summary><div>${chips(d.keywords, "line")}</div></details>
       </div><div>
       <h3>누가 묻고, 어느 기관으로 이어졌나</h3>
-      <p class="sub" style="margin-bottom:6px">질의 위원 → 쟁점 → 답하거나 언급된 기관 · 띠 굵기와 숫자 = 발언 수 · 누르면 의원 분석 / 기관 브리핑</p>
-      <p class="flowhint">← 옆으로 밀어서 전체 보기 →</p><div class="flowscroll"><div class="flow" id="iFlow" style="min-width:520px"></div></div>
+      <p class="sub" style="margin-bottom:6px">질의 위원 → 쟁점 → 답하거나 언급된 기관, 띠 굵기와 숫자 = 발언 수, 누르면 의원 분석 / 기관 브리핑</p>
+      <p class="flowhint">옆으로 밀어서 전체를 볼 수 있습니다.</p><div class="flowscroll"><div class="flow" id="iFlow" style="min-width:520px"></div></div>
       </div></div>
     </div>
     <div class="g32"><div class="card"><h2>질의와 정부 답변</h2><p class="sub">한 위원의 질의 순서에서 실제로 이어진 질의(왼쪽)와 정부 답변(오른쪽)입니다. <span class="chip warn">약속</span>은 구체적 조치 약속. 최근 회의 순.</p>
       <div class="scrollbox tall">${d.dialogue.map((t, i) => {
         const head = i === 0 || d.dialogue[i - 1].meeting_id !== t.meeting_id;
-        return `${head ? `<div class="chat-day"><span>${dot(t.date)} · 제${t.session}회 · <button class="link" onclick="gotoMeeting('${esc(t.meeting_id)}')">회의 보기</button></span></div>` : ""}
+        return `${head ? `<div class="chat-day"><span>${dot(t.date)}<span class="sep"></span>제${t.session}회<span class="sep"></span><button class="link" onclick="gotoMeeting('${esc(t.meeting_id)}')">회의 보기</button></span></div>` : ""}
         <div class="qa">${t.turns.map(x => x.side === "q"
           ? `<div class="bubble q"><div class="who">${esc(x.speaker)}</div>${esc(x.text)}</div>`
           : `<div class="bubble a${x.commitment ? " promise" : ""}${!x.commitment && isShort(x.text) ? " short" : ""}"><div class="who">${esc(x.speaker)} ${x.commitment ? '<span class="chip warn">약속</span>' : ""}</div>${esc(x.text)}</div>`).join("")}</div>`;
@@ -1368,10 +1447,10 @@ function renderMemberList(){
   const f = $("#mbq").value.trim(), rows = mbState.rows || [];
   const hit = r => !f || (r.name + r.top_issues.map(i => i.label).join(" ") + r.keywords.join(" ")).includes(f);
   $("#mbList").innerHTML = rows.filter(hit).map(r => `<div class="item ${r.name === mbState.sel ? "sel" : ""}" data-name="${esc(r.name)}">
-      <div class="d">질의 ${fmt(r.counts.questions)} · 회의 ${fmt(r.counts.meetings)}${r.counts.promises ? ` · 받아낸 약속 ${fmt(r.counts.promises)}` : ""}</div>
+      <div class="d">질의 ${fmt(r.counts.questions)}<span class="sep"></span>회의 ${fmt(r.counts.meetings)}${r.counts.promises ? `<span class="sep"></span>받아낸 약속 ${fmt(r.counts.promises)}` : ""}</div>
       <div class="t">${esc(r.name)} 의원</div>
       <div class="h">${chips(r.top_issues.slice(0, 2).map(i => i.label), "member")}${r.perspectives[0] ? `<span class="chip line">${esc(r.perspectives[0].label)}</span>` : ""}</div>
-      ${r.keywords.length ? `<div class="h muted" style="font-size:12px">${esc(r.keywords.slice(0, 4).join(" · "))}</div>` : ""}</div>`).join("")
+      ${r.keywords.length ? `<div class="h muted" style="font-size:12px">${esc(r.keywords.slice(0, 4).join(", "))}</div>` : ""}</div>`).join("")
     || '<div class="empty">해당 의원이 없습니다.</div>';
   document.querySelectorAll("#mbList .item").forEach(el => el.onclick = () => showMember(el.dataset.name).then(() => toDetail("#mbDetail")));
 }
@@ -1398,7 +1477,7 @@ async function showMember(name){
       <h2 style="margin:2px 0 6px;font-size:20px">${esc(d.name)} 의원</h2>
       <p style="margin:0 0 8px">${esc(d.headline)}</p>
       <div class="row" style="gap:12px;font-size:13px">
-        <button class="link" onclick="briefMemberFrom('${esc(d.name)}')">이 의원 국감 브리핑 →</button>
+        <button class="link" onclick="briefMemberFrom('${esc(d.name)}')">이 의원 국감 브리핑</button>
         <button class="link" onclick="copyLink()">이 화면 링크 복사</button>
       </div>
       <div class="mini">
@@ -1417,28 +1496,28 @@ async function showMember(name){
           <div class="q">${esc(q.question)}</div>
           <div class="why">근거: ${esc(q.why)}</div>
           ${q.basis ? `<details><summary>근거 발언 ${q.basis.date ? dot(q.basis.date) : ""}</summary><div style="margin:4px 0">${esc(q.basis.text)}</div>
-            <button class="link" style="font-size:12px" onclick="gotoMeeting('${esc(q.basis.meeting_id)}')">회의 보기 →</button></details>` : ""}
+            <button class="link" style="font-size:12px" onclick="gotoMeeting('${esc(q.basis.meeting_id)}')">회의 보기</button></details>` : ""}
         </div>`).join("") || '<div class="empty">근거가 되는 발언이 부족합니다.</div>'}</div>
       </div>
       <div class="segpanel" data-seg="mbTabs" data-k="int">
         <div class="grid g3">
-          <div><h3 style="margin-top:0">관심 쟁점</h3><p class="sub">발언 수 · 두드러진 쟁점을 앞에 · 누르면 쟁점 분석</p>
+          <div><h3 style="margin-top:0">관심 쟁점</h3><p class="sub">발언 수, 두드러진 쟁점을 앞에, 누르면 쟁점 분석</p>
             ${d.top_issues.length ? barsHtml(d.top_issues.slice(0, 6).map(i => ({id: i.id, label: i.label, count: i.count})), {onclick: "gotoIssue"}) : '<div class="empty">-</div>'}</div>
-          <div><h3 style="margin-top:0">질의 관점</h3><p class="sub">무엇을 따지는가 · 발언 중 비율 · <b>×</b>는 전체 의원 평균 대비</p>
+          <div><h3 style="margin-top:0">질의 관점</h3><p class="sub">무엇을 따지는가, 발언 중 비율, <b>×</b>는 전체 의원 평균 대비</p>
             ${d.perspectives.slice(0, 6).map(p => `<div class="pbar" data-tip="${esc(p.label)} · 발언 ${fmt(p.count)}건 (${Math.round(p.share * 100)}%) · 평균의 ${p.lift}배">
               <span>${esc(p.label)}</span><span class="track"><i style="width:${Math.max(3, p.share / pmax * 100)}%"></i></span>
               <span class="v">${Math.round(p.share * 100)}% ${p.lift >= 1.2 ? `<b>×${p.lift.toFixed(1)}</b>` : `<span class="muted">×${p.lift.toFixed(1)}</span>`}</span></div>`).join("") || '<div class="empty">-</div>'}</div>
           <div><h3 style="margin-top:0">회기별 질의</h3>${d.by_session.length > 1 ? columns(d.by_session, {label: r => r.session, tip: r => `${esc(SESS[r.session]?.label || "제" + r.session + "회")} ${fmt(r.count)}건`}) : `<span class="muted">${d.by_session.length ? esc(SESS[d.by_session[0].session]?.label || "") + " " + fmt(d.by_session[0].count) + "건" : "-"}</span>`}
             <h3>주로 상대한 기관</h3>${d.orgs.length ? d.orgs.map(o => `<span class="chip gov">${esc(o.name)} ${fmt(o.count)}</span>`).join("") : '<span class="muted">-</span>'}</div>
         </div>
-        <h3>핵심어 <span class="muted" style="font-weight:400;font-size:12px">다른 의원보다 두드러지게 쓰는 말 · 크기는 언급 횟수 · 작은 숫자는 언급한 회의 수</span></h3>
+        <h3>핵심어 <span class="muted" style="font-weight:400;font-size:12px">다른 의원보다 두드러지게 쓰는 말, 크기는 언급 횟수, 작은 숫자는 언급한 회의 수</span></h3>
         <div class="kwcloud">${d.keywords.map(k => `<span style="font-size:${12 + Math.round(8 * Math.sqrt(k.count / kmax))}px" data-tip="${esc(k.word)} · ${fmt(k.count)}회 · 회의 ${fmt(k.meetings)}건">${esc(k.word)}<small>${fmt(k.meetings)}</small></span>`).join("") || '<span class="muted">-</span>'}</div>
       </div>
       <div class="segpanel" data-seg="mbTabs" data-k="qa">
         <div class="mbqa">
           <div><h3 style="margin-top:0">대표 질의와 정부 답변</h3><p class="sub">쟁점이 많고 실질 답변·약속이 나온 대화 순</p>
-            <div class="scrollbox tall">${d.top_questions.map(q => `<div class="chat-day"><span>${dot(q.date)} · <button class="link" onclick="gotoMeeting('${esc(q.meeting_id)}')">회의 보기</button></span></div>${qaHtml(q)}`).join("") || '<div class="empty">-</div>'}</div></div>
-          <div><h3 style="margin-top:0">받아낸 정부 약속 ${d.promises.length}건 · 자료요구 ${d.data_requests.length}건</h3>
+            <div class="scrollbox tall">${d.top_questions.map(q => `<div class="chat-day"><span>${dot(q.date)}<span class="sep"></span><button class="link" onclick="gotoMeeting('${esc(q.meeting_id)}')">회의 보기</button></span></div>${qaHtml(q)}`).join("") || '<div class="empty">-</div>'}</div></div>
+          <div><h3 style="margin-top:0">받아낸 정부 약속 ${d.promises.length}건<span class="sep"></span>자료요구 ${d.data_requests.length}건</h3>
             <div class="scrollbox tall"><div class="points" style="grid-template-columns:1fr">${d.promises.map(p => `<div class="pt warn" onclick="this.classList.toggle('open')"><div class="who">${esc(p.speaker)}<span class="meta">${dot(p.date)}</span></div><div class="txt">${esc(p.text)}</div></div>`).join("")}
               ${d.data_requests.map(x => `<div class="pt member" onclick="this.classList.toggle('open')"><div class="who">자료요구<span class="meta">${dot(x.date)}</span></div><div class="txt">${esc(x.text)}</div></div>`).join("")}</div>
               ${d.promises.length + d.data_requests.length ? "" : '<div class="empty">-</div>'}</div></div>
@@ -1460,18 +1539,20 @@ async function loadMeetingMembers(id){
   box.innerHTML = rows.length ? `<div class="mcards">${rows.slice(0, 12).map((r, i) => { const d = details[i]; const q = d?.expected_questions?.[0];
     return `<div class="mcard"><div class="row" style="justify-content:space-between"><span class="n">${esc(r.name)} 의원</span><span class="muted">질의 ${fmt(r.counts.questions)}</span></div>
       <div style="margin:4px 0">${chips(r.top_issues.slice(0, 2).map(x => x.label), "member")}${r.perspectives.slice(0, 2).map(p => `<span class="chip line">${esc(p.label)}</span>`).join("")}</div>
-      ${r.keywords.length ? `<div class="muted">핵심어 · ${esc(r.keywords.join(", "))}</div>` : ""}
+      ${r.keywords.length ? `<div class="muted">핵심어: ${esc(r.keywords.join(", "))}</div>` : ""}
       ${d?.top_questions?.[0] ? `<div style="margin-top:6px"><b style="font-size:12px;color:var(--ink-2)">이 회의 주요 질의</b><div>${esc(cut(d.top_questions[0].question, 140))}</div></div>` : ""}
       ${q ? `<div style="margin-top:6px"><b style="font-size:12px;color:var(--member)">예상 질문</b><div>${esc(q.question)}</div></div>` : ""}
-      <button class="link" style="font-size:12px;margin-top:6px" onclick="gotoMember('${esc(r.name)}')">전체 기간 의원 분석 →</button></div>` }).join("")}</div>`
+      <button class="link" style="font-size:12px;margin-top:6px" onclick="gotoMember('${esc(r.name)}')">전체 기간 의원 분석</button></div>` }).join("")}</div>`
     : '<div class="empty">이 회의에는 의원 질의가 없습니다.</div>';
 }
 // ── 쟁점 신경망(3D): 위원(입력층) → 쟁점(은닉층) → 기관(출력층) ──
 const THREE_URL = "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
+// 색은 CSS 토큰(--net-*)에서 읽는다: 화면 체계를 바꿔도 관계망이 따라가게
+const cssHex = (name, fb) => { const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim(); return /^#[0-9a-f]{6}$/i.test(v) ? parseInt(v.slice(1), 16) : fb };
 const NET_LAYERS = [
-  {kind: "member", title: "입력층 · 질의 위원", x: -360, top: 22, radius: 230, color: 0xd7a6ea},
-  {kind: "issue", title: "은닉층 · 쟁점", x: 0, top: 16, radius: 190, color: 0x7fd49a},
-  {kind: "org", title: "출력층 · 피감기관", x: 360, top: 16, radius: 200, color: 0x7fc0f0},
+  {kind: "member", title: "입력층: 질의 위원", x: -360, top: 22, radius: 230, color: cssHex("--net-member", 0xe0a477)},
+  {kind: "issue", title: "은닉층: 쟁점", x: 0, top: 16, radius: 190, color: cssHex("--net-issue", 0x9fcf98)},
+  {kind: "org", title: "출력층: 피감기관", x: 360, top: 16, radius: 200, color: cssHex("--net-org", 0x9cc3dc)},
 ];
 // ── 흐름도(3열 리본 그래프): 왼쪽 열 → 가운데 열 → 오른쪽 열 ──
 // cols: [{kind, title, nodes:[{id, label, weight}]}] 3개, links: [{s, t, w}] (s는 앞 열, t는 다음 열)
@@ -1602,7 +1683,7 @@ function setNetMode(k){
   const fl = $("#netFlow").parentElement; fl.hidden = fl.previousElementSibling.hidden = k !== "flow";
   $("#netStage").hidden = k !== "3d";
   $("#netSub").innerHTML = k === "flow"
-    ? "왼쪽 위원이 어떤 쟁점을 따졌고, 그 쟁점이 어느 기관으로 이어졌는지 보여 줍니다. <b>띠가 굵을수록</b> 함께 언급된 발언이 많습니다 · 항목에 마우스를 올리면 연결만 강조 · 누르면 쟁점 분석 / 의원 분석 / 기관 브리핑"
+    ? "왼쪽 위원이 어떤 쟁점을 따졌고, 그 쟁점이 어느 기관으로 이어졌는지 보여 줍니다. <b>띠가 굵을수록</b> 함께 언급된 발언이 많습니다, 항목에 마우스를 올리면 연결만 강조, 누르면 쟁점 분석 / 의원 분석 / 기관 브리핑"
     : "질의 위원(입력층) → 쟁점(은닉층) → 피감기관(출력층). 선이 밝을수록 함께 언급된 횟수가 많고, 흐르는 빛은 질의가 쟁점을 거쳐 기관으로 향하는 흐름입니다. 드래그로 회전합니다.";
   if(k === "3d") loadNet3d();
 }
@@ -1631,7 +1712,7 @@ function netSide(data){
       return `<div class="nl" onclick="gotoIssue('${esc(iss.id.slice(6))}')" data-tip="${esc(r.from.label)} → ${esc(r.to.label)} · ${fmt(r.w)}회">
         <div class="nl-t"><span>${esc(r.from.label)}</span><i>→</i><span>${esc(r.to.label)}</span><b>${fmt(r.w)}</b></div>
         <span class="nl-bar" style="width:${Math.max(4, r.w / max * 100)}%"></span></div>` }).join("")}` };
-  $("#netSide").innerHTML = `<div class="muted" style="font-size:12px">가장 강한 연결 · 누르면 쟁점 분석</div>`
+  $("#netSide").innerHTML = `<div class="muted" style="font-size:12px">가장 강한 연결, 누르면 쟁점 분석</div>`
     + block("위원 → 쟁점", pick("member", "issue")) + block("쟁점 → 기관", pick("issue", "org"));
 }
 function netWebGL(){
@@ -1670,7 +1751,7 @@ function buildNet3d(THREE, stage, data){
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   stage.prepend(renderer.domElement);
   const scene = new THREE.Scene();
-  scene.fog = new THREE.FogExp2(0x070b16, 0.00085);
+  scene.fog = new THREE.FogExp2(cssHex("--net-ground-3", 0x12110f), 0.00085);
   const camera = new THREE.PerspectiveCamera(48, 1, 1, 5000);
   const glow = netGlowTexture(THREE);
   const additive = {transparent: true, depthWrite: false, blending: THREE.AdditiveBlending};
@@ -1759,7 +1840,7 @@ function buildNet3d(THREE, stage, data){
     dPos.set([r * Math.sin(ph) * Math.cos(th), r * Math.cos(ph), r * Math.sin(ph) * Math.sin(th)], i * 3);
   }
   const dGeo = new THREE.BufferGeometry(); dGeo.setAttribute("position", new THREE.BufferAttribute(dPos, 3));
-  const dust = new THREE.Points(dGeo, new THREE.PointsMaterial({size: 2.2, color: 0x6f86b3, opacity: .55, ...additive}));
+  const dust = new THREE.Points(dGeo, new THREE.PointsMaterial({size: 2.2, color: cssHex("--net-ink-3", 0x9a9183), opacity: .55, ...additive}));
   scene.add(dust);
 
   // 라벨(HTML): 쟁점은 모두, 위원·기관은 상위만, 포커스된 노드의 이웃은 추가로
@@ -1807,9 +1888,9 @@ function buildNet3d(THREE, stage, data){
     if(n !== hover){ hover = n; if(!locked) paintLines(n); el.style.cursor = n ? "pointer" : "" }
     if(n){
       const links = edges.filter(x => x.s === n || x.t === n).sort((a, b) => b.w - a.w).slice(0, 4);
-      tipEl.innerHTML = `<b>${esc(n.label)}</b> <span style="color:#8fa3c4">${kindName[n.layer.kind]} · ${fmt(n.weight)}</span>`
-        + links.map(x => `<div style="color:#b9c6da">— ${esc((x.s === n ? x.t : x.s).label)} ${fmt(x.w)}</div>`).join("")
-        + (n.layer.kind === "issue" ? '<div style="color:#7fd49a;margin-top:3px">누르면 쟁점 상세</div>' : "");
+      tipEl.innerHTML = `<b>${esc(n.label)}</b> <span class="nt-meta">${kindName[n.layer.kind]} ${fmt(n.weight)}</span>`
+        + links.map(x => `<div class="nt-link">${esc((x.s === n ? x.t : x.s).label)} ${fmt(x.w)}</div>`).join("")
+        + (n.layer.kind === "issue" ? '<div class="nt-hint">누르면 쟁점 상세</div>' : "");
       const r = stage.getBoundingClientRect();
       tipEl.style.display = "block";
       tipEl.style.left = Math.min(e.clientX - r.left + 14, r.width - tipEl.offsetWidth - 8) + "px";
@@ -1933,7 +2014,7 @@ function renderFuStatus(){
       .map(([k, l, n]) => `<button class="${fuState.status === k ? "on" : ""}" onclick="fuState.status='${k}';renderFuStatus();renderFuList();fuKeepSelection()" ${k ? `data-tip="${esc(d.statuses[k].desc)}"` : ""}>
         ${k ? `<i style="background:${FU_COLOR[k]}"></i>` : ""}${esc(l)} <b>${fmt(n)}</b></button>`).join("")}</div>
     ${total ? stackBar(Object.entries(d.statuses).map(([k, v]) => ({label: v.label, value: d.counts[k], color: FU_COLOR[k]}))) : ""}
-    <p class="muted" style="font-size:12px;margin:6px 0 0">회의록 기준일 ${dot(d.as_of)} · 무엇을 하겠다는지 드러나지 않는 약속("지적사항 반영하겠습니다" 등) ${fmt(d.vague)}건은 제외</p>`;
+    <p class="muted" style="font-size:12px;margin:6px 0 0">회의록 기준일 ${dot(d.as_of)}, 무엇을 하겠다는지 드러나지 않는 약속("지적사항 반영하겠습니다" 등) ${fmt(d.vague)}건은 제외</p>`;
 }
 // 상태를 거른 뒤 보고 있던 약속이 목록에서 빠졌으면, 걸러진 목록의 첫 약속을 보여 준다(목록과 상세가 어긋나지 않게)
 function fuKeepSelection(){
@@ -1946,9 +2027,9 @@ function fuKeepSelection(){
 function renderFuList(){
   const rows = fuRows();
   $("#fuList").innerHTML = rows.map(x => `<div class="item fuitem ${x.id === fuState.sel ? "sel" : ""}" data-id="${x.id}">
-      <div class="d">${fuChip(x.status, x.status_label)} ${dot(x.date)} · ${esc(x.org || x.speaker)}${x.n_evidence ? ` · 근거 ${x.n_evidence}` : ""}${x.checked ? ' · <span title="외부 근거 확인함">외부 확인✓</span>' : ""}</div>
+      <div class="d">${fuChip(x.status, x.status_label)} ${dot(x.date)}<span class="sep"></span>${esc(x.org || x.speaker)}${x.n_evidence ? `<span class="sep"></span>근거 ${x.n_evidence}` : ""}${x.checked ? '<span class="sep"></span><span title="외부 근거 확인함">외부 확인✓</span>' : ""}</div>
       <div class="t fut">${esc(cut(x.text, 110))}</div>
-      <div class="h muted" style="font-size:12px">${esc(x.action_label)}${x.laws.length ? " · " + esc(x.laws.join(", ")) : ""}${x.keywords.length ? " · " + esc(x.keywords.slice(0, 3).join(" · ")) : ""}</div></div>`).join("")
+      <div class="h muted" style="font-size:12px">${esc(x.action_label)}${x.laws.length ? ", " + esc(x.laws.join(", ")) : ""}${x.keywords.length ? ", " + esc(x.keywords.slice(0, 3).join(", ")) : ""}</div></div>`).join("")
     || '<div class="empty">조건에 맞는 약속이 없습니다.</div>';
   document.querySelectorAll("#fuList .item").forEach(el => el.onclick = () => showFollowup(+el.dataset.id).then(() => toDetail("#fuDetail")));
 }
@@ -1959,30 +2040,30 @@ function progList(items){
     const url = /^https?:\/\//.test(a.url || "") ? a.url : "";
     return `<div class="pt prog ${a.status}"><div class="who"><span class="chip ${a.status === "open" ? "" : "line"}">${PROG_STATUS[a.status] || ""}</span>${esc(a.org || "")}
       <span class="meta">${dot(a.start)} ~ ${dot(a.end) || "미정"}</span></div>
-      <div class="txt">${url ? `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(a.title)} ↗</a>` : esc(a.title)}</div></div>` }).join("");
+      <div class="txt">${url ? `<a href="${esc(url)}" target="_blank" rel="noopener" title="공고 원문(새 창)">${esc(a.title)}</a>` : esc(a.title)}</div></div>` }).join("");
 }
 function progSignal(sig){
   if(!sig) return "";
   return `<div class="sigbox ${sig.quadrant}" data-tip="국회 발언: 데이터 마지막 회의 기준 최근 12개월 · 공고: 오늘 기준 최근 12개월 접수 시작"><b>${esc(sig.label)}</b>${esc(sig.desc)}
-    <div class="muted" style="margin-top:4px">국회 발언 ${fmt(sig.talk_12m)}건 · 공고 ${fmt(sig.programs_12m)}건(최근 12개월) · 접수 중 ${fmt(sig.open)}건</div></div>`;
+    <div class="muted" style="margin-top:4px">국회 발언 ${fmt(sig.talk_12m)}건<span class="sep"></span>공고 ${fmt(sig.programs_12m)}건(최근 12개월)<span class="sep"></span>접수 중 ${fmt(sig.open)}건</div></div>`;
 }
 function progCard(p, title = "지원사업 공고"){
   return `<div class="card"><h2>${title} <span class="muted" style="font-size:13px;font-weight:400">${fmt(p.total)}건</span></h2>
-    <p class="sub">공공데이터포털(창업진흥원 K-Startup)의 농림·해양수산 관련 공고 · 제목을 누르면 공고 원문</p>
+    <p class="sub">공공데이터포털(창업진흥원 K-Startup)의 농림·해양수산 관련 공고, 제목을 누르면 공고 원문</p>
     ${progSignal(p.signal)}
     <div class="points scrollbox" style="--box-h:520px">${progList(p.items) || '<div class="empty">관련 공고가 없습니다.</div>'}</div></div>`;
 }
 function fuEvidence(e){
   const url = /^https?:\/\//.test(e.url || "") ? e.url : "";
-  const link = e.meeting_id ? `<button class="link" onclick="gotoUtt('${esc(e.meeting_id)}', ${e.idx ?? -1})">회의록에서 보기 →</button>`
-    : url ? `<a href="${esc(url)}" target="_blank" rel="noopener">원문 보기 ↗</a>` : "";
+  const link = e.meeting_id ? `<button class="link" onclick="gotoUtt('${esc(e.meeting_id)}', ${e.idx ?? -1})">회의록에서 보기</button>`
+    : url ? `<a href="${esc(url)}" target="_blank" rel="noopener">공고 원문 보기(새 창)</a>` : "";
   return `<li class="tl k-${e.kind}"><span class="tl-dot"></span><div class="tl-d">${dot(e.date)}</div>
     <div class="tl-h"><span class="chip line">${esc(FU_SRC[e.source] || e.source)}</span><span class="fukind k-${e.kind}">${esc(FU_KIND[e.kind] || e.kind)}</span><b>${esc(e.title)}</b></div>
     <div class="tl-t">${esc(e.text)}</div>${link}</li>`;
 }
 function fuExternal(x){
   const ext = x.external;
-  const srcs = ext ? ext.sources.map(s => `<li><b>${esc(s.label)}</b> · ${s.status === "ok" ? `근거 ${fmt(s.count)}건` : s.status === "skipped" ? `건너뜀 — ${esc(s.message)}` : `<span style="color:var(--bad)">오류 — ${esc(s.message)}</span>`}</li>`).join("") : "";
+  const srcs = ext ? ext.sources.map(s => `<li><b>${esc(s.label)}</b>: ${s.status === "ok" ? `근거 ${fmt(s.count)}건` : s.status === "skipped" ? `건너뜀 — ${esc(s.message)}` : `<span style="color:var(--bad)">오류 — ${esc(s.message)}</span>`}</li>`).join("") : "";
   return `<div class="fuext">
     <div class="row" style="justify-content:space-between;gap:8px"><b>외부 근거 확인</b>
       <button class="ghost" id="fuExtBtn" onclick="checkFollowupExternal(${x.id}, ${ext ? "true" : "false"})">${ext ? "다시 확인" : "국회 의안 처리 현황 확인"}</button></div>
@@ -2002,17 +2083,17 @@ function renderFollowup(x){
   const ev = x.evidence || [];
   $("#fuDetail").innerHTML = `<div class="card">
     <div class="fubanner st-${x.status}"><b>${esc(x.status_label)}</b><span>${esc(x.status_desc || "")}</span></div>
-    <div class="muted" style="font-size:13px;margin-top:10px">${dot(x.date)} · ${esc(SESS[x.session]?.label || "")} · <button class="link" onclick="gotoUtt('${esc(x.meeting_id)}', ${x.idx})">회의록에서 보기 →</button></div>
+    <div class="muted" style="font-size:13px;margin-top:10px">${dot(x.date)}<span class="sep"></span>${esc(SESS[x.session]?.label || "")}<span class="sep"></span><button class="link" onclick="gotoUtt('${esc(x.meeting_id)}', ${x.idx})">회의록에서 보기</button></div>
     <div class="fugrid">
       <div>
         ${x.question ? `<div class="bubble q" style="max-width:100%"><div class="who">${esc(x.question.member)} 위원 질의</div>${esc(x.question.text)}</div>` : ""}
         <div class="bubble a promise" style="max-width:100%"><div class="who">${esc(x.speaker)} <span class="chip warn">약속</span></div>${esc(x.text)}</div>
         <div class="fumeta"><span class="chip">${esc(x.action_label)}</span>${x.laws.map(l => `<span class="chip gov">${esc(l)}</span>`).join("")}${chips(x.issues, "member")}</div>
-        <div class="muted" style="font-size:12px;margin-top:6px">근거를 찾은 대상어 · ${esc(x.keywords.join(", ") || "-")}</div>
+        <div class="muted" style="font-size:12px;margin-top:6px">근거를 찾은 대상어, ${esc(x.keywords.join(", ") || "-")}</div>
         ${fuExternal(x)}
       </div>
       <div>
-        <h3 style="margin-top:0">이행 근거 타임라인 <span class="muted" style="font-weight:400;font-size:12px">약속 뒤 기록 · 오래된 순</span></h3>
+        <h3 style="margin-top:0">이행 근거 타임라인 <span class="muted" style="font-weight:400;font-size:12px">약속 뒤 기록, 오래된 순</span></h3>
         <ol class="timeline scrollbox" style="--box-h:min(64vh,640px)">
           <li class="tl k-start"><span class="tl-dot"></span><div class="tl-d">${dot(x.date)}</div><div class="tl-h"><b>약속</b></div><div class="tl-t">${esc(cut(x.text, 120))}</div></li>
           ${ev.map(fuEvidence).join("") || `<li class="tl k-none"><span class="tl-dot"></span><div class="tl-t muted">뒤 회의록·안건에서 같은 일을 가리키는 기록을 찾지 못했습니다. 국감에서 이행 여부를 물어볼 대상입니다.</div></li>`}
@@ -2104,14 +2185,14 @@ $("#bBtn").onclick = async () => {
       ${(b.key_point_items || []).length ? pointCards(b.key_point_items) : "<div class='muted'>-</div>"}
     </div>
     <div class="segpanel scrollbox tall" data-seg="bTabs" data-k="qa">
-      ${b.top_questions.map(q => `<div class="chat-day"><span>${dot(q.date)} · <button class="link" onclick="gotoMeeting('${esc(q.meeting_id)}')">회의 보기</button></span></div>${qaHtml(q)}`).join("") || '<div class="empty">-</div>'}
+      ${b.top_questions.map(q => `<div class="chat-day"><span>${dot(q.date)}<span class="sep"></span><button class="link" onclick="gotoMeeting('${esc(q.meeting_id)}')">회의 보기</button></span></div>${qaHtml(q)}`).join("") || '<div class="empty">-</div>'}
     </div>
     <div class="segpanel scrollbox tall" data-seg="bTabs" data-k="cm">
       ${Object.keys(orgs).length ? `<div class="legend" style="margin-bottom:8px">${Object.entries(orgs).sort((a, b) => b[1].length - a[1].length).map(([o, xs]) => `<span><b>${esc(o)}</b> ${xs.length}건</span>`).join("")}</div>` : ""}
       <div class="points">${b.commitments.map(x => `<div class="pt warn" onclick="this.classList.toggle('open')"><div class="who">${esc(x.speaker)}<span class="meta">${dot(x.date)}</span>${chips(x.issues)}</div><div class="txt">${esc(x.text)}</div></div>`).join("") || '<div class="empty">-</div>'}</div>
     </div>
     ${b.programs ? `<div class="segpanel" data-seg="bTabs" data-k="pg">
-      <p class="sub">이 기관이 주관·전담한 지원사업 공고(공공데이터포털 K-Startup) · 접수 중 ${fmt(b.programs.open)}건</p>
+      <p class="sub">이 기관이 주관·전담한 지원사업 공고(공공데이터포털 K-Startup), 접수 중 ${fmt(b.programs.open)}건</p>
       <div class="points scrollbox tall">${progList(b.programs.items) || '<div class="empty">이 기관의 공고가 없습니다.</div>'}</div></div>` : ""}
     <div class="segpanel" data-seg="bTabs" data-k="mt">
       <div class="grid g2">
