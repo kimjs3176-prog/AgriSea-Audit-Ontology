@@ -454,7 +454,7 @@ b.num{font-weight:700;color:var(--ink)}
 abbr[title]{text-decoration:underline dotted;text-underline-offset:3px;cursor:help}
 a.law{color:inherit;text-decoration:underline;text-decoration-color:color-mix(in oklab,var(--brand) 60%,transparent);text-underline-offset:3px}
 /* 회의 3줄 브리핑 · 질의 차례 */
-.brief3{list-style:none;margin:12px 0 4px;padding:12px 16px;border-radius:10px;background:var(--brand-weak);font-size:14px;line-height:1.75}
+.brief3{list-style:none;margin:12px 0 4px;padding:12px 16px;border-radius:var(--radius-pill);background:var(--color-paper-3);border:1px solid var(--color-rule);font-size:14px;line-height:1.75}
 .brief3 li{display:flex;gap:8px} .brief3 b{white-space:nowrap}
 .turnnav{display:flex;gap:8px;margin:4px 0 12px;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}
 .turnnav button{flex:0 0 auto;border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:2px 12px;font-size:12.5px;cursor:pointer}
@@ -1017,10 +1017,10 @@ function brief3(m, s, turns, nMain){
   const nQ = turns.reduce((a, t) => a + t.questions, 0), members = new Set(turns.map(t => t.member));
   const top = [...turns].sort((a, b) => b.questions - a.questions)[0];
   const lines = [
-    ["다룬 안건", ags.length ? `${fmt(nMain)}건 — ${esc(cut(ags[0], 46))}${nMain > 1 ? ` 외 ${fmt(nMain - 1)}건` : ""}` : "-"],
-    ["주요 쟁점", s.key_issues.length ? s.key_issues.slice(0, 3).map(i => `<button class="link" onclick="gotoIssue('${i.id}')">${esc(i.label)}</button>`).join(" · ") : "-"],
-    ["질의·약속", turns.length ? `위원 ${fmt(members.size)}명이 ${fmt(turns.length)}차례 · 질문 ${fmt(nQ)}개 · 정부 약속 ${fmt(s.commitments.length)}건`
-      + (top ? ` · 가장 많이 물은 위원 <b>${esc(top.member)}</b>(${fmt(top.questions)}문항)` : "") : `정부 약속 ${fmt(s.commitments.length)}건`],
+    ["다룬 안건", ags.length ? `${esc(cut(ags[0], 46))}${nMain > 1 ? ` 외 ${fmt(nMain - 1)}건(모두 ${fmt(nMain)}건)` : ""}` : "-"],
+    ["주요 쟁점", s.key_issues.length ? s.key_issues.slice(0, 3).map(i => `<button class="link" onclick="gotoIssue('${i.id}')">${esc(i.label)}</button>`).join(", ") : "-"],
+    ["질의·약속", turns.length ? `위원 ${fmt(members.size)}명이 ${fmt(turns.length)}차례에 걸쳐 ${fmt(nQ)}개를 질문했고, 정부 약속은 ${fmt(s.commitments.length)}건입니다.`
+      + (top ? ` 가장 많이 물은 위원은 <b>${esc(top.member)}</b>(${fmt(top.questions)}문항)입니다.` : "") : `정부 약속은 ${fmt(s.commitments.length)}건입니다.`],
   ];
   return `<ul class="brief3">${lines.map(([k, v]) => `<li><b>${k}</b><span>${v}</span></li>`).join("")}</ul>`;
 }
