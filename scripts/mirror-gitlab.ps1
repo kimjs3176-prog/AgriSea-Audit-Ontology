@@ -1,4 +1,6 @@
-# GitLab 미러(Windows): GitHub 원본의 main·governance-log 를 기관 GitLab 으로 밀어 넣는다.
+﻿# GitLab 미러(Windows): GitHub 원본의 main 을 기관 GitLab 으로 밀어 넣는다.
+# governance-log(운영 관문 기록, 예전 코드가 든 브랜치)는 GitLab 보안 검사에 걸려 기본으로 넘기지 않는다.
+# 이 파일은 UTF-8(BOM)로 저장한다: Windows PowerShell 5.1이 BOM 없는 파일의 한글을 깨뜨린다.
 # GitHub 호스트 러너(해외)는 gitlab.aigov.go.kr 에 접속하지 못하므로, 기관망에 붙은 국내 PC에서 돌린다.
 #
 #   1) 토큰을 사용자 환경변수로 한 번 저장(창을 새로 열어야 반영):
@@ -11,7 +13,7 @@ $ErrorActionPreference = "Stop"
 $Src = if ($env:SRC) { $env:SRC } else { "https://github.com/kimjs3176-prog/AgriSea-Audit-Ontology.git" }
 $Dst = if ($env:DST) { $env:DST } else { "https://gitlab.aigov.go.kr/kimjs1408/kookgam-ax.git" }
 $Dir = if ($env:MIRROR_DIR) { $env:MIRROR_DIR } else { Join-Path $env:LOCALAPPDATA "ax-mirror.git" }
-$Branches = if ($env:BRANCHES) { $env:BRANCHES -split " " } else { @("main", "governance-log") }
+$Branches = if ($env:BRANCHES) { $env:BRANCHES -split " " } else { @("main") }
 $Token = $env:GITLAB_TOKEN
 if (-not $Token) { $Token = [Environment]::GetEnvironmentVariable("GITLAB_TOKEN", "User") }
 if (-not $Token) { throw "GITLAB_TOKEN(write_repository) 환경변수가 필요합니다." }

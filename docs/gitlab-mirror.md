@@ -1,7 +1,8 @@
 # 기관 GitLab 자동 미러 설정
 
 GitHub(`kimjs3176-prog/AgriSea-Audit-Ontology`)가 원본이고, 기관 GitLab(`https://gitlab.aigov.go.kr/kimjs1408/kookgam-ax.git`)에
-`main`·`governance-log` 브랜치를 그대로 복사합니다. 자동 수집 데이터 커밋도 함께 넘어갑니다.
+`main` 브랜치를 그대로 복사합니다. 자동 수집 데이터 커밋도 함께 넘어갑니다.
+`governance-log`(운영 관문 기록)는 예전 코드가 든 브랜치라 GitLab 보안 검사에 걸려 넘기지 않습니다.
 
 > **왜 GitHub Actions만으로는 안 되나**: 기관 GitLab은 GitHub 호스트 러너(해외 서버)에서 접속되지 않습니다
 > (443 연결 시간 초과). 그래서 **기관 GitLab에 접속되는 국내 PC·서버**가 하나 필요합니다.
@@ -61,5 +62,5 @@ crontab -e   # 30분마다
 |---|---|
 | `접속할 수 없습니다` / 연결 시간 초과 | 그 PC가 기관망·VPN에 연결돼 있는지 확인 |
 | `HTTP Basic: Access denied` | 토큰 만료·권한(`write_repository`) 확인, 새 토큰으로 교체 |
-| `pre-receive hook declined` / `protected branch` | GitLab 보호 브랜치 푸시 권한, 파일 크기 제한(데이터 파일 약 7~9MB) 확인 |
+| `pre-receive hook declined` / `protected branch` | `SECURITY SCAN REJECTED`면 GitLab 보안 검사(Semgrep·OSV-Scanner)에 걸린 것: 지적된 코드·의존성 버전을 GitHub에서 고친 뒤 다시 실행. 그 밖에는 보호 브랜치 푸시 권한, 파일 크기 제한(데이터 파일 약 7~9MB) 확인 |
 | `rejected (non-fast-forward)` | GitLab 쪽에 직접 커밋됨 → GitLab 브랜치를 GitHub 기준으로 되돌린 뒤 재실행 |

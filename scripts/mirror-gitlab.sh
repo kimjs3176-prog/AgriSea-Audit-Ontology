@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# GitLab 미러: GitHub 원본의 main·governance-log 를 기관 GitLab 으로 밀어 넣는다.
+# GitLab 미러: GitHub 원본의 main 을 기관 GitLab 으로 밀어 넣는다.
+# governance-log(운영 관문 기록, 예전 코드가 든 브랜치)는 GitLab 보안 검사에 걸려 기본으로 넘기지 않는다.
 # GitHub 호스트 러너(해외)는 gitlab.aigov.go.kr 에 접속하지 못하므로, 두 곳 모두 접속되는 국내 PC·서버에서 cron 으로 돌린다.
 #   GITLAB_TOKEN=... scripts/mirror-gitlab.sh
 #   */30 * * * * GITLAB_TOKEN=... /path/to/mirror-gitlab.sh >> /var/log/ax-mirror.log 2>&1
@@ -9,7 +10,7 @@ set -euo pipefail
 SRC=${SRC:-https://github.com/kimjs3176-prog/AgriSea-Audit-Ontology.git}
 DST=${DST:-https://gitlab.aigov.go.kr/kimjs1408/kookgam-ax.git}
 DIR=${MIRROR_DIR:-$HOME/.cache/ax-mirror.git}
-BRANCHES=${BRANCHES:-"main governance-log"}
+BRANCHES=${BRANCHES:-"main"}
 : "${GITLAB_TOKEN:?GITLAB_TOKEN(write_repository)이 필요합니다}"
 
 # 토큰을 주소에 넣지 않고 헤더로 넘겨 프로세스 목록·원격 설정에 남지 않게 한다

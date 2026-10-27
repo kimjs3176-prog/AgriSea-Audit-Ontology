@@ -50,7 +50,7 @@ python -m agrisea serve --port 8000                    # http://127.0.0.1:8000
 
 - **회의록 데이터 갱신**(Actions, 하루 3번): 회의록과 지원사업 공고를 수집·분석해 `data/`에 커밋하면 Vercel이 다시 배포합니다.
   국회 PDF와 공공데이터포털이 해외 접속을 막으면 서울 리전 배포본(`/api/minutes-text`, `/api/kstartup`)을 거쳐 받습니다.
-- **GitLab 미러**(Actions): `main`·`governance-log`를 기관 GitLab으로 푸시합니다. 기관 GitLab은 해외(GitHub 호스트 러너)에서 접속되지 않아 국내 PC의 self-hosted 러너(`MIRROR_RUNNER`) 또는 PC 예약 스크립트(`scripts/mirror-gitlab.ps1`·`.sh`)로 실행합니다 → [설정 방법](docs/gitlab-mirror.md)
+- **GitLab 미러**(Actions): `main`을 기관 GitLab으로 푸시합니다. 기관 GitLab은 해외(GitHub 호스트 러너)에서 접속되지 않아 국내 PC의 self-hosted 러너(`MIRROR_RUNNER`) 또는 PC 예약 스크립트(`scripts/mirror-gitlab.ps1`·`.sh`)로 실행합니다 → [설정 방법](docs/gitlab-mirror.md)
 
 ## 테스트
 
