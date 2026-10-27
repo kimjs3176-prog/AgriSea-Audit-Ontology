@@ -9,7 +9,7 @@ from typing import Any
 from fastapi import Body, FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, PlainTextResponse, Response
 
-from .. import analysis, members, programs
+from .. import analysis, members, programs, readable
 from ..config import Settings, get_settings
 from ..lexicon import ISSUES
 from ..ontology import KG_PATH, PRESET_QUERIES, kg_from_file, kg_from_store, run_sparql
@@ -183,6 +183,18 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         # 이 쟁점의 지원사업 공고(공공데이터포털 K-Startup)와 국회 관심 대비 공급 신호
         d["programs"] = programs.issue_view(store, issue_id, cached("program_signals"))
         return d
+
+    @app.get("/api/meetings/{meeting_id}/turns")
+    def meeting_turns(meeting_id: str):
+        """질의 차례: 위원별로 묶은 질문 핵심 문장 → 정부 답변 요지(원문 발언 번호 포함)."""
+        if not store.meeting(meeting_id):
+            raise HTTPException(404, "회의를 찾을 수 없습니다.")
+        return {"meeting_id": meeting_id, "turns": readable.meeting_turns(store, meeting_id)}
+
+    @app.get("/api/readable")
+    def readable_glossary():
+        """'읽기 쉽게' 보기용 사전: 끊긴 낱말 잇기, 기관 약칭 → 정식 명칭, 회의록에 나온 법률 이름."""
+        return cached("readable")
 
     @app.get("/api/programs/overview")
     def programs_overview():
