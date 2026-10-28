@@ -9,6 +9,7 @@
     python -m agrisea summary <회의ID> [--llm]
     python -m agrisea briefing --org 농촌진흥청 -o 브리핑.md
     python -m agrisea sparql "SELECT ..."
+    python -m agrisea validate            # 온톨로지 검증(오류가 있으면 종료 코드 1)
     python -m agrisea serve --port 8000
 """
 from __future__ import annotations
@@ -93,6 +94,8 @@ def main(argv: list[str] | None = None) -> int:
 
     q = sub.add_parser("sparql", help="지식그래프 SPARQL 질의")
     q.add_argument("query")
+
+    sub.add_parser("validate", help="온톨로지 검증(지식그래프가 스키마의 개념 정의를 지키는지)")
 
     sv = sub.add_parser("serve", help="웹 서비스 실행")
     sv.add_argument("--host", default="127.0.0.1")
@@ -218,6 +221,20 @@ def main(argv: list[str] | None = None) -> int:
         print("\t".join(res["columns"]))
         for row in res["rows"]:
             print("\t".join("" if v is None else v for v in row))
+    elif args.cmd == "validate":
+        from .ontology import kg_exists, kg_from_file, kg_from_store
+        from .validate import validate
+        kg = kg_from_store(store) if store.stats()["utterances"] or not kg_exists() \
+            else kg_from_file()
+        rep = validate(kg)
+        mark = {"error": "오류", "warn": "경고", "info": "참고", "pass": "통과"}
+        for c in rep["checks"]:
+            if c["severity"] != "pass":
+                total = f"/{c['total']}" if c["total"] else ""
+                print(f"[{mark[c['severity']]}] {c['group']}: {c['title']} {c['count']}{total}")
+        n = rep["counts"]
+        print(f"점검 {len(rep['checks'])}개: 오류 {n['error']}, 경고 {n['warn']}, 참고 {n['info']}, 통과 {n['pass']}")
+        return 1 if n["error"] else 0
     return 0
 
 

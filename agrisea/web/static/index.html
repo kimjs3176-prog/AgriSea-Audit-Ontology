@@ -654,7 +654,19 @@ button.link:hover{text-decoration:underline;text-underline-offset:.2em}
 @media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
 /* 온톨로지 탭 */
 .otwo{grid-template-columns:minmax(260px,320px) minmax(0,1fr)}
-#oProps,#oRules{overflow-x:auto}
+#oProps,#oRules,#oCheck{overflow-x:auto}
+.vsum{margin:0 0 8px}
+.vtab{min-width:640px}
+.vtab td{vertical-align:top}
+.vtab .nowrap{white-space:nowrap}
+.vpass{border-top:1px solid var(--line);padding:8px 0}
+.vpass summary{cursor:pointer;font-size:14px}
+.vpass[open] summary{margin-bottom:8px}
+.vtab .ov{font-size:12px;padding:2px 8px;margin:0 4px 4px 0}
+.vchip{display:inline-block;padding:1px 8px;border-radius:var(--radius-pill);font-size:12px;font-weight:600;white-space:nowrap;border:1px solid var(--line);color:var(--muted)}
+.vchip.error{background:var(--color-error-soft);color:var(--color-error);border-color:transparent}
+.vchip.warn{background:var(--warn-weak);color:var(--warn);border-color:transparent}
+.vchip.info{color:var(--ink-2)}
 #oProps td:nth-child(-n+2),#oProps th{white-space:nowrap}
 .ohits{max-height:60vh;overflow:auto;margin-top:8px}
 .otree .ot-row{display:flex;gap:8px;align-items:baseline;padding:4px 0 4px calc(var(--d) * 16px + 2px);border-bottom:1px solid var(--line);cursor:pointer;font-size:14px}
@@ -874,6 +886,7 @@ code{font-family:var(--font-mono);font-size:12px}
       <button data-k="cls" onclick="segShow('oTabs','cls')">클래스와 관계</button>
       <button data-k="rules" onclick="segShow('oTabs','rules')">추론 규칙</button>
       <button data-k="schemes" onclick="segShow('oTabs','schemes')">개념체계</button>
+      <button data-k="check" onclick="segShow('oTabs','check')">개념 검증</button>
       <button data-k="sparql" onclick="segShow('oTabs','sparql')">SPARQL 질의</button>
     </div>
     <div class="segpanel on" data-seg="oTabs" data-k="ent">
@@ -894,6 +907,11 @@ code{font-family:var(--font-mono);font-size:12px}
       <div id="oRules"></div>
     </div>
     <div class="segpanel" data-seg="oTabs" data-k="schemes"><div id="oSchemes" class="g3 grid"></div></div>
+    <div class="segpanel" data-seg="oTabs" data-k="check">
+      <p class="sub">지식그래프가 스키마의 개념 정의를 지키는지 자동으로 점검합니다. 오류는 공리와 어긋난 것(서로 배타인 클래스에 함께 속함, 정의역·치역 위반, 관계 뜻 모순 등),
+        경고는 개념상 있어야 할 관계가 빠진 것(원문에 정보가 없을 수 있음), 참고는 사람이 확인할 만한 것입니다. 예시를 누르면 그 개체로 이동합니다.</p>
+      <div id="oCheck"><div class="empty">검증하는 중…</div></div>
+    </div>
     <div class="segpanel" data-seg="oTabs" data-k="sparql">
       <div class="row" style="margin-bottom:8px"><select id="sPreset"></select> <a class="muted" href="/api/ontology.ttl" target="_blank">온톨로지 스키마(TTL)</a></div>
       <textarea id="sQuery"></textarea>
@@ -2254,6 +2272,7 @@ function segShow(id, k){
   document.querySelectorAll(`[data-seg="${id}"]`).forEach(p => p.classList.toggle("on", p.dataset.k === k));
   if(id === "mTabs" && k === "full") loadTranscript();
   if(id === "oTabs" && k === "sparql") loadPresets();
+  if(id === "oTabs" && k === "check") loadCheck();
   if(id === "mTabs" && k === "mb" && transcript) loadMeetingMembers(transcript.id);
 }
 $("#bBtn").onclick = async () => {
@@ -2354,7 +2373,7 @@ function ontoLink(iri){
   return "";
 }
 async function showEntity(iri){
-  onto.cur = iri; onto.hist.push({iri}); setHash("ontology/" + encodeURIComponent(iri));
+  onto.cur = iri; onto.hist.push({iri}); setHash("ontology/" + encodeURIComponent(iri)); segShow("oTabs", "ent");
   $("#oEnt").innerHTML = '<div class="empty">지식그래프에서 찾는 중…</div>';
   let d;
   try{ d = await api("/api/ontology/entity?iri=" + encodeURIComponent(iri)) }
@@ -2412,6 +2431,29 @@ function renderOntoSchemes(){
       + (kids[c.iri] || []).sort((a, b) => b.count - a.count).map(k => row(k, d + 1)).join("");
     return `<div><h3 style="margin-top:0">${esc(sc.label)}</h3><div class="otree">${(kids[""] || []).sort((a, b) => b.count - a.count).map(c => row(c, 0)).join("")}</div></div>`;
   }).join("");
+}
+let oCheck = null;
+async function loadCheck(){
+  if(oCheck) return;
+  try{ oCheck = await api("/api/ontology/validation") }
+  catch(e){ $("#oCheck").innerHTML = `<div class="notice">${esc(e.message)}</div>`; return }
+  const n = oCheck.counts, all = oCheck.checks.length;
+  const word = {error: "오류", warn: "경고", info: "참고", pass: "통과"};
+  const rank = {error: 0, warn: 1, info: 2, pass: 3};
+  const row = c => `<tr><td><span class="vchip ${c.severity}">${word[c.severity]}</span></td><td class="muted nowrap">${esc(c.group)}</td>
+      <td>${esc(c.title)}${c.desc ? `<div class="muted" style="font-size:12px">${esc(c.desc)}</div>` : ""}</td>
+      <td class="num">${c.severity === "pass" ? "" : fmt(c.count) + (c.total ? ` / ${fmt(c.total)}` : "")}</td>
+      <td>${c.examples.map(e => `<button class="ov" onclick="showEntity('${esc(e.iri)}')">${esc(cut(e.label, 30))}</button>`).join("")}</td></tr>`;
+  const head = '<tr><th>결과</th><th>분류</th><th>점검</th><th class="num">해당</th><th>예시</th></tr>';
+  const open = oCheck.checks.filter(c => c.severity !== "pass").sort((a, b) => rank[a.severity] - rank[b.severity]);
+  const passed = oCheck.checks.filter(c => c.severity === "pass"), groups = {};
+  passed.forEach(c => (groups[c.group] ||= []).push(c));
+  $("#oCheck").innerHTML = `<p class="vsum">점검 ${all}개 가운데 <b>통과 ${n.pass}개</b>, 오류 ${n.error}개, 경고 ${n.warn}개, 참고 ${n.info}개입니다.
+      <span class="muted">${esc(oCheck.as_of)} 기준</span></p>
+    ${open.length ? `<table class="t vtab">${head}${open.map(row).join("")}</table>` : ""}
+    <h3>통과한 점검</h3>
+    ${Object.entries(groups).map(([g, cs]) => `<details class="vpass"><summary><b>${esc(g)}</b> <span class="muted">${cs.length}개 통과</span></summary>
+      <table class="t vtab">${cs.map(row).join("")}</table></details>`).join("")}`;
 }
 let oTimer = null;
 $("#oQ").oninput = () => { clearTimeout(oTimer); oTimer = setTimeout(async () => {

@@ -27,9 +27,32 @@ def meeting_uri(mid: str) -> URIRef:
     return AGD[f"meeting/{_slug(mid)}"]
 
 
-def person_uri(name: str, stype: str) -> URIRef:
-    # 같은 의원이 위원장(소위원장)으로도 발언하므로 의원은 역할과 상관없이 한 개체로 잇는다
-    return AGD[f"person/{'member' if stype in ('member', 'chair') else stype}/{_slug(name)}"]
+_OFFICIAL_ROLE = re.compile(r"장관|차관|청장|국장|실장|본부장|원장|이사장|사장|회장|처장|관장|후보자|직무")
+
+
+def person_kind(stype: str, role: str = "") -> str:
+    """발언자 유형 → 인물 식별 범주. member(국회의원) | staff(위원회 직원) | person(그 밖의 인물).
+
+    같은 의원이 위원장·소위원장·'위원장 직무대리'로도 발언하므로 의원은 역할과 상관없이 한 개체로 잇고,
+    정부 관계자·증인·참고인은 같은 사람이 회의마다 다른 자격으로 나오므로(장관이 증인으로도 출석) 한 개체로 잇는다.
+    """
+    if stype in ("member", "chair") or (stype == "other" and "위원장" in role):
+        return "member"
+    return "staff" if stype == "staff" else "person"
+
+
+def person_class(stype: str, role: str = "") -> URIRef:
+    if stype == "other":
+        if "위원장" in role:
+            return AG.Chair
+        if _OFFICIAL_ROLE.search(role):
+            return AG.GovernmentOfficial
+    return PERSON_CLASS.get(stype, AG.Person)
+
+
+def person_uri(name: str, stype: str, role: str = "") -> URIRef:
+    kind = person_kind(stype, role)
+    return AGD[f"person/{kind}/{_slug(name)}"] if kind != "person" else AGD[f"person/{_slug(name)}"]
 
 
 def org_uri(name: str) -> URIRef:
@@ -38,6 +61,9 @@ def org_uri(name: str) -> URIRef:
 
 def issue_uri(iid: str) -> URIRef:
     return AGD[f"issue/{iid}"]
+
+
+VAGUE_STATUS = "vague"
 
 
 def status_uri(key: str) -> URIRef:
@@ -54,8 +80,10 @@ def utt_uri(mid: str, idx) -> URIRef:
 
 # 안건 문구에서 의안 정보: '농어업회의소법안(문금주 의원 대표발의)(의안번호 2200520)'
 BILL_NO = re.compile(r"의안번호\s*(\d{6,8})")
-BILL_PROPOSER = re.compile(r"\(([가-힣]{2,5})\s*의원\s*(?:대표)?발의\)")
-BILL_META = re.compile(r"\((?:[^()]*의원\s*(?:대표)?발의|정부\s*제출|대안|의안번호[^()]*|위원장\s*제출)\)")
+BILL_PROPOSER = re.compile(r"\(([가-힣]{2,5})\s*의원\s*(?:등\s*\d+\s*인\s*)?(?:대표)?발의\)")
+BILL_META = re.compile(r"\((?:[^()]*의원\s*(?:등\s*\d+\s*인\s*)?(?:대표)?발의|정부\s*제출|대안|의안번호[^()]*|위원장\s*제출)\)")
+# 의안 자체가 아니라 의안을 다루는 절차 안건: '○○법안에 대한 공청회', '○○법안 철회동의의 건'
+BILL_PROCEDURE = re.compile(r"\s*(?:에\s*대한\s*(?:입법)?공청회|\s*철회\s*동의의?\s*건|\s*상정의?\s*건)$")
 
 
 def parse_bill(agenda: str) -> dict | None:
@@ -65,7 +93,8 @@ def parse_bill(agenda: str) -> dict | None:
     alt = "(대안)" in text
     if not no and not alt:
         return None
-    title = BILL_META.sub("", text).strip()
+    title = BILL_META.sub("", text).replace("`#`", "").strip(" -·")
+    title = BILL_PROCEDURE.sub("", title).strip()
     if not re.search(r"법률안|법안|대안|결의안|동의안|승인안", text):
         return None
     m = BILL_PROPOSER.search(text)
@@ -82,9 +111,16 @@ def bill_uri(b: dict) -> URIRef:
     return AGD[f"bill/{b['no']}"] if b["no"] else AGD[f"bill/alt/{_slug(b['title'])}"]
 
 
+AUDIT_AGENDA = re.compile(r"국정감사\s*$")  # '농림축산식품부에 대한 국정감사' (계획서 채택·증인 출석 요구의 건은 전체회의 안건)
+
+
+def is_audit_agenda(a: str) -> bool:
+    return bool(AUDIT_AGENDA.search(a))
+
+
 def meeting_class(m: dict) -> URIRef:
     hay = f"{m.get('title', '')} {m.get('class_name', '')} {' '.join(m.get('agendas', []))}"
-    if "국정감사" in hay:
+    if "국정감사" in f"{m.get('title', '')} {m.get('class_name', '')}" or any(map(is_audit_agenda, m.get("agendas", []))):
         return AG.AuditMeeting
     if "소위" in hay:
         return AG.SubcommitteeMeeting
@@ -129,13 +165,22 @@ def add_vocabulary(g: Graph) -> None:
         u = status_uri(key)
         g.add((u, RDF.type, AG.FollowUpStatus))
         g.add((u, SKOS.inScheme, AG.FollowUpStatusScheme))
+        g.add((u, SKOS.topConceptOf, AG.FollowUpStatusScheme))
         g.add((u, SKOS.prefLabel, Literal(label, lang="ko")))
         g.add((u, RDFS.label, Literal(label, lang="ko")))
         g.add((u, SKOS.definition, Literal(desc, lang="ko")))
+    u = status_uri(VAGUE_STATUS)
+    g.add((u, RDF.type, AG.FollowUpStatus))
+    g.add((u, SKOS.inScheme, AG.FollowUpStatusScheme))
+    g.add((u, SKOS.topConceptOf, AG.FollowUpStatusScheme))
+    g.add((u, SKOS.prefLabel, Literal("추적 불가", lang="ko")))
+    g.add((u, RDFS.label, Literal("추적 불가", lang="ko")))
+    g.add((u, SKOS.definition, Literal("무엇을 하겠다는지 드러나지 않는 약속('지적사항 반영하겠습니다')이라 이행 근거를 찾지 않음", lang="ko")))
     for key, label in ACTION_LABEL.items():
         u = action_uri(key)
         g.add((u, RDF.type, AG.ActionType))
         g.add((u, SKOS.inScheme, AG.ActionTypeScheme))
+        g.add((u, SKOS.topConceptOf, AG.ActionTypeScheme))
         g.add((u, SKOS.prefLabel, Literal(label, lang="ko")))
         g.add((u, RDFS.label, Literal(label, lang="ko")))
     for name, aliases in ORGANIZATIONS.items():
@@ -200,13 +245,18 @@ def build_graph(store: Store, with_schema: bool = True, core: bool = False,
                 g.add((bu, RDF.type, AG.Bill))
                 if bill["kind"] in BILL_CLASS:
                     g.add((bu, RDF.type, AG[BILL_CLASS[bill["kind"]]]))
-                g.add((bu, RDFS.label, Literal(bill["title"], lang="ko")))
+                if g.value(bu, RDFS.label) is None:  # 같은 의안이 여러 안건에 오르면 처음 이름 하나만
+                    g.add((bu, RDFS.label, Literal(bill["title"], lang="ko")))
                 if bill["no"]:
                     g.add((bu, AG.billNumber, Literal(bill["no"])))
                 if bill["proposer"]:
-                    g.add((bu, AG.proposedBy, person_uri(bill["proposer"], "member")))
+                    pu = person_uri(bill["proposer"], "member")
+                    g.add((bu, AG.proposedBy, pu))
+                    g.add((pu, RDF.type, AG.Legislator))  # 농해수위 위원이 아닌 의원도 발의자로 그래프에 든다
+                    if g.value(pu, RDFS.label) is None:
+                        g.add((pu, RDFS.label, Literal(bill["proposer"], lang="ko")))
             for org in match_organizations(a):
-                if meeting_class(m) == AG.AuditMeeting:
+                if is_audit_agenda(a):
                     g.add((mu, AG.audited, org_uri(org)))
                 g.add((au, AG.mentionsOrganization, org_uri(org)))
 
@@ -214,11 +264,11 @@ def build_graph(store: Store, with_schema: bool = True, core: bool = False,
         last_q_orgs: list[str] = []
         for u in store.utterances(meeting_id=m["id"]):
             uu = utt_uri(m["id"], u["idx"])
-            pu = person_uri(u["speaker_name"], u["speaker_type"])
-            g.add((pu, RDF.type, PERSON_CLASS.get(u["speaker_type"], AG.Person)))
+            pu = person_uri(u["speaker_name"], u["speaker_type"], u["speaker_role"])
+            g.add((pu, RDF.type, person_class(u["speaker_type"], u["speaker_role"])))
             g.add((pu, RDFS.label, Literal(u["speaker_name"], lang="ko")))
             g.add((pu, AG.role, Literal(u["speaker_role"], lang="ko")))
-            if u["speaker_type"] in ("member", "chair"):
+            if person_kind(u["speaker_type"], u["speaker_role"]) == "member":
                 g.add((pu, AG.memberOf, committee))
             if u["org"]:
                 g.add((pu, AG.affiliatedWith, org_uri(u["org"])))
@@ -273,6 +323,10 @@ def add_followups(g: Graph, store: Store) -> None:
     d = store.kv_get("followups")
     if not d:
         return
+    # 무엇을 하겠다는지 드러나지 않아 추적하지 않은 약속도 판정 하나를 갖게 한다(이행 판정은 약속마다 꼭 하나)
+    tracked = {utt_uri(it["meeting_id"], it["idx"]) for it in d.get("items", [])}
+    for cu in set(g.subjects(RDF.type, AG.Commitment)) - tracked:
+        g.add((cu, AG.followUpStatus, status_uri(VAGUE_STATUS)))
     for it in d.get("items", []):
         cu = utt_uri(it["meeting_id"], it["idx"])
         g.add((cu, AG.followUpStatus, status_uri(it["status"])))
