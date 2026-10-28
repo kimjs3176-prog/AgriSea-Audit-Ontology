@@ -1,6 +1,8 @@
-# 국회 농해수위 온톨로지 (AgriSea Audit Ontology)
+# 농해수위 인사이트
 
 배포: https://ax-rosy-seven.vercel.app/
+
+국회 농해수위 회의록을 온톨로지(지식그래프)로 구조화해 분석하는 서비스입니다. 저장소 이름은 `AgriSea-Audit-Ontology`, 온톨로지 이름은 「농해수위 국정감사 온톨로지(AgriSea Audit Ontology)」입니다.
 
 ## 서비스 개요
 

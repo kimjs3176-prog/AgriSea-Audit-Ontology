@@ -71,7 +71,7 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
             value = CACHED_VIEWS[key](store)
             store.kv_set(key, value)
         return value
-    app = FastAPI(title="국회 농해수위 온톨로지", version="0.1.0")
+    app = FastAPI(title="농해수위 인사이트", version="0.1.0")
     app.state.store = store
 
     @app.get("/", include_in_schema=False)

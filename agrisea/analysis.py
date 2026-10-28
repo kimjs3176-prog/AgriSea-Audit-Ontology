@@ -627,7 +627,7 @@ def meeting_markdown(store: Store, meeting_id: str, base_url: str = "") -> str |
     if m.get("pdf_url"):
         lines.append(f"- 원문(PDF): {m['pdf_url']}")
     if base_url:
-        lines.append(f"- 출처: 국회 농해수위 온톨로지 {base_url}/#meetings/{meeting_id}")
+        lines.append(f"- 출처: 농해수위 인사이트 {base_url}/#meetings/{meeting_id}")
     if agendas:
         lines += ["", "## 안건", *[f"{i + 1}. {a}" for i, a in enumerate(agendas)]]
     issues = [i["label"] for i in (s.get("key_issues") or [])[:8]]
