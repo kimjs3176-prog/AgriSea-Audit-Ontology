@@ -4,7 +4,7 @@
 #    (정각 예약은 GitHub 혼잡으로 2~4시간씩 늦게 시작돼 정각을 피함. 회의록이 낮에 올라와도 당일 반영)
 #  - 국회 API 접속이 일부 날짜만 막히면 나머지는 저장하고 계속, 실행이 실패하면 이슈로 알림
 #  - 초기 데이터가 없으면 22대 임기 시작일(2024-05-30)부터 전체 수집
-#  - 수집 후 회의 요약·쟁점/기관 집계·관계망·지식그래프(data/kg.nt.gz)를 미리 계산해 함께 커밋
+#  - 수집 후 회의 요약·쟁점/기관 집계·관계망·지식그래프(data/kg.nq.gz, 추론 포함)를 미리 계산해 함께 커밋
 #  - 내용이 바뀌었을 때만 커밋
 # 저장소 Settings > Secrets and variables > Actions 에 ASSEMBLY_API_KEY 를 등록해야 한다.
 name: 회의록 데이터 갱신
@@ -38,6 +38,9 @@ on:
       - "agrisea/governance.py"
       - "agrisea/programs.py"
       - "agrisea/readable.py"
+      - "agrisea/ontology.py"
+      - "agrisea/reasoner.py"
+      - "ontology/agrisea.ttl"
 
 permissions:
   contents: write
@@ -117,7 +120,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/seed.sqlite3.gz data/seed.meta.json data/kg.nt.gz
+          git add -A data/   # 예전 data/kg.nt.gz 삭제도 함께 반영
           if git diff --cached --quiet; then echo "변경 없음"; exit 0; fi
           git commit -m "chore(data): 농해수위 회의록 자동 수집 반영"
           # 그사이 다른 실행이 데이터를 커밋했으면, 방금 만든 데이터 파일을 우선해 다시 얹는다

@@ -1,7 +1,7 @@
-"""수집 후 사전 계산: 회의 요약, 쟁점·기관·관계망 집계, 지식그래프(N-Triples).
+"""수집 후 사전 계산: 회의 요약, 쟁점·기관·관계망 집계, 지식그래프(원 데이터 + 추론, N-Quads).
 
 배포 환경(서버리스)은 요청마다 무거운 계산을 할 수 없어, 자동 수집 단계에서 미리 만들어
-초기 데이터(seed)와 data/kg.nt.gz 에 함께 싣는다.
+초기 데이터(seed)와 data/kg.nq.gz 에 함께 싣는다.
 """
 from __future__ import annotations
 
@@ -10,13 +10,13 @@ from pathlib import Path
 from typing import Callable
 
 from . import analysis, followup, governance, members, programs, readable
-from .ontology import build_graph, to_ntriples_gz
+from .ontology import build_kg, save_kg
 from .store import Store
 
 # 사전 계산 형식이 바뀌면 올린다(초기 데이터를 다시 만들게 함).
 # 2: 발언자 역할 재분류, 회기별 쟁점·개요 집계 / 3: 띄어쓰기 교정 / 4: 요약에서 의안 목록 제외 / 5: 위원별 분석
 # 6: 정부 약속 이행 추적 / 7: 운영 관문 정책(차단 대상어) 반영
-PRECOMPUTE_VERSION = 11
+PRECOMPUTE_VERSION = 12  # 12: 온톨로지 v0.2(의안·이행 판정) + 추론기, 지식그래프 N-Quads
 
 
 def current_policy() -> dict:
@@ -111,9 +111,13 @@ def precompute(store: Store, kg_path: Path | None = None,
         store.kv_set(key, fn(store))
     out = {"spacing": spaced, "reclassified": fixed, "summaries": n, "views": list(CACHED_VIEWS)}
     if kg_path:
-        g = build_graph(store, text_limit=500)
-        to_ntriples_gz(g, kg_path)
-        out["triples"] = len(g)
+        from . import kgview
+        kg, counts = build_kg(store, text_limit=500)
+        save_kg(kg, kg_path)
+        summary = kgview.summary(kg)
+        store.kv_set("ontology", summary)
+        out["triples"] = summary["triples"]
+        out["inferred"] = summary["inferred"]
     progress(f"사전 계산: 발언자 재분류 {fixed}건, 회의 요약 {n}건, 집계 {len(CACHED_VIEWS)}종"
-             + (f", 지식그래프 트리플 {out['triples']}개" if kg_path else ""))
+             + (f", 지식그래프 트리플 {out['triples']}개(추론 {out['inferred']}개)" if kg_path else ""))
     return out

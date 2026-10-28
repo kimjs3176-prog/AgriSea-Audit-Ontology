@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>국회 농해수위 온톨로지</title>
+<title>농해수위 인사이트</title>
 <meta name="description" content="국회 농림축산식품해양수산위원회 회의록을 모아 쟁점, 의원 질의, 정부 약속과 이행을 찾아보는 국정감사 준비 도구">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@600&family=Red+Hat+Text:wght@400;500;600&family=Red+Hat+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -576,7 +576,7 @@ button.primary:hover{border-color:var(--color-ink)}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .card{color:var(--ink)}}
 /* ═══ v6 · Hallmark 전면 재구성: 상단 한 줄, 회의 원장(표)이 첫머리, 상자 속 상자 대신 괘선 행 ═══ */
 /* 상단바: 넓은 화면에서는 표지·탭·검색·회기를 한 줄에(두 줄 머리글이 화면 위 128px를 차지하던 것을 60px로) */
-@media (min-width:1200px){
+@media (min-width:1280px){
   :root{--header-h:61px}
   header .wrap{display:flex;align-items:stretch;gap:20px}
   header .top{display:contents}
@@ -584,10 +584,10 @@ button.primary:hover{border-color:var(--color-ink)}
   header h1{white-space:nowrap;font-size:18px}
   header h1 small{display:none}
   header nav{order:2;flex:1 1 auto;margin:0;align-self:stretch}
-  header nav button{padding:0 12px;height:100%;border-bottom-width:3px}
-  header .gsearch{order:3;flex:0 1 260px;min-width:160px;align-self:center}
+  header nav button{padding:0 8px;height:100%;border-bottom-width:3px}
+  header .gsearch{order:3;flex:0 1 240px;min-width:120px;align-self:center}
   header .sessionbar{order:4;align-self:center;white-space:nowrap;flex:none}
-  header .sessionbar select{max-width:220px}
+  header .sessionbar select{max-width:180px}
   .two>.card:first-child{top:calc(var(--header-h) + 16px);max-height:calc(100vh - var(--header-h) - 32px)}
 }
 /* 대시보드 머리: 기간·갱신 문장과 핵심 수치 한 줄(상자 없이 먹 괘선 위에) */
@@ -652,6 +652,25 @@ table.ledger td.iss{max-width:260px}
 button.link:hover{text-decoration:underline;text-underline-offset:.2em}
 /* 움직임 줄이기 */
 @media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
+/* 온톨로지 탭 */
+.otwo{grid-template-columns:minmax(260px,320px) minmax(0,1fr)}
+#oProps,#oRules{overflow-x:auto}
+#oProps td:nth-child(-n+2),#oProps th{white-space:nowrap}
+.ohits{max-height:60vh;overflow:auto;margin-top:8px}
+.otree .ot-row{display:flex;gap:8px;align-items:baseline;padding:4px 0 4px calc(var(--d) * 16px + 2px);border-bottom:1px solid var(--line);cursor:pointer;font-size:14px}
+.otree .ot-row:hover span:first-child{text-decoration:underline}
+.otree .ot-row .num{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--ink-2);font-size:13px}
+.og{padding:8px 0;border-top:1px solid var(--line)}
+.og-h{font-size:13.5px}
+.og-items,.ostart .ex{display:flex;flex-wrap:wrap;gap:4px 8px;margin-top:4px;align-items:center}
+.ov{border:1px solid var(--line);background:var(--panel);border-radius:var(--radius-pill);padding:4px 8px;font:inherit;font-size:13px;cursor:pointer;color:var(--ink);text-align:left;max-width:100%}
+.ov:hover{border-color:var(--ink)}
+.ov.inf,.chip.inf{border-style:dashed;border-color:var(--muted);background:var(--color-paper-3)}
+.ov.lit{cursor:default;background:none;border-color:transparent;padding-left:0}
+.ov small{color:var(--muted);margin-left:4px}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+code{font-family:var(--font-mono);font-size:12px}
+@media (max-width:860px){.otwo{grid-template-columns:minmax(0,1fr)}}
 </style>
 </head>
 <body>
@@ -661,7 +680,7 @@ button.link:hover{text-decoration:underline;text-underline-offset:.2em}
       <div class="brand">
         <svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="logo-plate" width="32" height="32" rx="6"/>
           <path class="logo-leaf" d="M9 18c0-6 5-10 12-10-1 7-5 11-12 10z"/><path class="logo-wave" d="M6 23c3-2 6-2 9 0s6 2 9 0 5-2 6-1" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
-        <h1>국회 농해수위 온톨로지<small>국회 농림축산식품해양수산위원회 회의록 분석</small></h1>
+        <h1>농해수위 인사이트<small>국회 농림축산식품해양수산위원회 회의록 분석</small></h1>
       </div>
       <form class="gsearch" id="gsearch" role="search" onsubmit="event.preventDefault();globalSearch()">
         <input type="search" id="gq" placeholder="회의록 검색 — 쌀값, 산불, 오염수…" aria-label="회의록 전체 검색">
@@ -675,6 +694,7 @@ button.link:hover{text-decoration:underline;text-underline-offset:.2em}
       <button data-tab="members">의원 분석</button>
       <button data-tab="followups">이행 추적</button>
       <button data-tab="brief">국감 브리핑</button>
+      <button data-tab="ontology">온톨로지</button>
     </nav>
   </div>
 </header>
@@ -846,17 +866,44 @@ button.link:hover{text-decoration:underline;text-underline-offset:.2em}
 </section>
 
 <!-- SPARQL -->
-<section id="sparql">
+<section id="ontology">
+  <div class="pagehead"><h2>온톨로지</h2><p id="oHead">회의록을 개념(클래스)과 관계로 구조화하고, 공리와 규칙으로 새 관계를 추론한 지식그래프입니다.</p></div>
   <div class="card">
-    <h2>지식그래프 질의 (SPARQL)</h2>
-    <div class="row" style="margin-bottom:8px"><select id="sPreset"></select> <a class="muted" href="/api/ontology.ttl" target="_blank">온톨로지 스키마(TTL)</a></div>
-    <textarea id="sQuery"></textarea>
-    <div class="row" style="margin-top:8px"><button class="primary" id="sBtn">실행</button></div>
+    <div class="segtabs" id="oTabs">
+      <button class="on" data-k="ent" onclick="segShow('oTabs','ent')">개체 탐색</button>
+      <button data-k="cls" onclick="segShow('oTabs','cls')">클래스와 관계</button>
+      <button data-k="rules" onclick="segShow('oTabs','rules')">추론 규칙</button>
+      <button data-k="schemes" onclick="segShow('oTabs','schemes')">개념체계</button>
+      <button data-k="sparql" onclick="segShow('oTabs','sparql')">SPARQL 질의</button>
+    </div>
+    <div class="segpanel on" data-seg="oTabs" data-k="ent">
+      <div class="two otwo">
+        <div>
+          <input type="search" id="oQ" placeholder="이름으로 찾기: 쌀, 농림축산식품부, 양곡관리법…" style="width:100%">
+          <div id="oHits" class="ohits"></div>
+        </div>
+        <div id="oEnt"><div class="empty">왼쪽에서 개체를 찾거나, 클래스와 관계 탭에서 클래스를 고르세요.</div></div>
+      </div>
+    </div>
+    <div class="segpanel" data-seg="oTabs" data-k="cls">
+      <div class="g32"><div><h3 style="margin-top:0">클래스 계층</h3><p class="sub">개체 수입니다. 점선 칩은 추론으로 그 클래스에 속하게 된 개체 수이고, 클래스를 누르면 개체 목록을 봅니다.</p><div id="oTree" class="otree"></div></div>
+        <div><h3 style="margin-top:0">관계(속성)</h3><p class="sub">정의역(어떤 개체에서)과 치역(어떤 개체로), 사실 수, 공리입니다. 관계 이름에 '추론'이 붙은 것은 규칙으로만 생깁니다.</p><div id="oProps" class="tablewrap"></div></div></div>
+    </div>
+    <div class="segpanel" data-seg="oTabs" data-k="rules">
+      <p class="sub">추론기는 아래 규칙을 더 나올 사실이 없을 때까지 반복 적용합니다. 스키마 규칙은 온톨로지 공리를 그대로 따르고, 업무 규칙은 국감 업무에서 쓰는 관계를 정의합니다. 추론한 사실은 규칙별로 따로 기록돼 어느 규칙에서 나왔는지 추적할 수 있습니다.</p>
+      <div id="oRules"></div>
+    </div>
+    <div class="segpanel" data-seg="oTabs" data-k="schemes"><div id="oSchemes" class="g3 grid"></div></div>
+    <div class="segpanel" data-seg="oTabs" data-k="sparql">
+      <div class="row" style="margin-bottom:8px"><select id="sPreset"></select> <a class="muted" href="/api/ontology.ttl" target="_blank">온톨로지 스키마(TTL)</a></div>
+      <textarea id="sQuery"></textarea>
+      <div class="row" style="margin-top:8px"><button class="primary" id="sBtn">실행</button></div>
+      <div class="tablewrap" id="sOut" style="margin-top:12px"></div>
+    </div>
   </div>
-  <div class="card tablewrap" id="sOut"></div>
 </section>
 </main>
-<footer class="site-footer"><span>국회 농해수위 온톨로지</span><span>자료: 열린국회정보 위원회 회의록, 공공데이터포털 K-Startup 지원사업 공고</span><span>제작자 kimjs1408</span><button class="link" onclick="openTab('sparql')">지식그래프 질의(고급)</button></footer>
+<footer class="site-footer"><span>농해수위 인사이트</span><span>자료: 열린국회정보 위원회 회의록, 공공데이터포털 K-Startup 지원사업 공고</span><span>제작자 kimjs1408</span><button class="link" onclick="gotoSparql()">SPARQL 질의</button></footer>
 
 <script>
 const $ = s => document.querySelector(s);
@@ -914,12 +961,15 @@ function setHash(h){ try{ history.replaceState(null, "", "#/" + h) }catch(e){} }
 // 좁은 화면에서는 목록 아래에 상세가 있으므로, 고르면 상세로 내려가 보여 준다
 function toDetail(sel){ if(matchMedia("(max-width:860px)").matches) $(sel)?.scrollIntoView({block: "start", behavior: "smooth"}) }
 function routeFromHash(){
-  const [tab, id] = decodeURIComponent(location.hash.replace(/^#\/?/, "")).split("/");
+  const [tab, ...rest] = decodeURIComponent(location.hash.replace(/^#\/?/, "")).split("/");
+  const id = rest.join("/");  // 온톨로지 개체 주소는 '/'를 포함한다
   if(tab === "meetings" && id){ gotoMeeting(id).then(() => toDetail("#mDetail")); return true }
   if(tab === "issues" && id){ gotoIssue(id).then(() => toDetail("#iDetail")); return true }
   if(tab === "members" && id){ gotoMember(id); return true }
   if(tab === "followups" && id){ openTab("followups", false); fuState.sel = +id; loadFollowups().then(() => toDetail("#fuDetail")); return true }
-  if(["meetings", "issues", "members", "followups", "brief", "sparql"].includes(tab)){ openTab(tab); return true }
+  if(tab === "ontology" && id){ gotoKg(id); return true }
+  if(tab === "sparql"){ gotoSparql(); return true }
+  if(["meetings", "issues", "members", "followups", "brief", "ontology"].includes(tab)){ openTab(tab); return true }
   return false;
 }
 function openTab(t, load = true){
@@ -928,7 +978,7 @@ function openTab(t, load = true){
   if(t === "meetings") loadMeetings();
   if(t === "issues") loadIssues();
   if(t === "members" && load) loadMembers();
-  if(t === "sparql") loadPresets();
+  if(t === "ontology") loadOntology();
   if(t === "followups" && load) loadFollowups();
   try{ localStorage.setItem("agrisea-tab", t) }catch(e){}
   setHash(t === "dash" ? "" : t);
@@ -1452,7 +1502,8 @@ async function showIssue(id){
       <div class="muted" style="font-size:13px">${d.parent ? esc(d.parent) + " ›" : "상위 쟁점"}<span class="sep"></span>${scopeLabel()}</div>
       <h2 style="margin:2px 0 8px;font-size:20px">${esc(d.label)}</h2>
       <div class="row" style="gap:6px"><span class="chip line">관련 발언 ${fmt(d.count)}건</span><span class="chip line">회의 ${fmt(d.meetings)}건</span>
-        ${d.children.map(c => `<button class="chip" style="border:0;cursor:pointer" onclick="showIssue('${c.id}')">${esc(c.label)} ›</button>`).join("")}</div>
+        ${d.children.map(c => `<button class="chip" style="border:0;cursor:pointer" onclick="showIssue('${c.id}')">${esc(c.label)} ›</button>`).join("")}
+        <button class="link" style="font-size:13px" onclick="gotoKg(kgIri.issue('${esc(id)}'))">온톨로지에서 관계 보기</button></div>
       <div class="isplit"><div>
       <h3>회기별 언급 추이</h3>
       <div class="cols">${allSess.map(s => { const v = byS[s] || 0; return `<div class="c ${v ? "" : "zero"}" style="height:${v ? Math.max(3, v / cmax * 100) : 100}%" data-tip="${esc(SESS[s]?.label || "제" + s + "회")}<br>${fmt(v)}건">${v && v >= cmax * .12 ? `<b>${fmt(v)}</b>` : ""}</div>` }).join("")}</div>
@@ -1547,6 +1598,7 @@ async function showMember(name){
       <p style="margin:0 0 8px">${esc(d.headline)}</p>
       <div class="row" style="gap:12px;font-size:13px">
         <button class="link" onclick="briefMemberFrom('${esc(d.name)}')">이 의원 국감 브리핑</button>
+        <button class="link" onclick="gotoKg(kgIri.member('${esc(d.name)}'))">온톨로지에서 관계 보기</button>
         <button class="link" onclick="copyLink()">이 화면 링크 복사</button>
       </div>
       <div class="mini">
@@ -2141,7 +2193,7 @@ function renderFollowup(x){
   const ev = x.evidence || [];
   $("#fuDetail").innerHTML = `<div class="card">
     <div class="fubanner st-${x.status}"><b>${esc(x.status_label)}</b><span>${esc(x.status_desc || "")}</span></div>
-    <div class="muted" style="font-size:13px;margin-top:10px">${dot(x.date)}<span class="sep"></span>${esc(SESS[x.session]?.label || "")}<span class="sep"></span><button class="link" onclick="gotoUtt('${esc(x.meeting_id)}', ${x.idx})">회의록에서 보기</button></div>
+    <div class="muted" style="font-size:13px;margin-top:10px">${dot(x.date)}<span class="sep"></span>${esc(SESS[x.session]?.label || "")}<span class="sep"></span><button class="link" onclick="gotoUtt('${esc(x.meeting_id)}', ${x.idx})">회의록에서 보기</button><span class="sep"></span><button class="link" onclick="gotoKg(kgIri.utt('${esc(x.meeting_id)}', ${x.idx}))">온톨로지에서 보기</button></div>
     <div class="fugrid">
       <div>
         ${x.question ? `<div class="bubble q" style="max-width:100%"><div class="who">${esc(x.question.member)} 위원 질의</div>${esc(x.question.text)}</div>` : ""}
@@ -2201,6 +2253,7 @@ function segShow(id, k){
   document.querySelectorAll(`#${id} button`).forEach(b => b.classList.toggle("on", b.dataset.k === k));
   document.querySelectorAll(`[data-seg="${id}"]`).forEach(p => p.classList.toggle("on", p.dataset.k === k));
   if(id === "mTabs" && k === "full") loadTranscript();
+  if(id === "oTabs" && k === "sparql") loadPresets();
   if(id === "mTabs" && k === "mb" && transcript) loadMeetingMembers(transcript.id);
 }
 $("#bBtn").onclick = async () => {
@@ -2255,6 +2308,121 @@ $("#bMd").onclick = async () => {
   }catch(e){ toast("내려받지 못했습니다: " + e.message) }
   finally{ btn.disabled = false; btn.textContent = label }
 };
+
+// ── 온톨로지: 클래스·관계·추론 규칙·개념체계, 개체를 관계로 따라가며 탐색 ──
+const AGD = "https://w3id.org/agrisea/id/";
+const kslug = t => String(t).replace(/[^\w가-힣]+/g, "_").replace(/^_+|_+$/g, "");
+const kgIri = {
+  issue: id => AGD + "issue/" + id,
+  member: n => AGD + "person/member/" + kslug(n),
+  org: n => AGD + "org/" + kslug(n),
+  utt: (m, i) => AGD + "utt/" + kslug(m) + "/" + i,
+};
+let onto = {summary: null, hist: [], cur: null};
+function gotoKg(iri){ openTab("ontology", false); loadOntology(); segShow("oTabs", "ent"); showEntity(iri) }
+function gotoSparql(){ openTab("ontology", false); loadOntology(); segShow("oTabs", "sparql") }
+async function loadOntology(){
+  if(onto.summary) return;
+  try{ onto.summary = await api("/api/ontology/summary") }
+  catch(e){ $("#oHead").textContent = "온톨로지를 불러오지 못했습니다: " + e.message; return }
+  const s = onto.summary;
+  $("#oHead").innerHTML = `회의록을 개념(클래스)과 관계로 구조화하고, 공리와 규칙으로 새 관계를 추론한 지식그래프입니다.
+    사실 <b>${fmt(s.triples)}</b>개 가운데 <b>${fmt(s.inferred)}</b>개를 규칙 ${s.rules.length}개로 추론했습니다.`;
+  renderOntoClasses(); renderOntoRules(); renderOntoSchemes();
+  if(!onto.cur) ontoStart();
+}
+function ontoStart(){
+  const pick = ids => onto.summary.classes.filter(c => ids.includes(c.id));
+  $("#oEnt").innerHTML = `<div class="ostart"><h3 style="margin-top:0">이렇게 탐색해 보세요</h3>
+    <p class="sub">개체를 누르면 그 개체가 가진 관계가 나오고, 관계 끝의 개체를 누르면 그쪽으로 이동합니다. 점선 테두리는 추론으로 도출된 관계입니다.</p>
+    <div class="ex">${[["쌀·식량안보", kgIri.issue("rice")], ["농림축산식품부", kgIri.org("농림축산식품부")], ["해양수산부", kgIri.org("해양수산부")]]
+      .map(([l, i]) => `<button class="ov" onclick="showEntity('${esc(i)}')">${esc(l)}</button>`).join("")}</div>
+    <h3>클래스로 시작하기</h3><div class="ex">${pick(["OpenCommitment", "Bill", "Legislator", "AuditedAgency", "SupportProgram"])
+      .map(c => `<button class="ov" onclick="showClass('${esc(c.iri)}')">${esc(c.label)} <small>${fmt(c.count)}</small></button>`).join("")}</div></div>`;
+}
+function ontoNav(){
+  return onto.hist.length > 1 ? `<button class="link" style="font-size:13px" onclick="ontoBack()">이전 개체로</button>` : "";
+}
+function ontoBack(){ onto.hist.pop(); const prev = onto.hist.pop(); if(prev) (prev.cls ? showClass(prev.cls) : showEntity(prev.iri)) }
+function ontoLink(iri){
+  // 이 개체를 다른 화면에서 보기(쟁점·의원·회의·발언)
+  const p = iri.startsWith(AGD) ? iri.slice(AGD.length).split("/") : [];
+  if(p[0] === "issue") return `<button class="link" onclick="gotoIssue('${esc(p[1])}')">쟁점 분석에서 보기</button>`;
+  if(p[0] === "person" && p[1] === "member") return `<button class="link" onclick="gotoMember(decodeURIComponent('${encodeURIComponent(p[2])}'))">의원 분석에서 보기</button>`;
+  if(p[0] === "meeting") return `<button class="link" onclick="gotoMeeting('${esc(p[1])}')">회의록에서 보기</button>`;
+  if(p[0] === "utt") return `<button class="link" onclick="gotoUtt('${esc(p[1])}', ${+p[2]})">회의록에서 보기</button>`;
+  return "";
+}
+async function showEntity(iri){
+  onto.cur = iri; onto.hist.push({iri}); setHash("ontology/" + encodeURIComponent(iri));
+  $("#oEnt").innerHTML = '<div class="empty">지식그래프에서 찾는 중…</div>';
+  let d;
+  try{ d = await api("/api/ontology/entity?iri=" + encodeURIComponent(iri)) }
+  catch(e){ $("#oEnt").innerHTML = `<div class="notice">${esc(e.message)}</div>`; return }
+  if(onto.cur !== iri) return;
+  const rule = r => r ? (d.rules[r] || r) : "";
+  const item = it => it.literal ? `<span class="ov lit">${esc(cut(it.label, 160))}</span>`
+    : `<button class="ov ${it.inferred ? "inf" : ""}" onclick="showEntity('${esc(it.value)}')" ${it.inferred ? `data-tip="추론: ${esc(rule(it.rule))}"` : ""}>${esc(cut(it.label, 70))}</button>`;
+  const group = g => `<div class="og"><div class="og-h"><b>${esc(g.label)}</b> <span class="muted">${fmt(g.count)}건</span></div>
+    <div class="og-items">${g.items.map(item).join("")}${g.count > g.items.length ? `<span class="muted">외 ${fmt(g.count - g.items.length)}건</span>` : ""}</div></div>`;
+  $("#oEnt").innerHTML = `<div class="oent">
+    <div class="row" style="justify-content:space-between">${ontoNav()}<span>${ontoLink(iri)}</span></div>
+    <h2 style="margin:4px 0 6px;font-size:20px">${esc(cut(d.label, 120))}</h2>
+    <div class="row" style="gap:6px">${d.types.map(t => `<button class="chip ${t.inferred ? "line inf" : ""}" style="cursor:pointer" onclick="showClass('${esc(t.iri)}')" ${t.inferred ? `data-tip="추론: ${esc(rule(t.rule))}"` : ""}>${esc(t.label)}</button>`).join("")}</div>
+    <p class="muted" style="font-size:12px;margin:6px 0 0;overflow-wrap:anywhere">${esc(iri)}</p>
+    <h3>이 개체에서 나가는 관계</h3>${d.out.map(group).join("") || '<p class="muted">없음</p>'}
+    <h3>이 개체로 들어오는 관계</h3>${d.in.map(group).join("") || '<p class="muted">없음</p>'}
+  </div>`;
+}
+async function showClass(cls){
+  onto.cur = cls; onto.hist.push({cls}); segShow("oTabs", "ent");
+  $("#oEnt").innerHTML = '<div class="empty">개체 목록을 불러오는 중…</div>';
+  let d;
+  try{ d = await api("/api/ontology/instances?cls=" + encodeURIComponent(cls)) }
+  catch(e){ $("#oEnt").innerHTML = `<div class="notice">${esc(e.message)}</div>`; return }
+  const c = onto.summary?.classes.find(x => x.iri === cls);
+  $("#oEnt").innerHTML = `<div class="oent">${ontoNav()}
+    <h2 style="margin:4px 0 6px;font-size:20px">${esc(d.label)} <span class="muted" style="font-size:14px;font-weight:400">클래스, 개체 ${fmt(d.total)}개</span></h2>
+    ${c?.comment ? `<p class="sub">${esc(c.comment)}</p>` : ""}
+    <div class="og-items">${d.items.map(it => `<button class="ov ${it.inferred ? "inf" : ""}" onclick="showEntity('${esc(it.iri)}')">${esc(cut(it.label, 70))}</button>`).join("")}
+    ${d.total > d.items.length ? `<span class="muted">외 ${fmt(d.total - d.items.length)}개</span>` : ""}</div></div>`;
+}
+function renderOntoClasses(){
+  const s = onto.summary, kids = {};
+  s.classes.forEach(c => (kids[c.parent || ""] ||= []).push(c));
+  Object.values(kids).forEach(a => a.sort((x, y) => y.count - x.count));
+  const row = (c, d) => `<div class="ot-row" style="--d:${d}" onclick="showClass('${esc(c.iri)}')" data-tip="${esc(c.comment || c.label)}">
+      <span>${esc(c.label)}</span><span class="num">${fmt(c.count)}</span>${c.inferred ? `<span class="chip line inf">추론 ${fmt(c.inferred)}</span>` : ""}</div>`
+    + (kids[c.iri] || []).map(k => row(k, d + 1)).join("");
+  $("#oTree").innerHTML = (kids[""] || []).map(c => row(c, 0)).join("");
+  $("#oProps").innerHTML = `<table class="t"><tr><th>관계</th><th>어디서 → 어디로</th><th class="num">사실</th><th class="num">추론</th><th>공리</th></tr>
+    ${s.properties.filter(p => p.kind === "object").map(p => `<tr><td><b>${esc(p.label)}</b></td><td class="muted">${esc(p.domain || "-")} → ${esc(p.range || "-")}</td>
+      <td class="num">${fmt(p.count)}</td><td class="num">${p.inferred ? fmt(p.inferred) : ""}</td><td>${p.axioms.map(a => `<span class="chip line">${esc(a)}</span>`).join("")}</td></tr>`).join("")}</table>`;
+}
+function renderOntoRules(){
+  $("#oRules").innerHTML = `<table class="t"><tr><th>규칙</th><th>종류</th><th>무엇을 추론하나</th><th class="num">추론한 사실</th></tr>
+    ${onto.summary.rules.map(r => `<tr><td><b>${esc(r.label)}</b><div class="muted" style="font-size:12px"><code>${esc(r.head)}</code></div></td>
+      <td><span class="chip ${r.kind === "domain" ? "warn" : "line"}">${r.kind === "domain" ? "업무 규칙" : "스키마 규칙"}</span></td>
+      <td>${esc(r.desc)}</td><td class="num">${fmt(r.count)}</td></tr>`).join("")}</table>`;
+}
+function renderOntoSchemes(){
+  $("#oSchemes").innerHTML = onto.summary.schemes.map(sc => {
+    const kids = {}; sc.concepts.forEach(c => (kids[c.broader || ""] ||= []).push(c));
+    const row = (c, d) => `<div class="ot-row" style="--d:${d}" onclick="showEntity('${esc(c.iri)}')"><span>${esc(c.label)}</span><span class="num">${fmt(c.count)}</span></div>`
+      + (kids[c.iri] || []).sort((a, b) => b.count - a.count).map(k => row(k, d + 1)).join("");
+    return `<div><h3 style="margin-top:0">${esc(sc.label)}</h3><div class="otree">${(kids[""] || []).sort((a, b) => b.count - a.count).map(c => row(c, 0)).join("")}</div></div>`;
+  }).join("");
+}
+let oTimer = null;
+$("#oQ").oninput = () => { clearTimeout(oTimer); oTimer = setTimeout(async () => {
+  const q = $("#oQ").value.trim();
+  if(!q){ $("#oHits").innerHTML = ""; return }
+  try{
+    const hits = await api("/api/ontology/search?q=" + encodeURIComponent(q));
+    $("#oHits").innerHTML = hits.map(h => `<div class="item" onclick="showEntity('${esc(h.iri)}')"><div class="d">${esc(h.type)}${h.note ? `<span class="sep"></span>${esc(h.note)}` : ""}</div><div class="t">${esc(cut(h.label, 80))}</div></div>`).join("")
+      || '<div class="empty">찾은 개체가 없습니다.</div>';
+  }catch(e){ $("#oHits").innerHTML = `<div class="notice">${esc(e.message)}</div>` }
+}, 250) };
 
 // ── SPARQL ──
 let presets = null;
