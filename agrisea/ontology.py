@@ -5,7 +5,7 @@ import hashlib
 import re
 from pathlib import Path
 
-from rdflib import RDF, RDFS, SKOS, XSD, Graph, Literal, Namespace, URIRef
+from rdflib import DCTERMS, RDF, RDFS, SKOS, XSD, Graph, Literal, Namespace, URIRef
 
 from .config import COMMITTEE_NAME, ROOT
 from .lexicon import ISSUES, ORGANIZATIONS, match_organizations
@@ -28,7 +28,8 @@ def meeting_uri(mid: str) -> URIRef:
 
 
 def person_uri(name: str, stype: str) -> URIRef:
-    return AGD[f"person/{stype}/{_slug(name)}"]
+    # 같은 의원이 위원장(소위원장)으로도 발언하므로 의원은 역할과 상관없이 한 개체로 잇는다
+    return AGD[f"person/{'member' if stype in ('member', 'chair') else stype}/{_slug(name)}"]
 
 
 def org_uri(name: str) -> URIRef:
@@ -37,6 +38,48 @@ def org_uri(name: str) -> URIRef:
 
 def issue_uri(iid: str) -> URIRef:
     return AGD[f"issue/{iid}"]
+
+
+def status_uri(key: str) -> URIRef:
+    return AGD[f"status/{key}"]
+
+
+def action_uri(key: str) -> URIRef:
+    return AGD[f"action/{key}"]
+
+
+def utt_uri(mid: str, idx) -> URIRef:
+    return AGD[f"utt/{_slug(mid)}/{idx}"]
+
+
+# 안건 문구에서 의안 정보: '농어업회의소법안(문금주 의원 대표발의)(의안번호 2200520)'
+BILL_NO = re.compile(r"의안번호\s*(\d{6,8})")
+BILL_PROPOSER = re.compile(r"\(([가-힣]{2,5})\s*의원\s*(?:대표)?발의\)")
+BILL_META = re.compile(r"\((?:[^()]*의원\s*(?:대표)?발의|정부\s*제출|대안|의안번호[^()]*|위원장\s*제출)\)")
+
+
+def parse_bill(agenda: str) -> dict | None:
+    """안건 한 줄 → 의안 {no, title, kind, proposer}. 법률안·대안이 아니면 None."""
+    text = re.sub(r"^\s*\d+\.\s*", "", agenda).strip()
+    no = BILL_NO.search(text)
+    alt = "(대안)" in text
+    if not no and not alt:
+        return None
+    title = BILL_META.sub("", text).strip()
+    if not re.search(r"법률안|법안|대안|결의안|동의안|승인안", text):
+        return None
+    m = BILL_PROPOSER.search(text)
+    kind = "government" if "정부 제출" in text or "정부제출" in text else \
+        "member" if m else "alternative" if alt else "other"
+    return {"no": no.group(1) if no else None, "title": title, "kind": kind,
+            "proposer": m.group(1) if m else None}
+
+
+BILL_CLASS = {"government": "GovernmentBill", "member": "MemberBill", "alternative": "CommitteeAlternative"}
+
+
+def bill_uri(b: dict) -> URIRef:
+    return AGD[f"bill/{b['no']}"] if b["no"] else AGD[f"bill/alt/{_slug(b['title'])}"]
 
 
 def meeting_class(m: dict) -> URIRef:
@@ -81,6 +124,20 @@ def add_vocabulary(g: Graph) -> None:
             g.add((AG.IssueScheme, SKOS.hasTopConcept, u))
         for k in kws:
             g.add((u, AG.keyword, Literal(k, lang="ko")))
+    from .followup import ACTION_LABEL, STATUS
+    for key, (label, desc) in STATUS.items():
+        u = status_uri(key)
+        g.add((u, RDF.type, AG.FollowUpStatus))
+        g.add((u, SKOS.inScheme, AG.FollowUpStatusScheme))
+        g.add((u, SKOS.prefLabel, Literal(label, lang="ko")))
+        g.add((u, RDFS.label, Literal(label, lang="ko")))
+        g.add((u, SKOS.definition, Literal(desc, lang="ko")))
+    for key, label in ACTION_LABEL.items():
+        u = action_uri(key)
+        g.add((u, RDF.type, AG.ActionType))
+        g.add((u, SKOS.inScheme, AG.ActionTypeScheme))
+        g.add((u, SKOS.prefLabel, Literal(label, lang="ko")))
+        g.add((u, RDFS.label, Literal(label, lang="ko")))
     for name, aliases in ORGANIZATIONS.items():
         u = org_uri(name)
         g.add((u, RDF.type, AG.AuditedAgency))
@@ -106,6 +163,7 @@ def build_graph(store: Store, with_schema: bool = True, core: bool = False,
         g.add((mu, RDF.type, AG.Meeting))
         g.add((mu, RDFS.label, Literal(m["title"] or m["id"], lang="ko")))
         g.add((mu, AG.heldBy, committee))
+        g.add((mu, DCTERMS.identifier, Literal(str(m["id"]))))
         if m["date"]:
             g.add((mu, AG.meetingDate, Literal(m["date"], datatype=XSD.date)))
         if m["dae"] and str(m["dae"]).isdigit():
@@ -135,6 +193,18 @@ def build_graph(store: Store, with_schema: bool = True, core: bool = False,
             g.add((au, RDFS.label, Literal(a, lang="ko")))
             g.add((au, AG.orderIndex, Literal(i, datatype=XSD.integer)))
             g.add((mu, AG.hasAgendaItem, au))
+            bill = parse_bill(a)
+            if bill:
+                bu = bill_uri(bill)
+                g.add((au, AG.aboutBill, bu))
+                g.add((bu, RDF.type, AG.Bill))
+                if bill["kind"] in BILL_CLASS:
+                    g.add((bu, RDF.type, AG[BILL_CLASS[bill["kind"]]]))
+                g.add((bu, RDFS.label, Literal(bill["title"], lang="ko")))
+                if bill["no"]:
+                    g.add((bu, AG.billNumber, Literal(bill["no"])))
+                if bill["proposer"]:
+                    g.add((bu, AG.proposedBy, person_uri(bill["proposer"], "member")))
             for org in match_organizations(a):
                 if meeting_class(m) == AG.AuditMeeting:
                     g.add((mu, AG.audited, org_uri(org)))
@@ -143,7 +213,7 @@ def build_graph(store: Store, with_schema: bool = True, core: bool = False,
         last_question: URIRef | None = None
         last_q_orgs: list[str] = []
         for u in store.utterances(meeting_id=m["id"]):
-            uu = AGD[f"utt/{_slug(m['id'])}/{u['idx']}"]
+            uu = utt_uri(m["id"], u["idx"])
             pu = person_uri(u["speaker_name"], u["speaker_type"])
             g.add((pu, RDF.type, PERSON_CLASS.get(u["speaker_type"], AG.Person)))
             g.add((pu, RDFS.label, Literal(u["speaker_name"], lang="ko")))
@@ -194,7 +264,32 @@ def build_graph(store: Store, with_schema: bool = True, core: bool = False,
                 if u["org"]:
                     g.add((uu, AG.committedBy, org_uri(u["org"])))
     add_programs(g, store)
+    add_followups(g, store)
     return g
+
+
+def add_followups(g: Graph, store: Store) -> None:
+    """정부 약속 이행 추적 결과(사전 계산 'followups'): 판정·조치 유형·질의 위원·근거."""
+    d = store.kv_get("followups")
+    if not d:
+        return
+    for it in d.get("items", []):
+        cu = utt_uri(it["meeting_id"], it["idx"])
+        g.add((cu, AG.followUpStatus, status_uri(it["status"])))
+        g.add((cu, AG.actionType, action_uri(it["action"])))
+        if it.get("question"):
+            g.add((cu, AG.raisedBy, person_uri(it["question"]["member"], "member")))
+        for k, e in enumerate(it.get("evidence") or []):
+            eu = AGD[f"evidence/{_slug(str(it['id']))}/{k}"]
+            g.add((eu, RDF.type, AG.FollowUpEvidence))
+            g.add((cu, AG.hasEvidence, eu))
+            g.add((eu, RDFS.label, Literal((e.get("text") or e.get("title") or "")[:200], lang="ko")))
+            g.add((eu, AG.evidenceKind, Literal(e.get("kind", ""))))
+            g.add((eu, AG.evidenceSource, Literal(e.get("source", ""))))
+            if e.get("date"):
+                g.add((eu, AG.evidenceDate, Literal(e["date"], datatype=XSD.date)))
+            if e.get("meeting_id"):
+                g.add((eu, AG.evidenceIn, meeting_uri(e["meeting_id"])))
 
 
 def program_uri(pid: str) -> URIRef:
@@ -286,11 +381,12 @@ ORDER BY DESC(?date)""",
 }
 
 
-KG_PATH = ROOT / "data" / "kg.nt.gz"
+KG_PATH = ROOT / "data" / "kg.nq.gz"          # 원 데이터 + 추론 결과(규칙별 이름 있는 그래프), N-Quads
+LEGACY_KG_PATH = ROOT / "data" / "kg.nt.gz"   # 예전 형식(원 데이터만): 읽을 때 추론을 다시 돌린다
 
 
 def to_ntriples_gz(g: Graph, path: Path) -> None:
-    """그래프를 N-Triples(gzip)로 저장. 서버는 이 파일을 pyoxigraph로 빠르게 적재한다."""
+    """그래프를 N-Triples(gzip)로 저장(예전 형식, 호환용)."""
     import gzip
     path.parent.mkdir(parents=True, exist_ok=True)
     data = g.serialize(format="nt").encode("utf-8")
@@ -298,21 +394,77 @@ def to_ntriples_gz(g: Graph, path: Path) -> None:
         gz.write(data)
 
 
-def load_kg(nt: bytes):
-    """N-Triples → pyoxigraph 메모리 저장소(SPARQL 질의용)."""
+def load_kg(nt: bytes, fmt: str = "nt"):
+    """N-Triples/N-Quads → pyoxigraph 메모리 저장소(SPARQL 질의용)."""
     import pyoxigraph as ox
     kg = ox.Store()
-    kg.bulk_load(nt, ox.RdfFormat.N_TRIPLES)
+    kg.bulk_load(nt, ox.RdfFormat.N_QUADS if fmt == "nq" else ox.RdfFormat.N_TRIPLES)
     return kg
+
+
+def annotate_rules(kg, counts: dict) -> None:
+    """추론 규칙 자체도 그래프의 개체로 남긴다(무엇을 어떤 규칙으로 몇 건 추론했는지)."""
+    import pyoxigraph as ox
+    from .reasoner import RULES
+    A = "https://w3id.org/agrisea/ontology#"
+    for r in RULES:
+        ru = ox.NamedNode(f"https://w3id.org/agrisea/id/rule/{r.id}")
+        for p, o in ((ox.NamedNode("http://www.w3.org/1999/02/22-rdf-syntax-ns#type"), ox.NamedNode(A + "InferenceRule")),
+                     (ox.NamedNode("http://www.w3.org/2000/01/rdf-schema#label"), ox.Literal(r.label, language="ko")),
+                     (ox.NamedNode("http://www.w3.org/2000/01/rdf-schema#comment"), ox.Literal(r.desc, language="ko")),
+                     (ox.NamedNode(A + "ruleKind"), ox.Literal(r.kind)),
+                     (ox.NamedNode(A + "ruleQuery"), ox.Literal(f"{r.head}  ⇐  {r.body}")),
+                     (ox.NamedNode(A + "inferredCount"), ox.Literal(str(counts.get(r.id, 0)),
+                      datatype=ox.NamedNode("http://www.w3.org/2001/XMLSchema#integer")))):
+            kg.add(ox.Quad(ru, p, o))
+
+
+def reason(kg) -> dict:
+    """추론을 돌리고 규칙 개체를 남긴다. 반환: 규칙별 추론 수."""
+    from .reasoner import materialize
+    counts = materialize(kg)
+    annotate_rules(kg, counts)
+    return counts
+
+
+def build_kg(store: Store, text_limit: int | None = 500):
+    """저장소 → 지식그래프(pyoxigraph) + 추론. 반환: (kg, 규칙별 추론 수)."""
+    # 빈 노드(OWL 목록·제한 등)는 IRI로 바꿔 싣는다: 큰 파일을 병렬로 적재할 때 빈 노드 이름이
+    # 조각마다 따로 해석되어 목록(rdf:first/rest)이 끊기는 일을 막는다
+    g = build_graph(store, text_limit=text_limit).skolemize(
+        authority="https://w3id.org", basepath="/agrisea/id/bnode/")
+    kg = load_kg(g.serialize(format="nt").encode("utf-8"))
+    return kg, reason(kg)
+
+
+def save_kg(kg, path: Path | None = None) -> None:
+    """원 데이터와 추론 결과(이름 있는 그래프)를 N-Quads(gzip)로 저장."""
+    import gzip
+
+    import pyoxigraph as ox
+    path = path or KG_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    data = kg.dump(format=ox.RdfFormat.N_QUADS)
+    with open(path, "wb") as raw, gzip.GzipFile(fileobj=raw, mode="wb", mtime=0) as gz:
+        gz.write(data)
 
 
 def kg_from_file(path: Path | None = None):
     import gzip
-    return load_kg(gzip.decompress((path or KG_PATH).read_bytes()))
+    path = path or (KG_PATH if KG_PATH.exists() else LEGACY_KG_PATH)
+    if str(path).endswith(".nq.gz"):
+        return load_kg(gzip.decompress(path.read_bytes()), "nq")
+    kg = load_kg(gzip.decompress(path.read_bytes()))
+    reason(kg)  # 예전 형식에는 추론 결과가 없다
+    return kg
+
+
+def kg_exists() -> bool:
+    return KG_PATH.exists() or LEGACY_KG_PATH.exists()
 
 
 def kg_from_store(store: Store):
-    return load_kg(build_graph(store, text_limit=500).serialize(format="nt").encode("utf-8"))
+    return build_kg(store)[0]
 
 
 def _term(t) -> str | None:

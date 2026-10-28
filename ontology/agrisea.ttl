@@ -12,7 +12,8 @@
     a owl:Ontology ;
     rdfs:label "농해수위 국정감사 온톨로지 (AgriSea Audit Ontology)"@ko ;
     rdfs:comment "국회 농림축산식품해양수산위원회 회의록을 회의·안건·발언·발언자·피감기관·쟁점·이행약속으로 구조화하여 국정감사 준비와 사후관리에 활용하기 위한 온톨로지."@ko ;
-    owl:versionInfo "0.1.0" .
+    owl:versionInfo "0.2.0" ;
+    rdfs:seeAlso <https://w3id.org/agrisea/ontology/rules> .
 
 ########## 클래스 ##########
 
@@ -40,7 +41,7 @@ ag:Commitment a owl:Class ; rdfs:subClassOf ag:Answer ;
 ag:DataRequest a owl:Class ; rdfs:subClassOf ag:Utterance ; rdfs:label "자료요구"@ko .
 
 ag:Person a owl:Class ; rdfs:subClassOf foaf:Person ; rdfs:label "인물"@ko .
-ag:Legislator a owl:Class ; rdfs:subClassOf ag:Person ; rdfs:label "국회의원(위원)"@ko .
+ag:Legislator a owl:Class ; rdfs:subClassOf ag:Person ; rdfs:label "국회의원"@ko .
 ag:Chair a owl:Class ; rdfs:subClassOf ag:Legislator ; rdfs:label "위원장"@ko .
 ag:GovernmentOfficial a owl:Class ; rdfs:subClassOf ag:Person ; rdfs:label "정부·기관 관계자"@ko .
 ag:Witness a owl:Class ; rdfs:subClassOf ag:Person ; rdfs:label "증인·참고인"@ko .
@@ -110,3 +111,92 @@ ag:receptionEnd a owl:DatatypeProperty ; rdfs:label "접수 마감일"@ko ; rdfs
 ag:announcementURL a owl:DatatypeProperty ; rdfs:label "공고 보기"@ko ; rdfs:range xsd:anyURI .
 ag:announcer a owl:DatatypeProperty ; rdfs:label "공고 기관명"@ko .
 ag:isSampleData a owl:DatatypeProperty ; rdfs:label "예시(가상) 데이터 여부"@ko ; rdfs:range xsd:boolean .
+
+########## v0.2: 의안·이행 추적·추론 관계 ##########
+# 아래 '추론' 표시 관계는 데이터에 직접 넣지 않고 추론기(agrisea/reasoner.py)가 공리·규칙으로 도출한다.
+
+ag:Bill a owl:Class ; rdfs:label "의안"@ko ;
+    rdfs:comment "안건에 오른 법률안 등. 의안번호(ag:billNumber)로 식별한다. 같은 의안이 소위원회와 전체회의에 거듭 올라오면 하나의 개체로 이어진다."@ko .
+ag:GovernmentBill a owl:Class ; rdfs:subClassOf ag:Bill ; rdfs:label "정부 제출 의안"@ko .
+ag:MemberBill a owl:Class ; rdfs:subClassOf ag:Bill ; rdfs:label "의원 발의 의안"@ko .
+ag:CommitteeAlternative a owl:Class ; rdfs:subClassOf ag:Bill ; rdfs:label "위원회 대안"@ko .
+
+ag:FollowUpEvidence a owl:Class ; rdfs:subClassOf prov:Entity ; rdfs:label "이행 근거"@ko ;
+    rdfs:comment "약속 뒤 회의록·안건에서 찾은 기록(이행 보고·진행 중·재지적 신호)."@ko .
+ag:FollowUpStatus a owl:Class ; rdfs:subClassOf skos:Concept ; rdfs:label "이행 판정"@ko .
+ag:ActionType a owl:Class ; rdfs:subClassOf skos:Concept ; rdfs:label "조치 유형"@ko .
+ag:FollowUpStatusScheme a skos:ConceptScheme ; rdfs:label "약속 이행 판정 체계"@ko .
+ag:ActionTypeScheme a skos:ConceptScheme ; rdfs:label "약속 조치 유형 체계"@ko .
+
+ag:OpenCommitment a owl:Class ; rdfs:subClassOf ag:Commitment ; rdfs:label "국감 확인 대상 약속"@ko ;
+    rdfs:comment "이행 판정이 '재지적' 또는 '근거 미확인'인 약속(추론)."@ko ;
+    owl:equivalentClass [ a owl:Class ; owl:intersectionOf ( ag:Commitment
+        [ a owl:Restriction ; owl:onProperty ag:followUpStatus ;
+          owl:someValuesFrom [ a owl:Class ; owl:oneOf ( <https://w3id.org/agrisea/id/status/reraised> <https://w3id.org/agrisea/id/status/none> ) ] ] ) ] .
+ag:FulfilledCommitment a owl:Class ; rdfs:subClassOf ag:Commitment ; rdfs:label "이행 보고된 약속"@ko ;
+    owl:equivalentClass [ a owl:Restriction ; owl:onProperty ag:followUpStatus ;
+                          owl:hasValue <https://w3id.org/agrisea/id/status/done> ] .
+
+ag:InferenceRule a owl:Class ; rdfs:label "추론 규칙"@ko .
+
+# 의안
+ag:aboutBill a owl:ObjectProperty ; rdfs:label "다룬 의안"@ko ;
+    rdfs:domain ag:AgendaItem ; rdfs:range ag:Bill .
+ag:proposedBy a owl:ObjectProperty ; rdfs:label "대표발의 의원"@ko ;
+    rdfs:domain ag:Bill ; rdfs:range ag:Legislator ; owl:inverseOf ag:proposed .
+ag:proposed a owl:ObjectProperty ; rdfs:label "대표발의한 의안"@ko .
+ag:deliberated a owl:ObjectProperty ; rdfs:label "심사한 의안(추론)"@ko ;
+    rdfs:domain ag:Meeting ; rdfs:range ag:Bill ;
+    owl:propertyChainAxiom ( ag:hasAgendaItem ag:aboutBill ) ; owl:inverseOf ag:deliberatedIn .
+ag:deliberatedIn a owl:ObjectProperty ; rdfs:label "심사한 회의(추론)"@ko .
+
+# 이행 추적
+ag:followUpStatus a owl:ObjectProperty, owl:FunctionalProperty ; rdfs:label "이행 판정"@ko ;
+    rdfs:domain ag:Commitment ; rdfs:range ag:FollowUpStatus .
+ag:actionType a owl:ObjectProperty ; rdfs:label "조치 유형"@ko ;
+    rdfs:domain ag:Commitment ; rdfs:range ag:ActionType .
+ag:hasEvidence a owl:ObjectProperty ; rdfs:label "이행 근거"@ko ;
+    rdfs:domain ag:Commitment ; rdfs:range ag:FollowUpEvidence ; owl:inverseOf ag:evidenceFor .
+ag:evidenceFor a owl:ObjectProperty ; rdfs:label "근거 대상 약속"@ko .
+ag:evidenceIn a owl:ObjectProperty ; rdfs:label "근거가 나온 회의"@ko ;
+    rdfs:domain ag:FollowUpEvidence ; rdfs:range ag:Meeting .
+ag:raisedBy a owl:ObjectProperty ; rdfs:label "질의한 의원"@ko ;
+    rdfs:comment "약속을 이끌어 낸 의원(약속 바로 앞 질의의 발언자)."@ko ;
+    rdfs:domain ag:Commitment ; rdfs:range ag:Legislator .
+
+# 역관계·하위 관계(공리)
+ag:spokenBy owl:inverseOf ag:speaks .
+ag:speaks a owl:ObjectProperty ; rdfs:label "한 발언"@ko .
+ag:respondsTo owl:inverseOf ag:answeredBy .
+ag:answeredBy a owl:ObjectProperty ; rdfs:label "받은 답변"@ko .
+ag:committedBy owl:inverseOf ag:madeCommitment .
+ag:madeCommitment a owl:ObjectProperty ; rdfs:label "한 약속"@ko .
+ag:addressedTo rdfs:subPropertyOf ag:mentionsOrganization .
+ag:concernsIssue rdfs:subPropertyOf ag:concernsTopic .
+ag:concernsTopic a owl:ObjectProperty ; rdfs:label "다룬 주제(상위 쟁점 포함, 추론)"@ko ; rdfs:range ag:Issue .
+
+# 추론 관계(도메인 규칙)
+ag:questionedOn a owl:ObjectProperty ; rdfs:label "질의한 쟁점(추론)"@ko ;
+    rdfs:domain ag:Legislator ; rdfs:range ag:Issue ; owl:inverseOf ag:questionedBy .
+ag:questionedBy a owl:ObjectProperty ; rdfs:label "질의한 의원(추론)"@ko .
+ag:questionedAgency a owl:ObjectProperty ; rdfs:label "질의한 기관(추론)"@ko ;
+    rdfs:domain ag:Legislator ; rdfs:range ag:Organization ; owl:inverseOf ag:questionedByMember .
+ag:questionedByMember a owl:ObjectProperty ; rdfs:label "질의한 의원(추론)"@ko .
+ag:respondedOn a owl:ObjectProperty ; rdfs:label "답변한 쟁점(추론)"@ko ;
+    rdfs:domain ag:Organization ; rdfs:range ag:Issue ; owl:inverseOf ag:respondedBy .
+ag:respondedBy a owl:ObjectProperty ; rdfs:label "답변한 기관(추론)"@ko .
+ag:pledgedOn a owl:ObjectProperty ; rdfs:label "약속한 쟁점(추론)"@ko ;
+    rdfs:domain ag:Organization ; rdfs:range ag:Issue ; owl:inverseOf ag:pledgedBy .
+ag:pledgedBy a owl:ObjectProperty ; rdfs:label "약속한 기관(추론)"@ko .
+ag:relatedIssue a owl:ObjectProperty, owl:SymmetricProperty ; rdfs:label "함께 논의된 쟁점(추론)"@ko ;
+    rdfs:domain ag:Issue ; rdfs:range ag:Issue .
+ag:hasSupportProgram a owl:ObjectProperty ; rdfs:label "관련 지원사업(추론)"@ko ;
+    rdfs:domain ag:Issue ; rdfs:range ag:SupportProgram .
+
+ag:billNumber a owl:DatatypeProperty ; rdfs:label "의안번호"@ko ; rdfs:subPropertyOf dct:identifier .
+ag:evidenceDate a owl:DatatypeProperty ; rdfs:label "근거 일자"@ko ; rdfs:range xsd:date .
+ag:evidenceKind a owl:DatatypeProperty ; rdfs:label "근거 종류"@ko .
+ag:evidenceSource a owl:DatatypeProperty ; rdfs:label "근거 출처"@ko .
+ag:ruleKind a owl:DatatypeProperty ; rdfs:label "규칙 종류"@ko .
+ag:ruleQuery a owl:DatatypeProperty ; rdfs:label "규칙(SPARQL)"@ko .
+ag:inferredCount a owl:DatatypeProperty ; rdfs:label "추론한 사실 수"@ko ; rdfs:range xsd:integer .

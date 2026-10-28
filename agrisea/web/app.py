@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse, PlainTextResponse, Response
 from .. import analysis, members, programs, readable
 from ..config import Settings, get_settings
 from ..lexicon import ISSUES
-from ..ontology import KG_PATH, PRESET_QUERIES, kg_from_file, kg_from_store, run_sparql
+from ..ontology import PRESET_QUERIES, kg_exists, kg_from_file, kg_from_store, run_sparql
 from ..pipeline import seed_meta
 from ..ontology import SCHEMA_PATH
 from ..store import Store
@@ -22,7 +22,7 @@ FORBIDDEN_SPARQL = re.compile(r"\b(SERVICE|LOAD|INSERT|DELETE|DROP|CLEAR|CREATE|
 
 
 class KGCache:
-    """SPARQL용 지식그래프(pyoxigraph). 미리 계산된 data/kg.nt.gz 를 우선 쓰고,
+    """지식그래프(pyoxigraph, 원 데이터 + 추론). 미리 계산된 data/kg.nq.gz 를 우선 쓰고,
     화면에서 수집해 데이터가 바뀐 뒤에는 첫 질의 때 저장소에서 다시 만든다."""
 
     def __init__(self, store: Store):
@@ -34,7 +34,7 @@ class KGCache:
     def get(self):
         with self._lock:
             if self._kg is None:
-                self._kg = (kg_from_file(KG_PATH) if not self._dirty and KG_PATH.exists()
+                self._kg = (kg_from_file() if not self._dirty and kg_exists()
                             else kg_from_store(self.store))
             return self._kg
 
@@ -626,6 +626,42 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         except Exception as e:
             raise HTTPException(400, f"SPARQL 오류: {e}") from e
 
+    def kg_call(fn):
+        try:
+            return fn(graphs.get())
+        except ValueError as e:
+            raise HTTPException(400, str(e)) from e
+
+    @app.get("/api/ontology/summary")
+    def ontology_summary():
+        """온톨로지 요약: 클래스·관계(원 데이터·추론 수), 추론 규칙, 개념체계."""
+        from .. import kgview
+        value = store.kv_get("ontology")
+        if value is None:
+            value = kg_call(kgview.summary)
+            store.kv_set("ontology", value)
+        return value
+
+    @app.get("/api/ontology/entity")
+    def ontology_entity(iri: str = Query(..., min_length=8, max_length=300)):
+        """개체 한 개: 유형(원 데이터·추론)과 나가는·들어오는 관계."""
+        from .. import kgview
+        if not iri.startswith(("https://w3id.org/agrisea/", "http://", "https://")):
+            raise HTTPException(400, "개체 주소가 올바르지 않습니다.")
+        return kg_call(lambda kg: kgview.describe(kg, iri))
+
+    @app.get("/api/ontology/instances")
+    def ontology_instances(cls: str = Query(..., min_length=8, max_length=200), limit: int = Query(80, le=300)):
+        """클래스의 개체 목록(추론으로 속한 개체 포함)."""
+        from .. import kgview
+        return kg_call(lambda kg: kgview.instances(kg, cls, limit))
+
+    @app.get("/api/ontology/search")
+    def ontology_search(q: str = Query(..., min_length=1, max_length=60)):
+        """이름으로 개체 찾기."""
+        from .. import kgview
+        return kg_call(lambda kg: kgview.search(kg, q))
+
     @app.get("/api/graph")
     def graph():
         """쟁점–기관–위원 관계망(시각화용)."""
@@ -664,7 +700,7 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
 
     @app.get("/api/ontology.ttl")
     def ontology_ttl():
-        """온톨로지 스키마(클래스·속성 정의). 인스턴스 전체는 저장소의 data/kg.nt.gz."""
+        """온톨로지 스키마(클래스·속성·공리). 인스턴스와 추론 결과 전체는 저장소의 data/kg.nq.gz."""
         return FileResponse(SCHEMA_PATH, media_type="text/turtle; charset=utf-8")
 
     @app.post("/api/admin/collect")

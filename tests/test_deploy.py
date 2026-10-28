@@ -68,7 +68,11 @@ def test_export_seed_roundtrip(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "SEED_DB", tmp_path / "data" / "seed.sqlite3.gz")
     monkeypatch.setattr(config, "SEED_META", tmp_path / "data" / "seed.meta.json")
     import agrisea.ontology as ontology
-    monkeypatch.setattr(ontology, "KG_PATH", tmp_path / "data" / "kg.nt.gz")
+    monkeypatch.setattr(ontology, "KG_PATH", tmp_path / "data" / "kg.nq.gz")
+    legacy = tmp_path / "data" / "kg.nt.gz"  # 예전 형식 파일은 내보내기 때 지운다(실제 저장소 파일은 건드리지 않게 바꿔 둠)
+    legacy.parent.mkdir(parents=True, exist_ok=True)
+    legacy.write_bytes(b"")
+    monkeypatch.setattr(ontology, "LEGACY_KG_PATH", legacy)
     s = Store(tmp_path / "work.sqlite3")
     pipeline.load_sample(s)
     with s.tx() as c:  # 예시 1건을 실제 수집 데이터처럼 표시
@@ -85,10 +89,13 @@ def test_export_seed_roundtrip(tmp_path, monkeypatch):
     # 사전 계산 결과(요약·집계·지식그래프)가 함께 실림
     assert restored.summary("SAMPLE-2025-1014", "rule")["key_issues"]
     assert {o["name"] for o in restored.kv_get("orgs") if o["mentions"]} >= {"농림축산식품부"}
-    assert (tmp_path / "data" / "kg.nt.gz").exists() and meta["kg_triples"] > 0
-    from agrisea.ontology import kg_from_file
-    kg = kg_from_file(tmp_path / "data" / "kg.nt.gz")
-    assert len(kg) == meta["kg_triples"]
+    assert (tmp_path / "data" / "kg.nq.gz").exists() and meta["kg_triples"] > 0
+    assert meta["kg_inferred"] > 0 and not legacy.exists()
+    from agrisea.ontology import kg_from_file, run_sparql
+    kg = kg_from_file(tmp_path / "data" / "kg.nq.gz")
+    n = run_sparql(kg, "SELECT (COUNT(*) AS ?n) WHERE { ?s ?p ?o }")["rows"][0][0]
+    assert int(n) == meta["kg_triples"]
+    assert restored.kv_get("ontology")["inferred"] == meta["kg_inferred"]
     assert restored.search("시장격리")
     # 인덱스 없이 만든 DB를 FTS 모드로 열면 인덱스를 다시 채움
     restored.conn.close()

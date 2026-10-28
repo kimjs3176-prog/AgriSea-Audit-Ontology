@@ -112,7 +112,7 @@ def export_seed(store: Store) -> dict:
     from datetime import datetime, timezone
 
     from .config import SEED_DB, SEED_META
-    from .ontology import KG_PATH
+    from .ontology import KG_PATH, LEGACY_KG_PATH
     from .precompute import PRECOMPUTE_VERSION, current_policy, precompute
 
     # 정책 버전이 바뀌면(운영 관문 G7 제도 반영) 같은 데이터라도 다시 판정해 싣는다
@@ -141,6 +141,8 @@ def export_seed(store: Store) -> dict:
         # 가상 예시를 뺀 사본 기준으로 요약·집계·지식그래프를 미리 계산해 함께 싣는다
         exported = Store(path, fts=False)
         pre = precompute(exported, KG_PATH)
+        if LEGACY_KG_PATH.exists() and LEGACY_KG_PATH != KG_PATH:
+            LEGACY_KG_PATH.unlink()  # 예전 형식(N-Triples, 추론 없음)은 새 파일로 대체
         stats = {k: v for k, v in exported.stats().items() if k != "samples"}
         exported.conn.close()
         conn = sqlite3.connect(path)
@@ -156,6 +158,7 @@ def export_seed(store: Store) -> dict:
         "exported_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "size_bytes": SEED_DB.stat().st_size,
         "kg_triples": pre.get("triples"),
+        "kg_inferred": pre.get("inferred"),
         **stats,
     }
     SEED_META.write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

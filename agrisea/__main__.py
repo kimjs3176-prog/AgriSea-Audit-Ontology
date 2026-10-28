@@ -211,8 +211,8 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print(md)
     elif args.cmd == "sparql":
-        from .ontology import KG_PATH, kg_from_file, kg_from_store, run_sparql
-        kg = kg_from_store(store) if store.stats()["utterances"] or not KG_PATH.exists() \
+        from .ontology import kg_exists, kg_from_file, kg_from_store, run_sparql
+        kg = kg_from_store(store) if store.stats()["utterances"] or not kg_exists() \
             else kg_from_file()
         res = run_sparql(kg, args.query)
         print("\t".join(res["columns"]))
