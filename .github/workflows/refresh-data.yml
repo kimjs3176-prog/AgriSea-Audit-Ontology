@@ -40,6 +40,7 @@ on:
       - "agrisea/readable.py"
       - "agrisea/ontology.py"
       - "agrisea/reasoner.py"
+      - "agrisea/validate.py"
       - "ontology/agrisea.ttl"
 
 permissions:

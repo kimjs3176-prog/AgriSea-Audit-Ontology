@@ -29,16 +29,14 @@ ag:Session a owl:Class ; rdfs:label "회기"@ko .
 
 ag:AgendaItem a owl:Class ; rdfs:label "안건"@ko .
 
-ag:MinutesDocument a owl:Class ; rdfs:label "회의록 문서"@ko ;
-    rdfs:subClassOf foaf:Document .
-
 ag:Utterance a owl:Class ; rdfs:label "발언"@ko .
 ag:Question a owl:Class ; rdfs:subClassOf ag:Utterance ; rdfs:label "질의"@ko .
 ag:Answer a owl:Class ; rdfs:subClassOf ag:Utterance ; rdfs:label "답변"@ko .
 ag:Commitment a owl:Class ; rdfs:subClassOf ag:Answer ;
     rdfs:label "이행약속 답변"@ko ;
     rdfs:comment "'검토하겠습니다', '개선하겠습니다' 등 후속조치를 약속한 답변. 국정감사 결과보고서·시정처리 요구의 추적 대상."@ko .
-ag:DataRequest a owl:Class ; rdfs:subClassOf ag:Utterance ; rdfs:label "자료요구"@ko .
+ag:DataRequest a owl:Class ; rdfs:subClassOf ag:Utterance ; rdfs:label "자료요구"@ko ;
+    rdfs:comment "자료를 요구한 발언. 질의 중에 자료를 요구하는 경우가 많아 질의(ag:Question)와 겹칠 수 있다(서로 배타 아님)."@ko .
 
 ag:Person a owl:Class ; rdfs:subClassOf foaf:Person ; rdfs:label "인물"@ko .
 ag:Legislator a owl:Class ; rdfs:subClassOf ag:Person ; rdfs:label "국회의원"@ko .
@@ -64,8 +62,6 @@ ag:inSession a owl:ObjectProperty ; rdfs:label "회기"@ko ;
     rdfs:domain ag:Meeting ; rdfs:range ag:Session .
 ag:hasAgendaItem a owl:ObjectProperty ; rdfs:label "안건"@ko ;
     rdfs:domain ag:Meeting ; rdfs:range ag:AgendaItem .
-ag:hasMinutes a owl:ObjectProperty ; rdfs:label "회의록"@ko ;
-    rdfs:domain ag:Meeting ; rdfs:range ag:MinutesDocument .
 ag:hasUtterance a owl:ObjectProperty ; rdfs:label "발언 포함"@ko ;
     rdfs:domain ag:Meeting ; rdfs:range ag:Utterance ; owl:inverseOf ag:inMeeting .
 ag:inMeeting a owl:ObjectProperty ; rdfs:label "발언 회의"@ko .
@@ -78,8 +74,10 @@ ag:respondsTo a owl:ObjectProperty ; rdfs:label "~에 대한 답변"@ko ;
 ag:addressedTo a owl:ObjectProperty ; rdfs:label "질의 대상 기관"@ko ;
     rdfs:domain ag:Question ; rdfs:range ag:Organization .
 ag:mentionsOrganization a owl:ObjectProperty ; rdfs:label "언급 기관"@ko ;
-    rdfs:domain ag:Utterance ; rdfs:range ag:Organization .
+    rdfs:comment "발언이나 안건 문구가 언급한 기관."@ko ;
+    rdfs:domain [ a owl:Class ; owl:unionOf ( ag:Utterance ag:AgendaItem ) ] ; rdfs:range ag:Organization .
 ag:concernsIssue a owl:ObjectProperty ; rdfs:label "관련 쟁점"@ko ;
+    rdfs:comment "발언·회의·지원사업 공고가 다룬 쟁점. 여러 종류의 개체가 쓰므로 정의역을 두지 않는다."@ko ;
     rdfs:range ag:Issue .
 ag:affiliatedWith a owl:ObjectProperty ; rdfs:label "소속 기관"@ko ;
     rdfs:domain ag:Person ; rdfs:range ag:Organization .
@@ -105,7 +103,6 @@ ag:pdfURL a owl:DatatypeProperty ; rdfs:label "회의록 PDF"@ko ; rdfs:range xs
 ag:minutesURL a owl:DatatypeProperty ; rdfs:label "회의록 보기"@ko ; rdfs:range xsd:anyURI .
 ag:vodURL a owl:DatatypeProperty ; rdfs:label "영상회의록"@ko ; rdfs:range xsd:anyURI .
 ag:keyword a owl:DatatypeProperty ; rdfs:label "쟁점 키워드"@ko .
-ag:mentionCount a owl:DatatypeProperty ; rdfs:label "언급 횟수"@ko ; rdfs:range xsd:integer .
 ag:receptionStart a owl:DatatypeProperty ; rdfs:label "접수 시작일"@ko ; rdfs:range xsd:date .
 ag:receptionEnd a owl:DatatypeProperty ; rdfs:label "접수 마감일"@ko ; rdfs:range xsd:date .
 ag:announcementURL a owl:DatatypeProperty ; rdfs:label "공고 보기"@ko ; rdfs:range xsd:anyURI .
@@ -152,6 +149,7 @@ ag:deliberatedIn a owl:ObjectProperty ; rdfs:label "심사한 회의(추론)"@ko
 
 # 이행 추적
 ag:followUpStatus a owl:ObjectProperty, owl:FunctionalProperty ; rdfs:label "이행 판정"@ko ;
+    rdfs:comment "약속마다 꼭 하나. 대상이 드러나지 않아 추적하지 않은 약속은 '추적 불가'."@ko ;
     rdfs:domain ag:Commitment ; rdfs:range ag:FollowUpStatus .
 ag:actionType a owl:ObjectProperty ; rdfs:label "조치 유형"@ko ;
     rdfs:domain ag:Commitment ; rdfs:range ag:ActionType .
@@ -200,3 +198,15 @@ ag:evidenceSource a owl:DatatypeProperty ; rdfs:label "근거 출처"@ko .
 ag:ruleKind a owl:DatatypeProperty ; rdfs:label "규칙 종류"@ko .
 ag:ruleQuery a owl:DatatypeProperty ; rdfs:label "규칙(SPARQL)"@ko .
 ag:inferredCount a owl:DatatypeProperty ; rdfs:label "추론한 사실 수"@ko ; rdfs:range xsd:integer .
+
+########## 서로 배타인 클래스(검증: agrisea/validate.py) ##########
+# 한 개체가 두 클래스에 함께 속하면 모순이다. 역할(정부 관계자·증인)은 같은 사람이 겸할 수 있어 배타로 두지 않는다.
+
+[] a owl:AllDisjointClasses ;
+    owl:members ( ag:Meeting ag:AgendaItem ag:Utterance ag:Person ag:Organization ag:Bill ag:Issue ag:SupportProgram ag:FollowUpEvidence ag:Session ag:Committee ) .
+[] a owl:AllDisjointClasses ; owl:members ( ag:AuditMeeting ag:PlenaryCommitteeMeeting ag:SubcommitteeMeeting ) .
+[] a owl:AllDisjointClasses ; owl:members ( ag:GovernmentBill ag:MemberBill ag:CommitteeAlternative ) .
+ag:Question owl:disjointWith ag:Answer .
+ag:Legislator owl:disjointWith ag:GovernmentOfficial , ag:Staff .
+ag:OpenCommitment owl:disjointWith ag:FulfilledCommitment .
+ag:FollowUpStatus owl:disjointWith ag:ActionType , ag:Issue .

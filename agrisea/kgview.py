@@ -45,6 +45,12 @@ def summary(kg) -> dict:
     pinf = dict(_rows(kg, f"SELECT ?p (COUNT(*) AS ?n) WHERE {{ GRAPH ?g {{ ?s ?p ?o }} FILTER({INF}) }} GROUP BY ?p"))
     dom = dict(_rows(kg, "SELECT ?p ?d WHERE { ?p rdfs:domain ?d . FILTER(isIRI(?d)) }"))
     rng = dict(_rows(kg, "SELECT ?p ?r WHERE { ?p rdfs:range ?r . FILTER(isIRI(?r)) }"))
+    def cls_name(c: str) -> str:
+        # owl:unionOf 로 정의한 정의역·치역은 구성 클래스를 '또는'으로 잇는다
+        if c.startswith(str(AG)):
+            return labels.get(c, _short(c))
+        ms = [m for (m,) in _rows(kg, f"SELECT ?m WHERE {{ <{c}> owl:unionOf/rdf:rest*/rdf:first ?m }}")]
+        return " 또는 ".join(labels.get(m, _short(m)) for m in ms) or _short(c)
     axioms: dict[str, list[str]] = {}
     for p, q in _rows(kg, "SELECT ?p ?q WHERE { ?p owl:inverseOf ?q }"):
         axioms.setdefault(p, []).append(f"역관계: {labels.get(q, _short(q))}")
@@ -53,12 +59,14 @@ def summary(kg) -> dict:
         axioms.setdefault(p, []).append(f"상위 관계: {labels.get(q, _short(q))}")
     for (p,) in _rows(kg, "SELECT ?p WHERE { ?p a owl:SymmetricProperty }"):
         axioms.setdefault(p, []).append("대칭")
+    for (p,) in _rows(kg, "SELECT ?p WHERE { ?p a owl:FunctionalProperty }"):
+        axioms.setdefault(p, []).append("값 하나(함수)")
     for (p,) in _rows(kg, "SELECT ?p WHERE { ?p owl:propertyChainAxiom ?l }"):
         axioms.setdefault(p, []).append("관계 연쇄")
     prop = [{"iri": p, "id": _short(p), "label": labels.get(p, _short(p)),
              "kind": "object" if t.endswith("ObjectProperty") else "data",
-             "domain": labels.get(dom.get(p, ""), _short(dom[p]) if p in dom else ""),
-             "range": labels.get(rng.get(p, ""), _short(rng[p]) if p in rng else ""),
+             "domain": cls_name(dom[p]) if p in dom else "",
+             "range": cls_name(rng[p]) if p in rng else "",
              "count": int(ptotal.get(p, 0)), "inferred": int(pinf.get(p, 0)), "axioms": sorted(set(axioms.get(p, [])))}
             for p, t in props]
     prop.sort(key=lambda x: (x["kind"], -x["count"]))

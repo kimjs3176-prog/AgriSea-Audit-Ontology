@@ -642,6 +642,16 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
             store.kv_set("ontology", value)
         return value
 
+    @app.get("/api/ontology/validation")
+    def ontology_validation():
+        """온톨로지 검증: 데이터가 스키마의 개념 정의(배타 클래스·정의역·치역·필수 관계 등)를 지키는지."""
+        from .. import validate
+        value = store.kv_get("ontology_validation")
+        if value is None:
+            value = kg_call(validate.validate)
+            store.kv_set("ontology_validation", value)
+        return value
+
     @app.get("/api/ontology/entity")
     def ontology_entity(iri: str = Query(..., min_length=8, max_length=300)):
         """개체 한 개: 유형(원 데이터·추론)과 나가는·들어오는 관계."""

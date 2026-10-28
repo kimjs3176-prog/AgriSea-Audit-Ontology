@@ -16,7 +16,7 @@ from .store import Store
 # 사전 계산 형식이 바뀌면 올린다(초기 데이터를 다시 만들게 함).
 # 2: 발언자 역할 재분류, 회기별 쟁점·개요 집계 / 3: 띄어쓰기 교정 / 4: 요약에서 의안 목록 제외 / 5: 위원별 분석
 # 6: 정부 약속 이행 추적 / 7: 운영 관문 정책(차단 대상어) 반영
-PRECOMPUTE_VERSION = 12  # 12: 온톨로지 v0.2(의안·이행 판정) + 추론기, 지식그래프 N-Quads
+PRECOMPUTE_VERSION = 13  # 13: 온톨로지 검증(배타 클래스·정의역 수정, 인물 식별 통합, 추적 불가 판정)
 
 
 def current_policy() -> dict:
@@ -111,11 +111,14 @@ def precompute(store: Store, kg_path: Path | None = None,
         store.kv_set(key, fn(store))
     out = {"spacing": spaced, "reclassified": fixed, "summaries": n, "views": list(CACHED_VIEWS)}
     if kg_path:
-        from . import kgview
+        from . import kgview, validate
         kg, counts = build_kg(store, text_limit=500)
         save_kg(kg, kg_path)
         summary = kgview.summary(kg)
         store.kv_set("ontology", summary)
+        report = validate.validate(kg)
+        store.kv_set("ontology_validation", report)
+        out["validation"] = report["counts"]
         out["triples"] = summary["triples"]
         out["inferred"] = summary["inferred"]
     progress(f"사전 계산: 발언자 재분류 {fixed}건, 회의 요약 {n}건, 집계 {len(CACHED_VIEWS)}종"
