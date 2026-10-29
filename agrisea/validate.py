@@ -18,6 +18,7 @@ from .reasoner import PREFIXES
 
 AG = "https://w3id.org/agrisea/ontology#"
 EXAMPLES = 3
+XSD_WORD = {"date": "날짜", "integer": "정수", "anyURI": "인터넷 주소", "boolean": "참·거짓", "string": "글자"}
 
 
 def _rows(kg, q: str) -> list[list]:
@@ -71,10 +72,10 @@ def check_schema(r: Report):
     used = {x for x, in _rows(kg, f"""SELECT DISTINCT ?x WHERE {{ {{ ?s ?x ?o }} UNION {{ ?s a ?x }}
         FILTER(STRSTARTS(STR(?x), '{AG}')) }}""")}
     undeclared = sorted(used - decl)
-    r.checks.append({"group": "스키마", "title": "스키마에 정의되지 않은 용어를 데이터가 씀", "level": "error",
+    r.checks.append({"group": "용어", "title": "정의되지 않은 용어를 데이터가 씀", "level": "error",
                      "severity": "error" if undeclared else "pass", "count": len(undeclared), "total": None, "desc": "",
                      "examples": [{"iri": x, "label": _short(x)} for x in undeclared[:EXAMPLES]]})
-    r.add("스키마", "이름(rdfs:label)이 없는 클래스·관계", "warn",
+    r.add("용어", "이름이 없는 분류·관계", "warn",
           _num(kg, f"""SELECT (COUNT(*) AS ?n) WHERE {{ ?x a ?t VALUES ?t {{ owl:Class owl:ObjectProperty owl:DatatypeProperty }}
               FILTER(STRSTARTS(STR(?x), '{AG}')) FILTER NOT EXISTS {{ ?x rdfs:label ?l }} }}"""),
           where=f"?x a owl:Class FILTER(STRSTARTS(STR(?x), '{AG}')) FILTER NOT EXISTS {{ ?x rdfs:label ?l }}")
@@ -95,13 +96,13 @@ def check_axioms(r: Report):
         if n:
             bad.append((a, b, n))
             total += n
-    r.add("공리", f"서로 배타인 클래스에 함께 속한 개체(배타 쌍 {len(pairs)}개 점검)", "error", total,
+    r.add("분류", f"함께 속할 수 없는 두 분류에 동시에 속한 항목({len(pairs)}쌍 점검)", "error", total,
           where=f"?x a <{bad[0][0]}>, <{bad[0][1]}>" if bad else None,
           desc=", ".join(f"{r.name(a)}∩{r.name(b)} {n}" for a, b, n in bad))
     # 함수 속성
     for p, in _rows(kg, "SELECT ?p WHERE { ?p a owl:FunctionalProperty }"):
         n = _num(kg, f"SELECT (COUNT(*) AS ?n) WHERE {{ SELECT ?x WHERE {{ ?x <{p}> ?o }} GROUP BY ?x HAVING(COUNT(DISTINCT ?o) > 1) }}")
-        r.add("공리", f"값이 하나여야 하는 관계 '{r.name(p)}'에 값이 여럿", "error", n,
+        r.add("분류", f"값이 하나여야 하는 관계 '{r.name(p)}'에 값이 여럿", "error", n,
               where=f"{{ SELECT ?x WHERE {{ ?x <{p}> ?o }} GROUP BY ?x HAVING(COUNT(DISTINCT ?o) > 1) }}")
     # 정의역·치역
     for p, d in _rows(kg, f"SELECT ?p ?d WHERE {{ ?p rdfs:domain ?d FILTER(STRSTARTS(STR(?p), '{AG}')) }}"):
@@ -110,7 +111,7 @@ def check_axioms(r: Report):
             continue
         where = f"?x <{p}> ?o FILTER NOT EXISTS {{ {_in_any('?x', cs)} }}"
         n = _num(kg, f"SELECT (COUNT(DISTINCT ?x) AS ?n) WHERE {{ {where} }}")
-        r.add("정의역·치역", f"'{r.name(p)}'의 주어가 {' 또는 '.join(map(r.name, cs))}이(가) 아님", "error", n,
+        r.add("관계 대상", f"'{r.name(p)}'의 주어가 {' 또는 '.join(map(r.name, cs))}이(가) 아님", "error", n,
               _num(kg, f"SELECT (COUNT(DISTINCT ?x) AS ?n) WHERE {{ ?x <{p}> ?o }}"), where)
     for p, rg in _rows(kg, f"SELECT ?p ?r WHERE {{ ?p a owl:ObjectProperty ; rdfs:range ?r FILTER(STRSTARTS(STR(?p), '{AG}')) }}"):
         cs = _classes_of(kg, rg)
@@ -118,12 +119,13 @@ def check_axioms(r: Report):
             continue
         where = f"?s <{p}> ?x FILTER NOT EXISTS {{ {_in_any('?x', cs)} }}"
         n = _num(kg, f"SELECT (COUNT(DISTINCT ?x) AS ?n) WHERE {{ {where} }}")
-        r.add("정의역·치역", f"'{r.name(p)}'의 대상이 {' 또는 '.join(map(r.name, cs))}이(가) 아님", "error", n,
+        r.add("관계 대상", f"'{r.name(p)}'의 대상이 {' 또는 '.join(map(r.name, cs))}이(가) 아님", "error", n,
               _num(kg, f"SELECT (COUNT(DISTINCT ?x) AS ?n) WHERE {{ ?s <{p}> ?x }}"), where)
     for p, dt in _rows(kg, f"SELECT ?p ?r WHERE {{ ?p a owl:DatatypeProperty ; rdfs:range ?r FILTER(STRSTARTS(STR(?p), '{AG}')) }}"):
         where = f"?x <{p}> ?o FILTER(!isLiteral(?o) || DATATYPE(?o) != <{dt}>)"
         n = _num(kg, f"SELECT (COUNT(*) AS ?n) WHERE {{ {where} }}")
-        r.add("정의역·치역", f"'{r.name(p)}' 값의 자료형이 {_short(dt).replace('http://www.w3.org/2001/XMLSchema#', 'xsd:')}이(가) 아님",
+        kind = XSD_WORD.get(dt.rsplit("#", 1)[-1], dt.rsplit("#", 1)[-1])
+        r.add("관계 대상", f"'{r.name(p)}' 값이 {kind} 형식이 아님",
               "error", n, None, where)
 
 
@@ -174,26 +176,26 @@ def check_semantic(r: Report):
 
 def check_skos(r: Report):
     kg = r.kg
-    r.add("개념체계", "상위 개념이 돌고 돎(broader 순환)", "error",
+    r.add("분류체계", "상위 분류가 돌고 돎", "error",
           _num(kg, "SELECT (COUNT(*) AS ?n) WHERE { ?x skos:broader+ ?x }"), None, "?x skos:broader+ ?x")
-    r.add("개념체계", "한 개념에 같은 언어 대표 이름이 둘 이상", "error",
+    r.add("분류체계", "한 분류에 대표 이름이 둘 이상", "error",
           _num(kg, "SELECT (COUNT(DISTINCT ?x) AS ?n) WHERE { ?x skos:prefLabel ?a, ?b FILTER(?a != ?b && LANG(?a) = LANG(?b)) }"),
           None, "?x skos:prefLabel ?a, ?b FILTER(?a != ?b && LANG(?a) = LANG(?b))")
-    r.add("개념체계", "같은 체계 안에서 대표 이름이 겹침", "error",
+    r.add("분류체계", "같은 체계 안에서 대표 이름이 겹침", "error",
           _num(kg, """SELECT (COUNT(*) AS ?n) WHERE { SELECT ?s ?l WHERE { ?c skos:prefLabel ?l ; skos:inScheme ?s }
                       GROUP BY ?s ?l HAVING(COUNT(?c) > 1) }"""))
     where = "?x skos:inScheme ?s FILTER NOT EXISTS { ?x skos:topConceptOf ?s } FILTER NOT EXISTS { ?s skos:hasTopConcept ?x } FILTER NOT EXISTS { ?x skos:broader ?b }"
-    r.add("개념체계", "최상위 개념인데 체계의 최상위로 선언되지 않음", "warn",
+    r.add("분류체계", "맨 위 분류인데 체계의 맨 위로 등록되지 않음", "warn",
           _num(kg, f"SELECT (COUNT(DISTINCT ?x) AS ?n) WHERE {{ {where} }}"), None, where)
 
 
 def check_identity(r: Report):
     kg = r.kg
     where = """?x a ag:Person ; rdfs:label ?l . ?y a ag:Person ; rdfs:label ?l FILTER(?x != ?y)"""
-    r.add("개체 식별", "같은 이름인데 서로 다른 인물 개체(국회의원과 정부 관계자 동명이인 또는 같은 사람)", "info",
+    r.add("동일 항목", "같은 이름인데 서로 다른 인물(국회의원과 정부 관계자 동명이인 또는 같은 사람)", "info",
           _num(kg, f"SELECT (COUNT(DISTINCT ?x) AS ?n) WHERE {{ {where} }}"), None, where)
     where = "?x rdfs:label ?a, ?b FILTER(?a != ?b && LANG(?a) = LANG(?b)) FILTER NOT EXISTS { ?x a owl:Class }"
-    r.add("개체 식별", "한 개체에 이름이 둘 이상", "warn",
+    r.add("동일 항목", "한 항목에 이름이 둘 이상", "warn",
           _num(kg, f"SELECT (COUNT(DISTINCT ?x) AS ?n) WHERE {{ {where} }}"), None, where)
 
 

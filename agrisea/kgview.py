@@ -112,15 +112,15 @@ def _types(kg, iri: str) -> list[dict]:
 def describe(kg, iri: str, per_prop: int = 12) -> dict:
     """개체 한 개: 이름, 유형(원 데이터·추론), 나가는 관계와 들어오는 관계(관계별 개수와 일부)."""
     if not iri or any(c in iri for c in '<>"{}| \\^`'):
-        raise ValueError("잘못된 개체 주소")
+        raise ValueError("잘못된 항목 주소")
     plabels = dict(_rows(kg, "SELECT ?p ?l WHERE { ?p rdfs:label ?l . ?p a ?t . VALUES ?t { owl:ObjectProperty owl:DatatypeProperty rdf:Property } }"))
     plabels.update({"http://www.w3.org/2000/01/rdf-schema#label": "이름",
                     "http://www.w3.org/2004/02/skos/core#prefLabel": "대표 이름",
                     "http://www.w3.org/2004/02/skos/core#altLabel": "다른 이름",
-                    "http://www.w3.org/2004/02/skos/core#broader": "상위 개념",
-                    "http://www.w3.org/2004/02/skos/core#narrower": "하위 개념",
-                    "http://www.w3.org/2004/02/skos/core#broaderTransitive": "상위 개념(전이, 추론)",
-                    "http://www.w3.org/2004/02/skos/core#inScheme": "개념체계",
+                    "http://www.w3.org/2004/02/skos/core#broader": "상위 분류",
+                    "http://www.w3.org/2004/02/skos/core#narrower": "하위 분류",
+                    "http://www.w3.org/2004/02/skos/core#broaderTransitive": "상위 분류(모두)",
+                    "http://www.w3.org/2004/02/skos/core#inScheme": "분류체계",
                     "http://www.w3.org/2004/02/skos/core#definition": "정의",
                     "http://purl.org/dc/terms/identifier": "식별자",
                     "http://www.w3.org/2000/01/rdf-schema#comment": "설명"})
@@ -169,7 +169,7 @@ def search(kg, q: str, limit: int = 40) -> list[dict]:
 def instances(kg, cls: str, limit: int = 80) -> dict:
     """클래스의 개체 목록(이름순 일부)과 전체 수. 추론으로 그 클래스가 된 개체도 포함."""
     if not cls.startswith(AG) or any(c in cls for c in '<>"{}| \\^`'):
-        raise ValueError("잘못된 클래스")
+        raise ValueError("잘못된 분류")
     total = int(_rows(kg, f"SELECT (COUNT(DISTINCT ?X) AS ?n) WHERE {{ ?X a <{cls}> }}")[0][0])
     rows = _rows(kg, f"""SELECT ?X ?LBL (SAMPLE(?g) AS ?gg) WHERE {{ ?X a <{cls}> {LABEL}
                          OPTIONAL {{ GRAPH ?g {{ ?X a <{cls}> }} FILTER({INF}) }} }}

@@ -22,7 +22,7 @@ def test_detects_disjoint_and_domain_violations(store):
     org = next(iter(kg.quads_for_pattern(None, ox.NamedNode(AG + "affiliatedWith"), None))).object
     kg.add(ox.Quad(org, ox.NamedNode("http://www.w3.org/1999/02/22-rdf-syntax-ns#type"), ox.NamedNode(AG + "Person")))
     bad = {c["title"] for c in validate.errors(validate.validate(kg))}
-    assert any("서로 배타" in t for t in bad)
+    assert any("함께 속할 수 없는" in t for t in bad)
 
 
 def test_detects_functional_violation(store):
