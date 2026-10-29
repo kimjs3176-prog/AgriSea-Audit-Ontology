@@ -36,7 +36,7 @@ ag:Commitment a owl:Class ; rdfs:subClassOf ag:Answer ;
     rdfs:label "이행약속 답변"@ko ;
     rdfs:comment "'검토하겠습니다', '개선하겠습니다' 등 후속조치를 약속한 답변. 국정감사 결과보고서·시정처리 요구의 추적 대상."@ko .
 ag:DataRequest a owl:Class ; rdfs:subClassOf ag:Utterance ; rdfs:label "자료요구"@ko ;
-    rdfs:comment "자료를 요구한 발언. 질의 중에 자료를 요구하는 경우가 많아 질의(ag:Question)와 겹칠 수 있다(서로 배타 아님)."@ko .
+    rdfs:comment "자료를 요구한 발언. 질의 중에 자료를 요구하는 경우가 많아 질의와 겹칠 수 있다."@ko .
 
 ag:Person a owl:Class ; rdfs:subClassOf foaf:Person ; rdfs:label "인물"@ko .
 ag:Legislator a owl:Class ; rdfs:subClassOf ag:Person ; rdfs:label "국회의원"@ko .
@@ -77,7 +77,7 @@ ag:mentionsOrganization a owl:ObjectProperty ; rdfs:label "언급 기관"@ko ;
     rdfs:comment "발언이나 안건 문구가 언급한 기관."@ko ;
     rdfs:domain [ a owl:Class ; owl:unionOf ( ag:Utterance ag:AgendaItem ) ] ; rdfs:range ag:Organization .
 ag:concernsIssue a owl:ObjectProperty ; rdfs:label "관련 쟁점"@ko ;
-    rdfs:comment "발언·회의·지원사업 공고가 다룬 쟁점. 여러 종류의 개체가 쓰므로 정의역을 두지 않는다."@ko ;
+    rdfs:comment "발언·회의·지원사업 공고가 다룬 쟁점. 여러 종류의 항목이 쓰므로 출발 항목을 정하지 않는다."@ko ;
     rdfs:range ag:Issue .
 ag:affiliatedWith a owl:ObjectProperty ; rdfs:label "소속 기관"@ko ;
     rdfs:domain ag:Person ; rdfs:range ag:Organization .
@@ -113,7 +113,7 @@ ag:isSampleData a owl:DatatypeProperty ; rdfs:label "예시(가상) 데이터 �
 # 아래 '추론' 표시 관계는 데이터에 직접 넣지 않고 추론기(agrisea/reasoner.py)가 공리·규칙으로 도출한다.
 
 ag:Bill a owl:Class ; rdfs:label "의안"@ko ;
-    rdfs:comment "안건에 오른 법률안 등. 의안번호(ag:billNumber)로 식별한다. 같은 의안이 소위원회와 전체회의에 거듭 올라오면 하나의 개체로 이어진다."@ko .
+    rdfs:comment "안건에 오른 법률안 등. 의안번호로 구별한다. 같은 의안이 소위원회와 전체회의에 거듭 올라오면 하나로 이어진다."@ko .
 ag:GovernmentBill a owl:Class ; rdfs:subClassOf ag:Bill ; rdfs:label "정부 제출 의안"@ko .
 ag:MemberBill a owl:Class ; rdfs:subClassOf ag:Bill ; rdfs:label "의원 발의 의안"@ko .
 ag:CommitteeAlternative a owl:Class ; rdfs:subClassOf ag:Bill ; rdfs:label "위원회 대안"@ko .
@@ -126,7 +126,7 @@ ag:FollowUpStatusScheme a skos:ConceptScheme ; rdfs:label "약속 이행 판정 
 ag:ActionTypeScheme a skos:ConceptScheme ; rdfs:label "약속 조치 유형 체계"@ko .
 
 ag:OpenCommitment a owl:Class ; rdfs:subClassOf ag:Commitment ; rdfs:label "국감 확인 대상 약속"@ko ;
-    rdfs:comment "이행 판정이 '재지적' 또는 '근거 미확인'인 약속(추론)."@ko ;
+    rdfs:comment "이행 판정이 '재지적' 또는 '근거 미확인'인 약속(규칙으로 판정)."@ko ;
     owl:equivalentClass [ a owl:Class ; owl:intersectionOf ( ag:Commitment
         [ a owl:Restriction ; owl:onProperty ag:followUpStatus ;
           owl:someValuesFrom [ a owl:Class ; owl:oneOf ( <https://w3id.org/agrisea/id/status/reraised> <https://w3id.org/agrisea/id/status/none> ) ] ] ) ] .
@@ -134,7 +134,7 @@ ag:FulfilledCommitment a owl:Class ; rdfs:subClassOf ag:Commitment ; rdfs:label 
     owl:equivalentClass [ a owl:Restriction ; owl:onProperty ag:followUpStatus ;
                           owl:hasValue <https://w3id.org/agrisea/id/status/done> ] .
 
-ag:InferenceRule a owl:Class ; rdfs:label "추론 규칙"@ko .
+ag:InferenceRule a owl:Class ; rdfs:label "연결 규칙"@ko .
 
 # 의안
 ag:aboutBill a owl:ObjectProperty ; rdfs:label "다룬 의안"@ko ;
@@ -142,10 +142,10 @@ ag:aboutBill a owl:ObjectProperty ; rdfs:label "다룬 의안"@ko ;
 ag:proposedBy a owl:ObjectProperty ; rdfs:label "대표발의 의원"@ko ;
     rdfs:domain ag:Bill ; rdfs:range ag:Legislator ; owl:inverseOf ag:proposed .
 ag:proposed a owl:ObjectProperty ; rdfs:label "대표발의한 의안"@ko .
-ag:deliberated a owl:ObjectProperty ; rdfs:label "심사한 의안(추론)"@ko ;
+ag:deliberated a owl:ObjectProperty ; rdfs:label "심사한 의안"@ko ;
     rdfs:domain ag:Meeting ; rdfs:range ag:Bill ;
     owl:propertyChainAxiom ( ag:hasAgendaItem ag:aboutBill ) ; owl:inverseOf ag:deliberatedIn .
-ag:deliberatedIn a owl:ObjectProperty ; rdfs:label "심사한 회의(추론)"@ko .
+ag:deliberatedIn a owl:ObjectProperty ; rdfs:label "심사한 회의"@ko .
 
 # 이행 추적
 ag:followUpStatus a owl:ObjectProperty, owl:FunctionalProperty ; rdfs:label "이행 판정"@ko ;
@@ -171,24 +171,24 @@ ag:committedBy owl:inverseOf ag:madeCommitment .
 ag:madeCommitment a owl:ObjectProperty ; rdfs:label "한 약속"@ko .
 ag:addressedTo rdfs:subPropertyOf ag:mentionsOrganization .
 ag:concernsIssue rdfs:subPropertyOf ag:concernsTopic .
-ag:concernsTopic a owl:ObjectProperty ; rdfs:label "다룬 주제(상위 쟁점 포함, 추론)"@ko ; rdfs:range ag:Issue .
+ag:concernsTopic a owl:ObjectProperty ; rdfs:label "다룬 주제(상위 쟁점 포함)"@ko ; rdfs:range ag:Issue .
 
 # 추론 관계(도메인 규칙)
-ag:questionedOn a owl:ObjectProperty ; rdfs:label "질의한 쟁점(추론)"@ko ;
+ag:questionedOn a owl:ObjectProperty ; rdfs:label "질의한 쟁점"@ko ;
     rdfs:domain ag:Legislator ; rdfs:range ag:Issue ; owl:inverseOf ag:questionedBy .
-ag:questionedBy a owl:ObjectProperty ; rdfs:label "질의한 의원(추론)"@ko .
-ag:questionedAgency a owl:ObjectProperty ; rdfs:label "질의한 기관(추론)"@ko ;
+ag:questionedBy a owl:ObjectProperty ; rdfs:label "질의한 의원"@ko .
+ag:questionedAgency a owl:ObjectProperty ; rdfs:label "질의한 기관"@ko ;
     rdfs:domain ag:Legislator ; rdfs:range ag:Organization ; owl:inverseOf ag:questionedByMember .
-ag:questionedByMember a owl:ObjectProperty ; rdfs:label "질의한 의원(추론)"@ko .
-ag:respondedOn a owl:ObjectProperty ; rdfs:label "답변한 쟁점(추론)"@ko ;
+ag:questionedByMember a owl:ObjectProperty ; rdfs:label "질의한 의원"@ko .
+ag:respondedOn a owl:ObjectProperty ; rdfs:label "답변한 쟁점"@ko ;
     rdfs:domain ag:Organization ; rdfs:range ag:Issue ; owl:inverseOf ag:respondedBy .
-ag:respondedBy a owl:ObjectProperty ; rdfs:label "답변한 기관(추론)"@ko .
-ag:pledgedOn a owl:ObjectProperty ; rdfs:label "약속한 쟁점(추론)"@ko ;
+ag:respondedBy a owl:ObjectProperty ; rdfs:label "답변한 기관"@ko .
+ag:pledgedOn a owl:ObjectProperty ; rdfs:label "약속한 쟁점"@ko ;
     rdfs:domain ag:Organization ; rdfs:range ag:Issue ; owl:inverseOf ag:pledgedBy .
-ag:pledgedBy a owl:ObjectProperty ; rdfs:label "약속한 기관(추론)"@ko .
-ag:relatedIssue a owl:ObjectProperty, owl:SymmetricProperty ; rdfs:label "함께 논의된 쟁점(추론)"@ko ;
+ag:pledgedBy a owl:ObjectProperty ; rdfs:label "약속한 기관"@ko .
+ag:relatedIssue a owl:ObjectProperty, owl:SymmetricProperty ; rdfs:label "함께 논의된 쟁점"@ko ;
     rdfs:domain ag:Issue ; rdfs:range ag:Issue .
-ag:hasSupportProgram a owl:ObjectProperty ; rdfs:label "관련 지원사업(추론)"@ko ;
+ag:hasSupportProgram a owl:ObjectProperty ; rdfs:label "관련 지원사업"@ko ;
     rdfs:domain ag:Issue ; rdfs:range ag:SupportProgram .
 
 ag:billNumber a owl:DatatypeProperty ; rdfs:label "의안번호"@ko ; rdfs:subPropertyOf dct:identifier .
@@ -197,7 +197,7 @@ ag:evidenceKind a owl:DatatypeProperty ; rdfs:label "근거 종류"@ko .
 ag:evidenceSource a owl:DatatypeProperty ; rdfs:label "근거 출처"@ko .
 ag:ruleKind a owl:DatatypeProperty ; rdfs:label "규칙 종류"@ko .
 ag:ruleQuery a owl:DatatypeProperty ; rdfs:label "규칙(SPARQL)"@ko .
-ag:inferredCount a owl:DatatypeProperty ; rdfs:label "추론한 사실 수"@ko ; rdfs:range xsd:integer .
+ag:inferredCount a owl:DatatypeProperty ; rdfs:label "이어 낸 연결 수"@ko ; rdfs:range xsd:integer .
 
 ########## 서로 배타인 클래스(검증: agrisea/validate.py) ##########
 # 한 개체가 두 클래스에 함께 속하면 모순이다. 역할(정부 관계자·증인)은 같은 사람이 겸할 수 있어 배타로 두지 않는다.
