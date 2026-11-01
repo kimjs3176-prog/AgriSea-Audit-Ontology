@@ -667,6 +667,35 @@ button.link:hover{text-decoration:underline;text-underline-offset:.2em}
 .vchip.error{background:var(--color-error-soft);color:var(--color-error);border-color:transparent}
 .vchip.warn{background:var(--warn-weak);color:var(--warn);border-color:transparent}
 .vchip.info{color:var(--ink-2)}
+/* 데이터 현황 */
+.dstat .mini{grid-template-columns:repeat(5,1fr)}
+@media (max-width:860px){.dstat .mini{grid-template-columns:repeat(3,1fr)}.dstat .mini div:nth-child(4){border-left:0;padding-left:0}}
+@media (max-width:640px){.dstat .mini{grid-template-columns:repeat(2,1fr)}.dstat .mini div:nth-child(3),.dstat .mini div:nth-child(5){border-left:0;padding-left:0}.dstat .mini div:nth-child(4){border-left:1px solid var(--color-rule);padding-left:16px}}
+.dstat .mini small{display:block;font-size:11px;color:var(--muted)}
+.mstrip{display:grid;grid-template-columns:repeat(var(--n),minmax(0,1fr));gap:2px;align-items:end;height:84px;border-bottom:1px solid var(--line)}
+.mstrip .m{display:flex;flex-direction:column-reverse;height:100%;cursor:default}
+.mstrip .m i{display:block;background:var(--seq)}
+.mstrip .m i.sc{background:color-mix(in oklab,var(--seq) 45%,var(--panel))}
+.mstrip .m.zero{border:1px dashed var(--line);border-bottom:0;height:22px;align-self:end}
+.mstrip .m.zero.gap{border-color:var(--warn)}
+.mstrip .m.now{border-style:dotted}
+.mstripx{display:grid;grid-template-columns:repeat(var(--n),minmax(0,1fr));gap:2px;font-size:10.5px;color:var(--muted);margin-top:4px;font-variant-numeric:tabular-nums}
+.mstripx span{white-space:nowrap;overflow:visible}
+.mlegend{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:12px;color:var(--muted);margin-top:8px}
+.mlegend i{display:inline-block;width:10px;height:10px;margin-right:4px;vertical-align:-1px;background:var(--seq)}
+.mlegend i.sc{background:color-mix(in oklab,var(--seq) 45%,var(--panel))}
+.mlegend i.gap{background:none;border:1px dashed var(--warn)}
+.gaps{list-style:none;margin:0;padding:0}
+.gaps li{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 12px;padding:8px 0;border-top:1px solid var(--line);font-size:14px}
+.gaps li:first-child{border-top:0}
+.gaps li .d{grid-column:2;color:var(--muted);font-size:12.5px;line-height:1.55}
+.qbars .q{display:grid;grid-template-columns:minmax(0,1fr) 120px 150px;gap:4px 12px;align-items:center;padding:4px 0;font-size:13px}
+.qbars .q .bar{height:8px;background:var(--seq-weak);border-radius:4px;overflow:hidden}
+.qbars .q .bar span{display:block;height:100%;background:var(--warn)}
+.qbars .q .n{font-variant-numeric:tabular-nums;color:var(--ink-2);white-space:nowrap;text-align:right}
+@media (max-width:640px){.qbars .q{grid-template-columns:minmax(0,1fr) auto;padding:6px 0}.qbars .q>span:first-child{grid-column:1 / -1}}
+.dstat .cols2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px 32px}
+@media (max-width:860px){.dstat .cols2{grid-template-columns:minmax(0,1fr)}}
 #oProps td:nth-child(-n+2),#oProps th{white-space:nowrap}
 .ohits{max-height:60vh;overflow:auto;margin-top:8px}
 .otree .ot-row{display:flex;gap:8px;align-items:baseline;padding:4px 0 4px calc(var(--d) * 16px + 2px);border-bottom:1px solid var(--line);cursor:pointer;font-size:14px}
@@ -764,6 +793,11 @@ code{font-family:var(--font-mono);font-size:12px}
     </div>
     <aside class="netside" id="netSide"><div class="muted" style="font-size:13px">연결을 불러오는 중…</div></aside>
     </div>
+  </div>
+  <div class="card dstat" id="dataStatus">
+    <div class="cardhead"><h2>데이터 현황</h2><button class="link" onclick="gotoCheck()">개념 검증 전체 보기</button></div>
+    <p class="sub">어떤 회의록이 얼마나 들어 있는지, 얼마나 최신인지, 무엇이 빠졌는지 한눈에 봅니다. 분석 결과를 읽기 전에 범위를 확인하세요.</p>
+    <div id="dsBody"><div class="empty">불러오는 중…</div></div>
   </div>
   <div class="card">
     <details>
@@ -974,7 +1008,7 @@ $("#session").onchange = () => {
 };
 
 // ── 탭 ──
-// ── 주소(해시)로 화면 공유: #/meetings/회의ID, #/issues/쟁점ID, #/brief ──
+// ── 주소(해시)로 화면 공유: #/meetings/회의ID, #/issues/쟁점ID, #/brief, #/data(데이터 현황) ──
 function setHash(h){ try{ history.replaceState(null, "", "#/" + h) }catch(e){} }
 // 좁은 화면에서는 목록 아래에 상세가 있으므로, 고르면 상세로 내려가 보여 준다
 function toDetail(sel){ if(matchMedia("(max-width:860px)").matches) $(sel)?.scrollIntoView({block: "start", behavior: "smooth"}) }
@@ -987,6 +1021,7 @@ function routeFromHash(){
   if(tab === "followups" && id){ openTab("followups", false); fuState.sel = +id; loadFollowups().then(() => toDetail("#fuDetail")); return true }
   if(tab === "ontology" && id){ gotoKg(id); return true }
   if(tab === "sparql"){ gotoSparql(); return true }
+  if(tab === "data"){ gotoDataStatus(); return true }
   if(["meetings", "issues", "members", "followups", "brief", "ontology"].includes(tab)){ openTab(tab); return true }
   return false;
 }
@@ -1022,7 +1057,9 @@ async function loadDash(){
   try{ s = await api("/api/stats") }
   catch(e){ $("#noticeArea").innerHTML = `<div class="notice">서버 응답 오류: ${esc(e.message)} — <a href="/api/health" target="_blank">/api/health</a></div>`; return }
   const kst = iso => { const d = new Date(iso); return isNaN(d) ? iso : new Date(d.getTime() + 9 * 3600e3).toISOString().slice(0, 16).replace("T", " ") };
-  const upd = s.data_updated ? `데이터 갱신 ${esc(kst(s.data_updated))} (한국시간)<span class="sep"></span>자동 수집 하루 3회` : "자동 수집 데이터 없음";
+  const upd = (s.date_max ? `최신 회의 ${dot(s.date_max)}<span class="sep"></span>` : "")
+    + (s.data_updated ? `데이터 반영 ${esc(kst(s.data_updated))} (한국시간)<span class="sep"></span>자동 확인 하루 3회` : "자동 수집 데이터 없음")
+    + `<span class="sep"></span><button class="link" onclick="gotoDataStatus()">데이터 현황 보기</button><span id="dsFlag"></span>`;
   $("#noticeArea").innerHTML = s.samples ? `<div class="notice">가상 예시 회의록 ${s.samples}건이 포함되어 있습니다.</div>` : "";
   $("#sampleBtn").hidden = s.meetings - s.samples > 0;  // 실제 회의록이 있으면 예시 데이터를 섞지 않는다
   const latest = SESSIONS[0];
@@ -1037,8 +1074,9 @@ async function loadDash(){
       ["발언", s.utterances, "위원·정부·기관 발언"],
       ["위원 질의", s.questions, "질문 형태의 위원 발언"],
       ["정부 약속", s.commitments, "검토·개선하겠다는 답변"],
-    ].map(([l, v, sub]) => `<div><b>${fmt(v)}</b><span>${l}</span><small>${sub}</small></div>`).join("")}</div>` };
+    ].map(([l, v, sub]) => `<div><b>${fmt(v)}</b><span>${l}</span><small>${sub}</small></div>`).join("")}</div>`; paintDsFlag() };
   renderHero(null, 0);
+  loadDataStatus();
 
   let issues, trend, ov;
   try{ [issues, trend, ov] = await Promise.all([api("/api/issues"), api("/api/issue-trend"), api("/api/overview")]) }
@@ -1065,6 +1103,7 @@ async function loadDash(){
       <td class="num c-utt">${m.n_utterances == null ? "-" : fmt(m.n_utterances)}</td><td class="num c-q">${m.n_questions == null ? "-" : fmt(m.n_questions)}</td>
       <td class="num ${m.n_commitments ? "hot" : ""}">${m.n_commitments == null ? "-" : fmt(m.n_commitments)}</td></tr>`).join("")}</tbody></table>`
     : '<div class="empty">아직 수집한 회의가 없습니다. 아래 데이터 직접 수집에서 가져올 수 있습니다.</div>';
+  scrollToDataStatus();
 
   const cols = trend.sessions.slice(-14);   // 최근 14개 회기(전체 추이는 쟁점 분석에서)
   const recentSum = r => cols.reduce((a, c) => a + (r.by_session[c] || 0), 0);
@@ -1089,6 +1128,73 @@ async function loadDash(){
       <div class="t">${esc(cut(c.text, 90))}</div>
       ${c.question ? `<div class="q">${esc(c.question.member)} 위원 질의: ${esc(c.question.text)}</div>` : ""}</div>`).join("") || '<div class="empty">데이터 없음</div>';
 }
+// ── 데이터 현황: 수록 범위·월별 회의·최신성·빠진 데이터·개념 검증 ──
+let dsData = null;
+async function loadDataStatus(){
+  let d;
+  try{ d = dsData = await api("/api/data-status") }
+  catch(e){ $("#dsBody").innerHTML = `<div class="empty err">데이터 현황을 불러오지 못했습니다: ${esc(e.message)}</div>`; return }
+  const r = d.range, f = d.freshness, word = {error: "오류", warn: "주의", info: "참고"}, qword = {...word, warn: "경고"};
+  paintDsFlag();
+  const ago = f.days_since == null ? "" : f.days_since === 0 ? "오늘" : `${fmt(f.days_since)}일 전`;
+  const kpis = [
+    ["수록 기간", `${dot(r.date_min).slice(2)}~${dot(r.date_max).slice(2)}`, `회기 ${fmt(r.sessions)}개`],
+    ["회의", fmt(r.meetings), `전체회의 ${fmt(r.plenary)} · 소위 ${fmt(r.subcommittee)}`],
+    ["본문 처리", `${fmt(r.parsed)}/${fmt(r.meetings)}`, r.parsed === r.meetings ? "모든 회의 발언 분석" : `미처리 ${fmt(r.meetings - r.parsed)}건`],
+    ["최신 회의", ago || "-", `${dot(f.latest_meeting)} · 매일 ${f.schedule.join("·")} 확인`],
+    ["지원사업 공고", fmt(d.programs.total), `접수 중 ${fmt(d.programs.open)}건`],
+  ];
+  // 월별 수록 회의: 막대 = 전체회의(진한 색) + 소위원회(옅은 색), 점선 = 수록된 회의 없음
+  const ms = d.months, mmax = Math.max(1, ...ms.map(m => m.meetings)), last = (r.date_max || "").slice(0, 7);
+  const label = m => `${m.slice(0, 4)}년 ${+m.slice(5)}월`;
+  const strip = ms.length ? `<div class="mstrip" style="--n:${ms.length}" role="img" aria-label="월별 수록 회의 수">${ms.map(m => {
+      if(!m.meetings) return `<div class="m zero ${m.month < last ? "gap" : "now"}" data-tip="${label(m.month)}<br>${m.month < last ? "수록된 회의 없음" : "아직 수록된 회의 없음"}"></div>`;
+      const h = v => (v / mmax * 100).toFixed(1);
+      return `<div class="m" data-tip="${label(m.month)}<br>회의 <b>${fmt(m.meetings)}</b>건 (소위원회 ${fmt(m.subcommittee)}건)">
+        <i style="height:${h(m.meetings - m.subcommittee)}%"></i><i class="sc" style="height:${h(m.subcommittee)}%"></i></div>` }).join("")}</div>
+    <div class="mstripx" style="--n:${ms.length}">${ms.map((m, i) => `<span>${i === 0 || m.month.endsWith("-01") ? `’${m.month.slice(2, 4)}.${+m.month.slice(5)}` : ""}</span>`).join("")}</div>
+    <div class="mlegend"><span><i></i>전체회의</span><span><i class="sc"></i>소위원회</span><span><i class="gap"></i>수록된 회의 없는 달</span></div>` : '<div class="empty">수록된 회의가 없습니다.</div>';
+  const gaps = d.gaps.length ? `<ul class="gaps">${d.gaps.map(g => `<li><span class="vchip ${g.level}">${word[g.level]}</span><span>${esc(g.title)}</span><span class="d">${esc(g.detail)}</span></li>`).join("")}</ul>`
+    : '<div class="empty">알려진 공백이 없습니다.</div>';
+  const q = d.quality;
+  const qual = !q ? '<div class="empty">개념 검증 결과가 없습니다. 자동 수집 때 만들어집니다.</div>'
+    : `<p class="muted" style="font-size:13px;margin:0 0 8px">지식그래프 ${fmt(d.kg.triples)}개 사실(추론 ${fmt(d.kg.inferred)}개)을 ${fmt(Object.values(q.counts).reduce((a, b) => a + b, 0))}개 항목으로 점검했습니다.
+        오류 <b>${fmt(q.counts.error)}</b> · 경고 <b>${fmt(q.counts.warn)}</b> · 참고 <b>${fmt(q.counts.info)}</b> · 통과 <b>${fmt(q.counts.pass)}</b></p>
+      <div class="qbars">${q.issues.map(i => {
+        const pct = i.total ? i.count / i.total * 100 : null;
+        return `<div class="q"><span><span class="vchip ${i.severity}">${qword[i.severity] || i.severity}</span> ${esc(i.title)}</span>
+          <span class="bar">${pct == null ? "" : `<span style="width:${Math.max(1, pct).toFixed(1)}%"></span>`}</span>
+          <span class="n">${fmt(i.count)}${i.total ? ` / ${fmt(i.total)} (${pct < 0.1 ? "0.1% 미만" : pct.toFixed(1) + "%"})` : "건"}</span></div>` }).join("")}</div>`;
+  $("#dsBody").innerHTML = `<div class="mini">${kpis.map(([l, v, sub]) => `<div><b>${v}</b><span>${l}</span><small>${sub}</small></div>`).join("")}</div>
+    <h3>월별 수록 회의</h3>${strip}
+    <div class="cols2"><div><h3>빠진 데이터와 주의할 점</h3>${gaps}</div>
+      <div><h3>개념 검증에서 채워지지 않은 관계</h3>${qual}</div></div>`;
+  scrollToDataStatus();
+}
+// 대시보드 상단 「데이터 현황 보기」 옆에 주의할 공백 수를 표시(상단은 두 번 그려지므로 그릴 때마다 다시 붙인다)
+function paintDsFlag(){
+  const flag = $("#dsFlag"), n = (dsData?.gaps || []).filter(g => g.level === "warn").length;
+  if(flag) flag.innerHTML = n ? ` <span class="vchip warn">주의 ${n}건</span>` : "";
+}
+// 위쪽 카드(회의 원장·쟁점·관계 흐름)가 늦게 채워지면 카드가 밀려나므로, 현황과 회의 원장이 그려진 뒤 이동한다
+let dsScroll = false;
+function gotoDataStatus(){
+  const ready = !!dsData;   // 이미 다 그려졌으면(상단 링크를 누른 경우) 부드럽게, 처음 들어온 주소면 그려진 뒤 바로
+  openTab("dash"); setHash("data"); dsScroll = true; scrollToDataStatus(ready ? "smooth" : "auto");
+}
+function scrollToDataStatus(behavior = "auto"){
+  if(!dsScroll || !dsData || $("#recent .empty")?.textContent === "불러오는 중…") return;
+  dsScroll = false;
+  const go = b => {   // 상단 메뉴가 고정이면 가리지 않게 그 높이만큼 띄운다
+    const h = $("header"), fixed = h && getComputedStyle(h).position === "sticky" ? h.offsetHeight : 0;
+    const y = $("#dataStatus").getBoundingClientRect().top + scrollY - fixed - 12;
+    scrollTo({top: Math.max(0, y), behavior: b});
+  };
+  requestAnimationFrame(() => go(behavior));
+  // 처음 들어온 주소: 관계 흐름도가 늦게 그려져 자리가 밀리면 한 번 더 맞춘다
+  if(behavior === "auto") setTimeout(() => { if(location.hash === "#/data") go("auto") }, 900);
+}
+function gotoCheck(){ openTab("ontology", false); loadOntology(); segShow("oTabs", "check") }
 function gotoIssue(id){ openTab("issues"); return showIssue(id) }
 function gotoMeeting(id){ openTab("meetings"); return showMeeting(id) }
 // 회의록의 특정 발언으로: 전체 회의록 탭을 열고 그 발언까지 이동

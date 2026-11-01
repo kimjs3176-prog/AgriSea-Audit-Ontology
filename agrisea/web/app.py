@@ -103,6 +103,12 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
                 "storage": storage, "serverless": settings.serverless,
                 "data_updated": seed_meta().get("exported_at")}
 
+    @app.get("/api/data-status")
+    def data_status():
+        """데이터 현황: 수록 범위·월별 회의·최신성·빠진 데이터·개념 검증 결과."""
+        from ..coverage import data_status as build
+        return build(store, meta=seed_meta())
+
     @app.get("/api/meetings")
     def meetings(date_from: str = "", date_to: str = "", q: str = "", session: int | None = None):
         return store.meetings(date_from, date_to, q, session=session)
