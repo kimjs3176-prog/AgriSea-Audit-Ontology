@@ -210,8 +210,14 @@ def org_from_role(role: str) -> str | None:
     return None
 
 
+# 직무대리·직무대행·권한대행과 인사청문회 후보자는 본래 직위로 분류한다.
+# 예) '해양경찰청장 직무대행' → 정부 관계자, '위원장 직무대리' → 회의 진행자, '해양수산부장관 후보자' → 정부 관계자
+_ROLE_QUALIFIER = re.compile(r"\s*(?:(?:전담)?직무|권한)?(?:대리|대행)$|\s+후보자$")
+
+
 def classify_role(role: str) -> str:
+    core = _ROLE_QUALIFIER.sub("", role.strip())
     for pat, kind in ROLE_TYPES:
-        if pat.search(role):
+        if pat.search(core):
             return kind
     return "other"
