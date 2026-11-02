@@ -61,6 +61,16 @@ def test_role_classification_and_commitments():
     assert "livestock" in match_issues("축산 농가 방역 대책")
 
 
+def test_org_from_role_finds_added_agencies():
+    from agrisea.lexicon import org_from_role
+    assert org_from_role("한국해양수산연수원장") == "한국해양수산연수원"
+    assert org_from_role("한국해양교통안전공단이사장") == "한국해양교통안전공단"
+    assert org_from_role("해양수산과학기술진흥원장") == "해양수산과학기술진흥원"
+    assert org_from_role("가축위생방역지원본부장") == "가축위생방역지원본부"
+    assert org_from_role("한국수목원정원관리원이사장 직무대행") == "한국수목원정원관리원"
+    assert org_from_role("전국한우협회장") is None   # 업계 단체는 피감기관 사전에 넣지 않는다
+
+
 def test_reclassify_fixes_stored_rows(store):
     from agrisea.precompute import reclassify
     with store.tx() as c:
