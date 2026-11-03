@@ -154,3 +154,20 @@ def test_sample_data_never_mixes_into_real_minutes(tmp_path):
     before = c.get("/api/stats").json()
     r = c.post("/api/admin/sample")                              # 실제 회의록이 있으면 거부
     assert r.status_code == 409 and c.get("/api/stats").json() == before
+
+
+def test_refresh_workflow_recomputes_even_if_collection_fails_on_push():
+    """규칙 변경(push)으로 돈 자동 수집은 국회 API가 막혀도 사전 계산·커밋까지 이어 간다.
+
+    예전에는 수집 단계가 실패하면 실행이 멈춰, 병합한 분석 규칙이 다음 수집 성공 때까지 반영되지 않았다.
+    """
+    import re
+    from pathlib import Path
+    wf = (Path(__file__).resolve().parent.parent / ".github/workflows/refresh-data.yml").read_text(encoding="utf-8")
+    step = re.search(r"- name: 수집\n(.*?)\n      - name:", wf, re.S).group(1)
+    assert "id: collect" in step
+    assert "continue-on-error: ${{ github.event_name == 'push' }}" in step
+    # 사전 계산·커밋 단계는 수집 결과로 막지 않는다(별도 if 조건 없음)
+    for name in ("사전 계산(요약·집계·지식그래프) 및 초기 데이터 내보내기", "커밋"):
+        block = re.search(rf"- name: {re.escape(name)}\n(.*?)\n      - name:", wf, re.S).group(1)
+        assert "\n        if:" not in block, name
