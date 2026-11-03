@@ -70,3 +70,11 @@ def test_index_has_no_governance_display(store, settings):
     html = TestClient(create_app(settings, store)).get("/").text
     for marker in ('data-tab="gov"', "govFlow", "govChip", "govchip", "fugov", "/api/governance"):
         assert marker not in html, marker
+
+
+def test_index_has_no_ontology_wording(store, settings):
+    """화면 문구에는 '온톨로지' 대신 '지식그래프'를 쓴다. 공유 주소는 #/kg(예전 #/ontology 도 열림)."""
+    html = TestClient(create_app(settings, store)).get("/").text
+    assert "온톨로지" not in html
+    assert '<button data-tab="ontology">지식그래프</button>' in html
+    assert 'if(tab === "kg") tab = "ontology"' in html and 'setHash("kg/"' in html
