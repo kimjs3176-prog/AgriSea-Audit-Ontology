@@ -85,6 +85,10 @@ jobs:
           python -m agrisea stats
 
       - name: 수집
+        id: collect
+        # 분석 규칙이 바뀌어 실행된 경우(push)에는 국회 API가 막혀도 멈추지 않고, 저장된 데이터로
+        # 아래 사전 계산을 계속해 새 규칙을 반영한다(예약 실행은 그대로 실패로 알림)
+        continue-on-error: ${{ github.event_name == 'push' }}
         env:
           DATE_FROM: ${{ inputs.date_from }}
           DATE_TO: ${{ inputs.date_to }}
@@ -140,6 +144,9 @@ jobs:
         run: |
           {
             echo "### 회의록 데이터 갱신"
+            if [ "${{ steps.collect.outcome }}" = "failure" ]; then
+              echo "> 국회 API 수집은 실패해 저장된 데이터로 사전 계산만 다시 했습니다(다음 예약 실행에서 수집 재시도)."
+            fi
             python -m agrisea stats 2>/dev/null | sed 's/^/    /' || true
             if [ -f data/seed.meta.json ]; then echo; echo '```json'; cat data/seed.meta.json; echo '```'; fi
           } >> "$GITHUB_STEP_SUMMARY"
