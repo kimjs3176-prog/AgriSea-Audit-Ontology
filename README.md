@@ -75,4 +75,6 @@ pip install -r requirements-dev.txt
 python -m pytest -q
 ```
 
+PR과 main 코드 변경마다 GitHub Actions 「테스트」가 같은 명령을 실행합니다.
+
 요약·질의응답·약속 판별과 이행 판정은 규칙 기반이라 놓치거나 잘못 잡는 경우가 있습니다. 공식 문서에는 원문을 확인하세요.
