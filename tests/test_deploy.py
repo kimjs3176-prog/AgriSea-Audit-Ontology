@@ -171,3 +171,12 @@ def test_refresh_workflow_recomputes_even_if_collection_fails_on_push():
     for name in ("사전 계산(요약·집계·지식그래프) 및 초기 데이터 내보내기", "커밋"):
         block = re.search(rf"- name: {re.escape(name)}\n(.*?)\n      - name:", wf, re.S).group(1)
         assert "\n        if:" not in block, name
+
+
+def test_test_workflow_runs_pytest_on_pull_requests():
+    """PR마다 pytest 를 돌리는 검사가 있어야 자동 병합이 테스트 결과를 근거로 삼는다."""
+    from pathlib import Path
+    wf = (Path(__file__).resolve().parent.parent / ".github/workflows/test.yml").read_text(encoding="utf-8")
+    assert "pull_request:" in wf and "python -m pytest -q" in wf
+    assert "requirements-dev.txt" in wf
+    assert 'python-version: "3.12"' in wf   # .python-version 과 같은 버전

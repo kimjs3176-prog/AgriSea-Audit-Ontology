@@ -1,0 +1,37 @@
+# 테스트: PR과 main 코드 변경마다 pytest 를 돌린다.
+# 자동 병합(매일 기능 점검)은 이 검사가 통과해야 병합한다. 하루 3번 들어오는 자동 수집 데이터 커밋(data/)만
+# 바뀐 push 는 돌리지 않는다(코드가 같으므로).
+name: 테스트
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    paths:
+      - "agrisea/**"
+      - "api/**"
+      - "ontology/**"
+      - "tests/**"
+      - "requirements*.txt"
+      - ".github/workflows/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements-dev.txt
+      - run: python -m pytest -q
