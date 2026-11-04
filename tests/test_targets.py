@@ -51,3 +51,45 @@ def test_titled_target_rules():
     assert titled_target("청장님 생각은 어떠십니까?", title_orgs) == "해양경찰청"
     assert titled_target("위원장님, 1분만 더 주시겠어요?", title_orgs) is None   # '위원장'의 '원장'은 직함이 아님
     assert titled_target("장관님과 차관님 모두 답해 주세요.", title_orgs) is None  # 기관이 둘이면 정하지 않음
+
+
+def test_question_kind_rules():
+    from agrisea.ontology import question_kind
+    assert question_kind("어떤 부분을 고쳐야 한다는 말씀이세요?", ["reference"]) == "expert"
+    assert question_kind("3호에는 지역이 없지 않습니까?", ["staff", "chair"]) == "procedural"
+    assert question_kind("위원장님, 1분만 더 주시겠어요?", ["chair"]) == "procedural"
+    assert question_kind("몇 페이지요?", ["member"]) == "procedural"
+    # 정부에 던진 질의가 위원장의 시간 안내로 끊긴 경우는 회의 진행 질의가 아니다
+    assert question_kind("급한 불을 꺼야 하지 않겠습니까?", ["chair"]) is None
+    # 정부 직함을 부르거나 정부가 답했으면 회의 진행·진술인 질의가 아니다
+    assert question_kind("장관, 1분만 더 답해 보시겠어요?", ["chair"]) is None
+    assert question_kind("몇 페이지요?", ["official", "reference"]) is None
+    # 긴 정부 질의 끝의 '1분만 더'는 진행 표현으로 보지 않는다
+    assert question_kind("폐업지원금 " * 40 + "1분만 더 주시겠습니까?", ["chair"]) is None
+
+
+def test_non_agency_questions_are_classified_and_excluded_from_check():
+    from rdflib import RDF
+
+    from agrisea.ontology import AGD, build_kg
+    from agrisea.validate import validate
+    s = _store()
+    s.save_minutes("M1", MinutesDoc(utterances=[
+        Utterance(0, "강도형", "해양수산부장관", "official", "해양수산부", "업무 현황을 보고드리겠습니다."),
+        Utterance(1, "김위원", "위원", "member", None, "어떤 부분을 고쳐야 한다는 말씀이세요?"),
+        Utterance(2, "이교수", "진술인", "reference", None, "제3조 범위가 넓습니다."),
+        Utterance(3, "김위원", "위원", "member", None, "위원장님, 1분만 더 주시겠어요?"),
+        Utterance(4, "어위원", "위원장", "chair", None, "1분 드리겠습니다."),
+        Utterance(5, "김위원", "위원", "member", None, "급한 불을 꺼야 하지 않겠습니까?"),
+        Utterance(6, "어위원", "위원장", "chair", None, "시간이 다 됐습니다."),
+    ]))
+    reclassify(s)
+    g = build_graph(s)
+    types = lambda i: set(g.objects(utt_uri("M1", i), RDF.type))  # noqa: E731
+    assert AG.ExpertQuestion in types(1)
+    assert set(g.objects(utt_uri("M1", 1), AG.addressedToPerson)) == {AGD["person/이교수"]}
+    assert AG.ProceduralQuestion in types(3)
+    assert not types(5) & {AG.ExpertQuestion, AG.ProceduralQuestion}   # 기관 대상 질의로 남는다
+    report = validate(build_kg(s)[0])
+    check = next(c for c in report["checks"] if c["title"].startswith("질의는 어느 기관을 향한다"))
+    assert check["count"] == 1 and report["counts"]["error"] == 0   # 끊긴 정부 질의 하나만 남는다

@@ -12,7 +12,7 @@
     a owl:Ontology ;
     rdfs:label "농해수위 국정감사 온톨로지 (AgriSea Audit Ontology)"@ko ;
     rdfs:comment "국회 농림축산식품해양수산위원회 회의록을 회의·안건·발언·발언자·피감기관·쟁점·이행약속으로 구조화하여 국정감사 준비와 사후관리에 활용하기 위한 온톨로지."@ko ;
-    owl:versionInfo "0.2.0" ;
+    owl:versionInfo "0.3.0" ;
     rdfs:seeAlso <https://w3id.org/agrisea/ontology/rules> .
 
 ########## 클래스 ##########
@@ -31,6 +31,10 @@ ag:AgendaItem a owl:Class ; rdfs:label "안건"@ko .
 
 ag:Utterance a owl:Class ; rdfs:label "발언"@ko .
 ag:Question a owl:Class ; rdfs:subClassOf ag:Utterance ; rdfs:label "질의"@ko .
+ag:ProceduralQuestion a owl:Class ; rdfs:subClassOf ag:Question ; rdfs:label "회의 진행 질의"@ko ;
+    rdfs:comment "위원장·전문위원 등 위원회 쪽에 묻는 질의(발언 시간·의사 진행·안건 문구·자료 쪽수 등). 정부 기관을 향하지 않아 질의 대상 기관이 없다."@ko .
+ag:ExpertQuestion a owl:Class ; rdfs:subClassOf ag:Question ; rdfs:label "진술인·참고인 질의"@ko ;
+    rdfs:comment "공청회·청문회에서 진술인·참고인에게 묻는 질의. 기관이 아니라 그 사람(ag:addressedToPerson)에게 묻는다."@ko .
 ag:Answer a owl:Class ; rdfs:subClassOf ag:Utterance ; rdfs:label "답변"@ko .
 ag:Commitment a owl:Class ; rdfs:subClassOf ag:Answer ;
     rdfs:label "이행약속 답변"@ko ;
@@ -73,6 +77,9 @@ ag:respondsTo a owl:ObjectProperty ; rdfs:label "~에 대한 답변"@ko ;
     rdfs:domain ag:Answer ; rdfs:range ag:Question .
 ag:addressedTo a owl:ObjectProperty ; rdfs:label "질의 대상 기관"@ko ;
     rdfs:domain ag:Question ; rdfs:range ag:Organization .
+ag:addressedToPerson a owl:ObjectProperty ; rdfs:label "질의 대상 인물"@ko ;
+    rdfs:comment "기관이 아닌 사람에게 묻는 질의(진술인·참고인 질의, 위원장·전문위원에게 묻는 회의 진행 질의)의 대상."@ko ;
+    rdfs:domain ag:Question ; rdfs:range ag:Person .
 ag:mentionsOrganization a owl:ObjectProperty ; rdfs:label "언급 기관"@ko ;
     rdfs:comment "발언이나 안건 문구가 언급한 기관."@ko ;
     rdfs:domain [ a owl:Class ; owl:unionOf ( ag:Utterance ag:AgendaItem ) ] ; rdfs:range ag:Organization .
@@ -207,6 +214,7 @@ ag:inferredCount a owl:DatatypeProperty ; rdfs:label "추론한 사실 수"@ko ;
 [] a owl:AllDisjointClasses ; owl:members ( ag:AuditMeeting ag:PlenaryCommitteeMeeting ag:SubcommitteeMeeting ) .
 [] a owl:AllDisjointClasses ; owl:members ( ag:GovernmentBill ag:MemberBill ag:CommitteeAlternative ) .
 ag:Question owl:disjointWith ag:Answer .
+ag:ProceduralQuestion owl:disjointWith ag:ExpertQuestion .
 ag:Legislator owl:disjointWith ag:GovernmentOfficial , ag:Staff .
 ag:OpenCommitment owl:disjointWith ag:FulfilledCommitment .
 ag:FollowUpStatus owl:disjointWith ag:ActionType , ag:Issue .
