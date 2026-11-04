@@ -18,7 +18,8 @@ from .store import Store
 # 6: 정부 약속 이행 추적 / 7: 운영 관문 정책(차단 대상어) 반영
 # 13: 온톨로지 검증(배타 클래스·정의역 수정, 인물 식별 통합, 추적 불가 판정)
 # 14: 직무대리·직무대행·후보자 직함을 본래 직위로 분류(정부 답변·약속 누락 수정)
-PRECOMPUTE_VERSION = 15  # 15: 소관 기관 5곳 추가(해양수산연수원·해양교통안전공단 등, 기관장 소속 식별)
+# 15: 소관 기관 5곳 추가(해양수산연수원·해양교통안전공단 등, 기관장 소속 식별)
+PRECOMPUTE_VERSION = 16  # 16: 질의 대상 기관 식별(사람 단위 소속, 연달은 질의, 직함 호칭)
 
 
 def current_policy() -> dict:
@@ -75,7 +76,7 @@ def reclassify(store: Store) -> int:
     rows = store.conn.execute("SELECT id, speaker_role, speaker_name, speaker_type, org, text, "
                               "is_question, is_commitment, is_data_request, issues_json, orgs_json "
                               "FROM utterances").fetchall()
-    updates = []
+    computed = []
     for r in rows:
         role, name, text = fix_role_qualifier(r["speaker_role"], r["speaker_name"],
                                               clean_utterance_text(r["text"]))
@@ -86,7 +87,18 @@ def reclassify(store: Store) -> int:
         q = int(stype == "member" and bool(QUESTION_PATTERNS.search(text)))
         d = int(stype in ("member", "chair") and bool(DATA_REQUEST_PATTERNS.search(text)))
         c = int(stype in ("official", "witness") and is_commitment(text))
-        new = (role, name, stype, org, q, c, d, text, issues, orgs)
+        computed.append((r, [role, name, stype, org, q, c, d, text, issues, orgs]))
+    # 직함에 기관이 없는 정부 관계자·증인(예: 증인으로 나온 장관)은 같은 이름이 다른 회의에서
+    # 한 기관으로만 확인될 때 그 기관 소속으로 본다(기관이 둘 이상이면 동명이인일 수 있어 비워 둔다)
+    known: dict[str, set[str]] = {}
+    for _, (_, name, stype, org, *_rest) in computed:
+        if stype in ("official", "witness") and org:
+            known.setdefault(name, set()).add(org)
+    updates = []
+    for r, new in computed:
+        if new[2] in ("official", "witness") and not new[3] and len(known.get(new[1], ())) == 1:
+            new[3] = next(iter(known[new[1]]))
+        new = tuple(new)
         if new != (r["speaker_role"], r["speaker_name"], r["speaker_type"], r["org"], r["is_question"],
                    r["is_commitment"], r["is_data_request"], r["text"], r["issues_json"], r["orgs_json"]):
             updates.append((*new, r["id"]))
