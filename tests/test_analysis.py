@@ -47,12 +47,28 @@ def test_role_classification_and_commitments():
     from agrisea.lexicon import classify_role, commitment_sentences, match_issues
     assert classify_role("소위원장") == "chair" and classify_role("농촌진흥청장") == "official"
     assert classify_role("진술인") == "reference" and classify_role("농협손해보험대표이사") == "official"
+    # 직무대리·직무대행·후보자는 본래 직위로(예전에는 '기타'로 빠져 정부 답변·약속이 누락됨)
+    assert classify_role("해양경찰청장 직무대행") == "official"
+    assert classify_role("해양경찰청구조안전국장 전담직무대리") == "official"
+    assert classify_role("해양수산부장관 후보자") == "official"
+    assert classify_role("위원장 직무대리") == "chair" and classify_role("조정위원장 직무대행") == "chair"
+    assert classify_role("위원") == "member" and classify_role("속기사") == "other"
     assert commitment_sentences("추가 시장격리 여부를 이달 중 검토하겠습니다.")
     assert not commitment_sentences("바쁘신 일정 중에도 의결해 주셔서 깊이 감사드립니다. 최선을 다하겠습니다.")
     assert not commitment_sentences("어촌어항재생과장 보고드리겠습니다.")
     # 기관·위원회명 속 키워드는 쟁점으로 세지 않음
     assert "livestock" not in match_issues("농림축산식품부장관님께 묻겠습니다")
     assert "livestock" in match_issues("축산 농가 방역 대책")
+
+
+def test_org_from_role_finds_added_agencies():
+    from agrisea.lexicon import org_from_role
+    assert org_from_role("한국해양수산연수원장") == "한국해양수산연수원"
+    assert org_from_role("한국해양교통안전공단이사장") == "한국해양교통안전공단"
+    assert org_from_role("해양수산과학기술진흥원장") == "해양수산과학기술진흥원"
+    assert org_from_role("가축위생방역지원본부장") == "가축위생방역지원본부"
+    assert org_from_role("한국수목원정원관리원이사장 직무대행") == "한국수목원정원관리원"
+    assert org_from_role("전국한우협회장") is None   # 업계 단체는 피감기관 사전에 넣지 않는다
 
 
 def test_reclassify_fixes_stored_rows(store):
