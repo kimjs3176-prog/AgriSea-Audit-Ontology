@@ -64,10 +64,12 @@ python -m agrisea serve --port 8000                    # http://127.0.0.1:8000
 |---|---|---|
 | `ASSEMBLY_API_KEY` | Vercel 환경 변수, GitHub Actions Secrets | 열린국회정보 인증키(필수) |
 | `KSTARTUP_API_KEY` | GitHub Actions Secrets, Vercel 환경 변수 | 공공데이터포털 인증키(지원사업 공고) |
-| `ANTHROPIC_API_KEY` | Vercel 환경 변수 | (선택) Claude 회의 요약 |
+| `ANTHROPIC_API_KEY` | Vercel 환경 변수 | (선택) Claude 회의 요약. 배포 용량을 아끼려고 `anthropic` 패키지는 기본 설치에서 뺐으니, 쓰려면 `requirements-llm.txt`의 패키지를 `requirements.txt`에 다시 넣는다 |
 
 - **회의록 데이터 갱신**(Actions, 하루 3번): 회의록과 지원사업 공고를 수집·분석해 `data/`에 커밋하면 Vercel이 다시 배포합니다.
   국회 PDF와 공공데이터포털이 해외 접속을 막으면 서울 리전 배포본(`/api/minutes-text`, `/api/kstartup`)을 거쳐 받습니다.
+- **Vercel 용량**: 작업 브랜치(`claude/**`)와 `governance-log`는 미리보기 배포를 만들지 않는다(`vercel.json`). 지난 배포본이 쌓여 무료 용량(Functions·Deployment Storage 10GB)을 넘지 않도록
+  Vercel 프로젝트 Settings → Security → Deployment Retention Policy 에서 보관 기간을 짧게 두고, 넘었으면 `vercel remove <프로젝트> --safe --yes`로 별칭 없는 배포를 지운다.
 - **GitLab 미러**(Actions): `main`을 기관 GitLab으로 푸시합니다. 기관 GitLab은 해외(GitHub 호스트 러너)에서 접속되지 않아 국내 PC의 self-hosted 러너(`MIRROR_RUNNER`) 또는 PC 예약 스크립트(`scripts/mirror-gitlab.ps1`·`.sh`)로 실행합니다 → [설정 방법](docs/gitlab-mirror.md)
 
 ## 테스트
