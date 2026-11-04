@@ -28,6 +28,29 @@ def meeting_uri(mid: str) -> URIRef:
 
 
 _OFFICIAL_ROLE = re.compile(r"장관|차관|청장|국장|실장|본부장|원장|이사장|사장|회장|처장|관장|후보자|직무")
+# 질의 대상 기관을 직함 호칭으로 찾을 때 쓰는 직함('장관님', '청장님' 등). '위원장님'의 '원장'은 제외한다
+_TITLES = "이사장|본부장|장관|차관|청장|처장|원장|사장|회장"
+_TITLE_CALL = re.compile(rf"(?<!위)({_TITLES})님")
+_ROLE_TITLE = re.compile(rf"({_TITLES})(?:\s*(?:(?:전담)?직무|권한)?(?:대리|대행)|\s+후보자)?$")
+
+
+def meeting_title_orgs(utterances: list[dict]) -> dict[str, set[str]]:
+    """회의에 출석해 발언한 정부 관계자의 직함 → 기관(예: '장관' → {해양수산부})."""
+    out: dict[str, set[str]] = {}
+    for u in utterances:
+        if u["speaker_type"] in ("official", "witness") and u["org"]:
+            t = _ROLE_TITLE.search(u["speaker_role"] or "")
+            if t:
+                out.setdefault(t.group(1), set()).add(u["org"])
+    return out
+
+
+def titled_target(text: str, title_orgs: dict[str, set[str]]) -> str | None:
+    """질의가 '장관님'처럼 직함으로만 부를 때, 그 회의에 그 직함으로 출석한 기관이 하나뿐이면 그 기관."""
+    found: set[str] = set()
+    for t in set(_TITLE_CALL.findall(text)):
+        found |= title_orgs.get(t, set())
+    return next(iter(found)) if len(found) == 1 else None
 
 
 def person_kind(stype: str, role: str = "") -> str:
@@ -261,9 +284,20 @@ def build_graph(store: Store, with_schema: bool = True, core: bool = False,
                 g.add((au, AG.mentionsOrganization, org_uri(org)))
 
         last_question: URIRef | None = None
-        last_q_orgs: list[str] = []
-        for u in store.utterances(meeting_id=m["id"]):
+        utts = store.utterances(meeting_id=m["id"])
+        title_orgs = meeting_title_orgs(utts)
+        # 질의 대상 기관: 질의 본문의 기관 + 뒤이은 답변자의 소속. 같은 위원이 연달아 한 질의(run)는
+        # 한 번에 받은 답변의 기관을 함께 받는다. 둘 다 없으면 직함 호칭으로 찾는다(회의가 끝난 뒤 판단).
+        q_targets: dict[URIRef, set[str]] = {}
+        q_text: dict[URIRef, str] = {}
+        run: list[URIRef] = []
+        prev: dict | None = None
+        for u in utts:
             uu = utt_uri(m["id"], u["idx"])
+            if u["is_question"]:
+                same_run = bool(prev and prev["is_question"] and prev["speaker_name"] == u["speaker_name"])
+                run = [*run, uu] if same_run and run else [uu]
+            prev = u
             pu = person_uri(u["speaker_name"], u["speaker_type"], u["speaker_role"])
             g.add((pu, RDF.type, person_class(u["speaker_type"], u["speaker_role"])))
             g.add((pu, RDFS.label, Literal(u["speaker_name"], lang="ko")))
@@ -298,14 +332,15 @@ def build_graph(store: Store, with_schema: bool = True, core: bool = False,
 
             if u["is_question"]:
                 g.add((uu, RDF.type, AG.Question))
-                last_question, last_q_orgs = uu, list(u["orgs"])
-                for org in last_q_orgs:
-                    g.add((uu, AG.addressedTo, org_uri(org)))
+                last_question = uu
+                q_targets[uu] = set(u["orgs"])
+                q_text[uu] = u["text"]
             elif is_answer:
                 g.add((uu, RDF.type, AG.Answer))
                 g.add((uu, AG.respondsTo, last_question))
                 if u["org"]:
-                    g.add((last_question, AG.addressedTo, org_uri(u["org"])))
+                    for q in run or [last_question]:
+                        q_targets.setdefault(q, set()).add(u["org"])
             if u["is_data_request"]:
                 g.add((uu, RDF.type, AG.DataRequest))
             if u["is_commitment"]:
@@ -313,6 +348,11 @@ def build_graph(store: Store, with_schema: bool = True, core: bool = False,
                 g.add((uu, RDF.type, AG.Answer))
                 if u["org"]:
                     g.add((uu, AG.committedBy, org_uri(u["org"])))
+        for q, orgs in q_targets.items():
+            if not orgs and (t := titled_target(q_text.get(q, ""), title_orgs)):
+                orgs = {t}
+            for org in orgs:
+                g.add((q, AG.addressedTo, org_uri(org)))
     add_programs(g, store)
     add_followups(g, store)
     return g
