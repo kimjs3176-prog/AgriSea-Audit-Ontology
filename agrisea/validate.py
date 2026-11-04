@@ -137,7 +137,8 @@ REQUIRED = [
     ("Answer", "ag:respondsTo", "답변은 어느 질의에 대한 답변이다"),
     ("Commitment", "ag:committedBy", "약속에는 약속한 기관이 있다"),
     ("Commitment", "ag:followUpStatus", "약속에는 이행 판정이 하나 있다"),
-    ("Question", "ag:addressedTo", "질의는 어느 기관을 향한다"),
+    ("Question", "ag:addressedTo", "질의는 어느 기관을 향한다(회의 진행·진술인 질의 제외)",
+     ("ProceduralQuestion", "ExpertQuestion")),
     ("AuditMeeting", "ag:audited", "국정감사 회의에는 감사 대상 기관이 있다"),
     ("Bill", "rdfs:label", "의안에는 이름이 있다"),
     ("MemberBill", "ag:proposedBy", "의원 발의 의안에는 대표발의 의원이 있다"),
@@ -148,9 +149,11 @@ REQUIRED = [
 
 
 def check_required(r: Report):
-    for cls, p, desc in REQUIRED:
-        total = _num(r.kg, f"SELECT (COUNT(*) AS ?n) WHERE {{ ?x a ag:{cls} }}")
-        where = f"?x a ag:{cls} FILTER NOT EXISTS {{ ?x {p} ?v }}"
+    for cls, p, desc, *rest in REQUIRED:
+        # 하위 클래스 가운데 그 관계가 개념상 없는 것은 뺀다(예: 회의 진행 질의는 기관을 향하지 않음)
+        skip = "".join(f" FILTER NOT EXISTS {{ ?x a ag:{c} }}" for c in (rest[0] if rest else ()))
+        total = _num(r.kg, f"SELECT (COUNT(*) AS ?n) WHERE {{ ?x a ag:{cls}{skip} }}")
+        where = f"?x a ag:{cls}{skip} FILTER NOT EXISTS {{ ?x {p} ?v }}"
         r.add("필수 관계", desc, "warn", _num(r.kg, f"SELECT (COUNT(*) AS ?n) WHERE {{ {where} }}"), total, where)
 
 

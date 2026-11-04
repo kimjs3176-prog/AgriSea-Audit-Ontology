@@ -45,6 +45,36 @@ def meeting_title_orgs(utterances: list[dict]) -> dict[str, set[str]]:
     return out
 
 
+# 기관을 못 찾은 질의의 갈래. 회의 진행 질의는 신호가 분명할 때만 정한다(정부에 던진 질의가 위원장의
+# 시간 안내로 끊긴 경우를 회의 진행으로 잘못 넣지 않게): 전문위원이 답함, 위원장·전문위원을 부름,
+# 짧은 질의의 진행 표현('1분만 더', '몇 페이지', '정회'). 정부 직함을 부르면('장관님', '장관,') 넣지 않는다.
+_COMMITTEE_CALL = re.compile(r"(소?위원장|수석\s*전문위원|수석|전문위원|간사)\s*님")
+_PROC_PHRASE = re.compile(r"의사\s*진행|\d+\s*분\s*(만|더)|시간(을|좀)?\s*(좀\s*)?(더|연장)|몇\s*(쪽|페이지)"
+                          r"|\d+\s*(쪽|페이지)\s*[요?]|^\s*\d+\s*(쪽|페이지)|정회|산회|(질의|발언)\s*(순서|차례|시간)"
+                          r"|발언권|추가\s*질의")
+_GOV_ADDRESS = re.compile(rf"(?<!위)({_TITLES})(님|께|,)")
+_PROC_SHORT = 150
+
+
+def question_kind(text: str, responders: list[str]) -> str | None:
+    """기관을 못 찾은 질의의 갈래: 'expert'(진술인·참고인 질의) | 'procedural'(회의 진행 질의) | None.
+
+    responders: 질의 뒤 다음 질의 전까지 발언한 사람들의 유형(speaker_type).
+    """
+    kinds = set(responders)
+    if kinds & {"official", "witness"}:
+        return None
+    if "reference" in kinds:
+        return "expert"
+    if _GOV_ADDRESS.search(text):
+        return None
+    if "staff" in kinds or _COMMITTEE_CALL.search(text):
+        return "procedural"
+    if _PROC_PHRASE.search(text) and (len(text) <= _PROC_SHORT or text.lstrip().startswith("의사진행")):
+        return "procedural"
+    return None
+
+
 def titled_target(text: str, title_orgs: dict[str, set[str]]) -> str | None:
     """질의가 '장관님'처럼 직함으로만 부를 때, 그 회의에 그 직함으로 출석한 기관이 하나뿐이면 그 기관."""
     found: set[str] = set()
@@ -290,6 +320,7 @@ def build_graph(store: Store, with_schema: bool = True, core: bool = False,
         # 한 번에 받은 답변의 기관을 함께 받는다. 둘 다 없으면 직함 호칭으로 찾는다(회의가 끝난 뒤 판단).
         q_targets: dict[URIRef, set[str]] = {}
         q_text: dict[URIRef, str] = {}
+        q_resp: dict[URIRef, list[tuple[str, URIRef]]] = {}   # 질의 뒤 다음 질의 전까지 발언한 (유형, 인물)
         run: list[URIRef] = []
         prev: dict | None = None
         for u in utts:
@@ -311,6 +342,9 @@ def build_graph(store: Store, with_schema: bool = True, core: bool = False,
                 g.add((mu, AG.concernsIssue, issue_uri(iid)))
             is_answer = (not u["is_question"] and last_question is not None
                          and u["speaker_type"] in ("official", "witness"))
+            if not u["is_question"]:
+                for q in run:
+                    q_resp.setdefault(q, []).append((u["speaker_type"], pu))
             if core and not (u["is_question"] or is_answer or u["is_commitment"]
                              or u["is_data_request"]):
                 continue
@@ -353,6 +387,16 @@ def build_graph(store: Store, with_schema: bool = True, core: bool = False,
                 orgs = {t}
             for org in orgs:
                 g.add((q, AG.addressedTo, org_uri(org)))
+            if orgs:
+                continue
+            resp = q_resp.get(q, [])
+            kind = question_kind(q_text.get(q, ""), [t for t, _ in resp])
+            if kind:
+                g.add((q, RDF.type, AG.ExpertQuestion if kind == "expert" else AG.ProceduralQuestion))
+                want = ("reference",) if kind == "expert" else ("chair", "staff")
+                person = next((p for t, p in resp if t in want), None)
+                if person is not None:
+                    g.add((q, AG.addressedToPerson, person))
     add_programs(g, store)
     add_followups(g, store)
     return g
