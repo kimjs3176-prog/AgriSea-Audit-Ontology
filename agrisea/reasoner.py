@@ -45,7 +45,7 @@ class Rule:
 
 
 RULES: list[Rule] = [
-    Rule("subclass", "schema", "하위 클래스", "약속은 답변이고 답변은 발언이다처럼, 하위 클래스의 개체는 상위 클래스의 개체이기도 하다",
+    Rule("subclass", "schema", "하위 분류", "약속은 답변이고 답변은 발언이다처럼, 하위 분류의 항목은 상위 분류에도 속한다",
          "?x a ?super .",
          "?x a ?c . ?c rdfs:subClassOf+ ?super . FILTER(isIRI(?super) && ?super != owl:Thing)"),
     Rule("subproperty", "schema", "하위 관계", "하위 관계가 성립하면 상위 관계도 성립한다(예: 질의 대상 기관 → 언급 기관)",
@@ -57,7 +57,7 @@ RULES: list[Rule] = [
     Rule("chain", "schema", "관계 연쇄", "두 관계를 이으면 새 관계가 된다(예: 회의의 안건 + 안건의 의안 → 회의가 심사한 의안)",
          "?x ?p ?z .",
          "?p owl:propertyChainAxiom ?l . ?l rdf:first ?p1 ; rdf:rest/rdf:first ?p2 . ?x ?p1 ?y . ?y ?p2 ?z ."),
-    Rule("broader", "schema", "상위 쟁점", "쟁점 분류의 상위 개념을 모두 잇는다(skos:broaderTransitive)",
+    Rule("broader", "schema", "상위 쟁점", "쟁점 분류에서 위로 이어진 상위 쟁점을 모두 잇는다",
          "?a skos:broaderTransitive ?b .", "?a skos:broader+ ?b ."),
     Rule("topic", "domain", "상위 쟁점 주제", "하위 쟁점을 다룬 발언은 그 상위 쟁점 주제도 다룬다",
          "?u ag:concernsTopic ?t .", "?u ag:concernsIssue ?i . ?i skos:broader+ ?t ."),

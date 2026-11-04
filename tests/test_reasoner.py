@@ -67,8 +67,7 @@ def test_kgview(store):
     hit = kgview.search(kg, "농림축산식품부")[0]
     d = kgview.describe(kg, hit["iri"])
     assert d["label"] == "농림축산식품부"
-    props = {p["label"] for p in d["out"]} | {p["label"] for p in d["in"]}
-    assert any("추론" in x for x in props)
+    assert any(it["inferred"] for g in d["out"] + d["in"] for it in g["items"])  # 규칙으로 이어 낸 관계도 보인다
 
 
 def test_ontology_endpoints(store, settings):
