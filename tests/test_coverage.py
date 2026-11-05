@@ -53,5 +53,22 @@ def test_data_status_endpoint_and_dashboard_card(store, settings):
     d = c.get("/api/data-status").json()
     assert d["range"]["meetings"] == 4 and d["months"] and isinstance(d["gaps"], list)
     html = c.get("/").text
-    for marker in ('id="dataStatus"', "function loadDataStatus", "function gotoDataStatus", 'tab === "data"'):
+    for marker in ('id="dataStatus"', "function loadDataStatus", "function gotoDataStatus", 'tab === "data"',
+                   "<h3>질의 분류</h3>", 'class="qsplit"'):
         assert marker in html, marker
+
+
+def test_data_status_question_breakdown(store):
+    store.kv_set("ontology", {"classes": [{"id": "Question", "count": 100},
+                                          {"id": "ProceduralQuestion", "count": 7},
+                                          {"id": "ExpertQuestion", "count": 3}]})
+    store.kv_set("ontology_validation", {"counts": {"error": 0, "warn": 1, "info": 0, "pass": 1}, "checks": [
+        {"group": "필수 관계", "title": "질의는 어느 기관을 향한다(회의 진행·진술인 질의 제외)",
+         "severity": "warn", "count": 12, "total": 90}]})
+    q = data_status(store, today=date(2026, 1, 10))["questions"]
+    assert q == {"total": 100, "procedural": 7, "expert": 3, "agency": 90, "agency_unresolved": 12}
+
+
+def test_data_status_without_kg_summary_has_no_breakdown():
+    from agrisea.store import Store
+    assert data_status(Store(":memory:"), today=date(2026, 1, 10))["questions"] is None
