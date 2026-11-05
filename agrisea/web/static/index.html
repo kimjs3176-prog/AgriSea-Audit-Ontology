@@ -694,6 +694,12 @@ button.link:hover{text-decoration:underline;text-underline-offset:.2em}
 .qbars .q .bar span{display:block;height:100%;background:var(--warn)}
 .qbars .q .n{font-variant-numeric:tabular-nums;color:var(--ink-2);white-space:nowrap;text-align:right}
 @media (max-width:640px){.qbars .q{grid-template-columns:minmax(0,1fr) auto;padding:6px 0}.qbars .q>span:first-child{grid-column:1 / -1}}
+.qsplit{display:flex;height:14px;border-radius:4px;overflow:hidden;background:var(--line);margin-top:4px}
+.qsplit i{display:block;height:100%}
+.qsplit .a,.mlegend i.lgq-a{background:var(--seq)}
+.qsplit .u,.mlegend i.lgq-u{background:var(--warn)}
+.qsplit .p,.mlegend i.lgq-p{background:color-mix(in oklab,var(--seq) 35%,var(--panel))}
+.qsplit .e,.mlegend i.lgq-e{background:color-mix(in oklab,var(--ink-2) 40%,var(--panel))}
 .dstat .cols2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px 32px}
 @media (max-width:860px){.dstat .cols2{grid-template-columns:minmax(0,1fr)}}
 #oProps td:nth-child(-n+2),#oProps th{white-space:nowrap}
@@ -1166,8 +1172,21 @@ async function loadDataStatus(){
         return `<div class="q"><span><span class="vchip ${i.severity}">${qword[i.severity] || i.severity}</span> ${esc(i.title)}</span>
           <span class="bar">${pct == null ? "" : `<span style="width:${Math.max(1, pct).toFixed(1)}%"></span>`}</span>
           <span class="n">${fmt(i.count)}${i.total ? ` / ${fmt(i.total)} (${pct < 0.1 ? "0.1% 미만" : pct.toFixed(1) + "%"})` : "건"}</span></div>` }).join("")}</div>`;
+  // 질의 분류: 기관 대상(기관 찾음·못 찾음) / 회의 진행 / 진술인·참고인
+  const qs = d.questions;
+  const qsplit = !qs ? "" : (() => {
+    const un = qs.agency_unresolved ?? 0, parts = [
+      ["a", "기관 대상 질의(기관 찾음)", qs.agency - un], ["u", "기관 대상 질의(기관 못 찾음)", un],
+      ["p", "회의 진행 질의", qs.procedural], ["e", "진술인·참고인 질의", qs.expert]];
+    const pct = v => qs.total ? (v / qs.total * 100) : 0;
+    return `<h3>질의 분류</h3>
+      <p class="muted" style="font-size:13px;margin:0">위원 질의 ${fmt(qs.total)}건을 무엇을 향한 질의인지로 나눴습니다. 회의 진행 질의는 위원장·전문위원에게, 진술인·참고인 질의는 그 사람에게 묻는 질의라 대상 기관이 없습니다.</p>
+      <div class="qsplit" role="img" aria-label="질의 분류 비율">${parts.filter(p => p[2] > 0).map(([k, l, v]) =>
+        `<i class="${k}" style="width:${Math.max(0.6, pct(v)).toFixed(2)}%" data-tip="${esc(l)}<br><b>${fmt(v)}</b>건 (${pct(v).toFixed(1)}%)"></i>`).join("")}</div>
+      <div class="mlegend">${parts.map(([k, l, v]) => `<span><i class="lgq-${k}"></i>${esc(l)} ${fmt(v)}</span>`).join("")}</div>`;
+  })();
   $("#dsBody").innerHTML = `<div class="mini">${kpis.map(([l, v, sub]) => `<div><b>${v}</b><span>${l}</span><small>${sub}</small></div>`).join("")}</div>
-    <h3>월별 수록 회의</h3>${strip}
+    <h3>월별 수록 회의</h3>${strip}${qsplit}
     <div class="cols2"><div><h3>빠진 데이터와 주의할 점</h3>${gaps}</div>
       <div><h3>개념 검증에서 채워지지 않은 관계</h3>${qual}</div></div>`;
   scrollToDataStatus();

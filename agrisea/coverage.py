@@ -82,6 +82,16 @@ def data_status(store: Store, meta: dict | None = None, today: date | None = Non
                        for ch in report.get("checks", []) if ch.get("severity") != "pass"],
         }
 
+    # 질의 분류(지식그래프 사전 계산 요약): 기관 대상 질의 / 회의 진행 질의 / 진술인·참고인 질의
+    cls = {c.get("id"): c.get("count", 0) for c in (store.kv_get("ontology") or {}).get("classes", [])}
+    questions = None
+    if cls.get("Question"):
+        proc, expert = cls.get("ProceduralQuestion", 0), cls.get("ExpertQuestion", 0)
+        unresolved = next((ch.get("count") for ch in (report or {}).get("checks", [])
+                           if ch.get("title", "").startswith("질의는 어느 기관을 향한다")), None)
+        questions = {"total": cls["Question"], "procedural": proc, "expert": expert,
+                     "agency": cls["Question"] - proc - expert, "agency_unresolved": unresolved}
+
     gaps = []
     if s["samples"]:
         gaps.append({"level": "warn", "title": f"가상 예시 회의록 {s['samples']}건 포함",
@@ -127,5 +137,6 @@ def data_status(store: Store, meta: dict | None = None, today: date | None = Non
         "programs": programs,
         "kg": {"triples": meta.get("kg_triples"), "inferred": meta.get("kg_inferred")},
         "quality": quality,
+        "questions": questions,
         "gaps": gaps,
     }
