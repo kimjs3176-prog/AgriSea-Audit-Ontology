@@ -78,3 +78,46 @@ def test_index_has_no_ontology_wording(store, settings):
     assert "온톨로지" not in html
     assert '<button data-tab="ontology">지식그래프</button>' in html
     assert 'if(tab === "kg") tab = "ontology"' in html and 'setHash("kg/"' in html
+
+
+def test_index_handlers_and_tooltips_do_not_run_data_as_code(store, settings):
+    """회의록·API·주소창 해시에서 온 값을 onclick JS 문자열에 넣을 때 esc만 쓰면 &#39; 가 속성에서 ' 로 풀려
+    문자열을 벗어난다(#/kg/…issue/x'+alert(1)+' 같은 링크). 툴팁도 data-tip을 그대로 innerHTML에 넣으면 안 된다."""
+    import re
+    html = TestClient(create_app(settings, store)).get("/").text
+    assert "const jsq = s => esc(JSON.stringify(" in html
+    assert not re.search(r"'\$\{esc\(", html)                      # onclick="fn('${esc(x)}')" 형태가 남지 않게
+    assert "decodeURIComponent('${encodeURIComponent(" not in html  # encodeURIComponent 는 ' 를 그대로 둔다
+    assert "tip.innerHTML = t.dataset.tip" not in html
+    assert 'tip.innerHTML = esc(t.dataset.tip).replace(/&lt;(\\/?b|br)&gt;/g, "<$1>")' in html
+    assert 'const dot = d => esc(d || "")' in html
+    assert "${safeUrl(m.pdf_url) ?" in html
+
+
+def test_admin_collect_params_cannot_override_api_key_or_paging(store, settings, monkeypatch):
+    """직접 수집의 params 는 국회 API 거르기 인자만: 인증키·쪽 번호·파이썬 인자를 바꿔 쓰지 못한다."""
+    import agrisea.pipeline as pipeline
+    seen = {}
+
+    def fake_collect(store, settings, params, progress=print, **kw):
+        seen.update(params)
+        return []
+
+    monkeypatch.setattr(pipeline, "collect", fake_collect)
+    c = TestClient(create_app(settings, store))
+    r = c.post("/api/admin/collect", json={"date": "2026-09-01", "params": {
+        "KEY": "attacker", "Type": "xml", "pIndex": "9", "pSize": "100000", "p_size": "1", "CMIT_NM": "농해수위"}})
+    assert r.status_code == 200
+    assert seen == {"DAE_NUM": "22", "CMIT_NM": "농해수위", "CONF_DATE": "2026-09-01"}
+    assert c.post("/api/admin/collect", json={"date": "2026-09-01", "params": "KEY=x"}).status_code == 400
+
+
+def test_security_headers_and_param_bounds(store, settings):
+    c = TestClient(create_app(settings, store))
+    assert c.get("/").headers["x-content-type-options"] == "nosniff"
+    assert c.get("/api/stats").headers["x-content-type-options"] == "nosniff"
+    # 중계는 json·xml 형식만(공공데이터포털 오류 페이지가 임의 값을 되비추지 않게)
+    assert c.get("/api/kstartup", params={"returnType": "<script>"}).status_code == 422
+    # 음수 개수는 SPARQL 문법 오류(500) 대신 입력 오류
+    assert c.get("/api/ontology/instances", params={"cls": "https://w3id.org/agrisea/ontology#Meeting",
+                                                    "limit": -1}).status_code == 422

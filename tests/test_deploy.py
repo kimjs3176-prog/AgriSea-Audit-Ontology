@@ -180,3 +180,42 @@ def test_test_workflow_runs_pytest_on_pull_requests():
     assert "pull_request:" in wf and "python -m pytest -q" in wf
     assert "requirements-dev.txt" in wf
     assert 'python-version: "3.12"' in wf   # .python-version 과 같은 버전
+
+
+def test_download_minutes_text_only_fetches_assembly_hosts(tmp_path):
+    """회의록 주소(API 응답)와 뷰어 페이지 속 PDF 링크는 국회 사이트만 따라간다(SSRF·끝없는 되따라가기 방지)."""
+    import pytest
+    from agrisea import pipeline
+
+    pages = {
+        "https://record.assembly.go.kr/viewer?id=1": "<a href='http://169.254.169.254/latest/x.pdf'>pdf</a>",
+        "https://record.assembly.go.kr/viewer?id=2": "<a href='https://record.assembly.go.kr/viewer/b.pdf'>pdf</a>",
+        "https://record.assembly.go.kr/viewer/b.pdf": "<a href='https://record.assembly.go.kr/viewer/c.pdf'>본문</a>",
+    }
+    calls = []
+
+    class Resp:
+        def __init__(self, text):
+            self.text, self.content = text, text.encode()
+
+        def raise_for_status(self):
+            pass
+
+    class Http:
+        def get(self, url, timeout=None):
+            calls.append(url)
+            return Resp(pages.get(url, "◯위원장 홍길동 개의하겠습니다."))
+
+    for bad in ("http://169.254.169.254/latest/meta-data", "file:///etc/passwd", "https://evil.example/a.pdf",
+                "https://record.assembly.go.kr.evil.example/a.pdf", "https://evil.example\\@record.assembly.go.kr/a.pdf",
+                "https://u@record.assembly.go.kr/a.pdf"):
+        with pytest.raises(ValueError):
+            pipeline.download_minutes_text(bad, tmp_path, "x", Http())
+    assert calls == []
+    # 외부 호스트를 가리키는 링크는 따라가지 않고 페이지 글을 쓴다
+    pipeline.download_minutes_text("https://record.assembly.go.kr/viewer?id=1", tmp_path, "x", Http())
+    assert calls == ["https://record.assembly.go.kr/viewer?id=1"]
+    # 국회 사이트 링크는 한 번만 따라간다
+    calls.clear()
+    pipeline.download_minutes_text("https://record.assembly.go.kr/viewer?id=2", tmp_path, "x", Http())
+    assert calls == ["https://record.assembly.go.kr/viewer?id=2", "https://record.assembly.go.kr/viewer/b.pdf"]
