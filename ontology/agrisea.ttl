@@ -77,6 +77,9 @@ ag:respondsTo a owl:ObjectProperty ; rdfs:label "~에 대한 답변"@ko ;
     rdfs:domain ag:Answer ; rdfs:range ag:Question .
 ag:addressedTo a owl:ObjectProperty ; rdfs:label "질의 대상 기관"@ko ;
     rdfs:domain ag:Question ; rdfs:range ag:Organization .
+ag:likelyAddressedTo a owl:ObjectProperty ; rdfs:label "추정 질의 대상 기관"@ko ;
+    rdfs:comment "대상 기관을 직접 찾지 못한 질의에, 같은 위원의 같은 질의 차례에서 다른 질의 둘 이상이 모두 한 기관을 향했을 때 그 기관을 추정으로 잇는다. 질의 대상 기관(ag:addressedTo)과 달리 확정이 아니어서 개념 검증의 '질의는 어느 기관을 향한다'를 채우지 않는다."@ko ;
+    rdfs:domain ag:Question ; rdfs:range ag:Organization .
 ag:addressedToPerson a owl:ObjectProperty ; rdfs:label "질의 대상 인물"@ko ;
     rdfs:comment "기관이 아닌 사람에게 묻는 질의(진술인·참고인 질의, 위원장·전문위원에게 묻는 회의 진행 질의)의 대상."@ko ;
     rdfs:domain ag:Question ; rdfs:range ag:Person .

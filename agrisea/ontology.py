@@ -75,6 +75,35 @@ def question_kind(text: str, responders: list[str]) -> str | None:
     return None
 
 
+def turn_estimates(questions: list[tuple[object, str, set[str] | None]]) -> dict[object, str]:
+    """같은 위원이 이어 간 질의 차례로 대상 기관을 추정한다.
+
+    questions: 회의 안 질의 순서대로 (질의, 질의한 위원, 대상 기관 집합). 회의 진행·진술인 질의는 None.
+    차례(다른 위원의 질의가 끼기 전까지 같은 위원의 질의)에서 대상 기관을 찾은 질의가 둘 이상이고 모두
+    한 기관이면, 그 차례에서 기관을 못 찾은 질의에 그 기관을 추정으로 준다.
+    """
+    out: dict[object, str] = {}
+
+    def close(turn):
+        found = [orgs for _, orgs in turn if orgs]
+        union = set().union(*found) if found else set()
+        if len(found) >= 2 and len(union) == 1:
+            org = next(iter(union))
+            out.update({q: org for q, orgs in turn if orgs == set()})
+
+    turn: list = []
+    who = None
+    for q, speaker, orgs in questions:
+        if turn and speaker != who:
+            close(turn)
+            turn = []
+        turn.append((q, orgs))
+        who = speaker
+    if turn:
+        close(turn)
+    return out
+
+
 def titled_target(text: str, title_orgs: dict[str, set[str]]) -> str | None:
     """질의가 '장관님'처럼 직함으로만 부를 때, 그 회의에 그 직함으로 출석한 기관이 하나뿐이면 그 기관."""
     found: set[str] = set()
@@ -321,6 +350,7 @@ def build_graph(store: Store, with_schema: bool = True, core: bool = False,
         q_targets: dict[URIRef, set[str]] = {}
         q_text: dict[URIRef, str] = {}
         q_resp: dict[URIRef, list[tuple[str, URIRef]]] = {}   # 질의 뒤 다음 질의 전까지 발언한 (유형, 인물)
+        q_speaker: dict[URIRef, str] = {}
         run: list[URIRef] = []
         prev: dict | None = None
         for u in utts:
@@ -369,6 +399,7 @@ def build_graph(store: Store, with_schema: bool = True, core: bool = False,
                 last_question = uu
                 q_targets[uu] = set(u["orgs"])
                 q_text[uu] = u["text"]
+                q_speaker[uu] = u["speaker_name"]
             elif is_answer:
                 g.add((uu, RDF.type, AG.Answer))
                 g.add((uu, AG.respondsTo, last_question))
@@ -382,21 +413,23 @@ def build_graph(store: Store, with_schema: bool = True, core: bool = False,
                 g.add((uu, RDF.type, AG.Answer))
                 if u["org"]:
                     g.add((uu, AG.committedBy, org_uri(u["org"])))
+        final: list[tuple[URIRef, str, set[str] | None]] = []
         for q, orgs in q_targets.items():
             if not orgs and (t := titled_target(q_text.get(q, ""), title_orgs)):
                 orgs = {t}
             for org in orgs:
                 g.add((q, AG.addressedTo, org_uri(org)))
-            if orgs:
-                continue
             resp = q_resp.get(q, [])
-            kind = question_kind(q_text.get(q, ""), [t for t, _ in resp])
+            kind = None if orgs else question_kind(q_text.get(q, ""), [t for t, _ in resp])
+            final.append((q, q_speaker.get(q, ""), None if kind else set(orgs)))
             if kind:
                 g.add((q, RDF.type, AG.ExpertQuestion if kind == "expert" else AG.ProceduralQuestion))
                 want = ("reference",) if kind == "expert" else ("chair", "staff")
                 person = next((p for t, p in resp if t in want), None)
                 if person is not None:
                     g.add((q, AG.addressedToPerson, person))
+        for q, org in turn_estimates(final).items():
+            g.add((q, AG.likelyAddressedTo, org_uri(org)))
     add_programs(g, store)
     add_followups(g, store)
     return g

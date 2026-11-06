@@ -93,3 +93,32 @@ def test_non_agency_questions_are_classified_and_excluded_from_check():
     report = validate(build_kg(s)[0])
     check = next(c for c in report["checks"] if c["title"].startswith("질의는 어느 기관을 향한다"))
     assert check["count"] == 1 and report["counts"]["error"] == 0   # 끊긴 정부 질의 하나만 남는다
+
+
+def test_turn_estimates_needs_two_answered_questions_to_one_agency():
+    from agrisea.ontology import turn_estimates
+    sea, agri = {"해양수산부"}, {"농림축산식품부"}
+    got = turn_estimates([
+        ("q1", "김", sea), ("q2", "김", set()), ("q3", "김", sea),   # 김 위원 차례: 해수부 둘 → q2 추정
+        ("q4", "박", agri), ("q5", "박", set()),                     # 박 위원 차례: 기관 찾은 질의가 하나뿐 → 추정 안 함
+        ("q6", "이", sea), ("q7", "이", agri), ("q8", "이", set()),  # 이 위원 차례: 기관이 둘 → 추정 안 함
+        ("q9", "최", sea), ("q10", "최", None), ("q11", "최", sea),  # 회의 진행 질의(None)에는 주지 않음
+    ])
+    assert got == {"q2": "해양수산부"}
+
+
+def test_estimated_target_is_separate_from_confirmed_target():
+    s = _store()
+    s.save_minutes("M1", MinutesDoc(utterances=[
+        Utterance(0, "김위원", "위원", "member", None, "해양수산부는 어민 지원을 언제 합니까?"),
+        Utterance(1, "강도형", "해양수산부장관", "official", "해양수산부", "이달 중 검토하겠습니다."),
+        Utterance(2, "김위원", "위원", "member", None, "그게 다입니까?"),
+        Utterance(3, "어위원", "위원장", "chair", None, "시간이 다 됐습니다."),
+        Utterance(4, "김위원", "위원", "member", None, "해양수산부 예산은 얼마입니까?"),
+        Utterance(5, "강도형", "해양수산부장관", "official", "해양수산부", "자료로 드리겠습니다."),
+    ]))
+    reclassify(s)
+    g = build_graph(s)
+    sea = org_uri("해양수산부")
+    assert set(g.objects(utt_uri("M1", 2), AG.addressedTo)) == set()      # 확정 관계는 비워 둔다
+    assert set(g.objects(utt_uri("M1", 2), AG.likelyAddressedTo)) == {sea}

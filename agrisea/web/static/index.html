@@ -1179,8 +1179,9 @@ async function loadDataStatus(){
       ["a", "기관 대상 질의(기관 찾음)", qs.agency - un], ["u", "기관 대상 질의(기관 못 찾음)", un],
       ["p", "회의 진행 질의", qs.procedural], ["e", "진술인·참고인 질의", qs.expert]];
     const pct = v => qs.total ? (v / qs.total * 100) : 0;
+    const est = qs.agency_estimated ? ` 기관을 못 찾은 질의 가운데 ${fmt(qs.agency_estimated)}건은 같은 위원의 같은 질의 차례가 한 기관을 향해 그 기관으로 추정했습니다(확정 아님).` : "";
     return `<h3>질의 분류</h3>
-      <p class="muted" style="font-size:13px;margin:0">위원 질의 ${fmt(qs.total)}건을 무엇을 향한 질의인지로 나눴습니다. 회의 진행 질의는 위원장·전문위원에게, 진술인·참고인 질의는 그 사람에게 묻는 질의라 대상 기관이 없습니다.</p>
+      <p class="muted" style="font-size:13px;margin:0">위원 질의 ${fmt(qs.total)}건을 무엇을 향한 질의인지로 나눴습니다. 회의 진행 질의는 위원장·전문위원에게, 진술인·참고인 질의는 그 사람에게 묻는 질의라 대상 기관이 없습니다.${est}</p>
       <div class="qsplit" role="img" aria-label="질의 분류 비율">${parts.filter(p => p[2] > 0).map(([k, l, v]) =>
         `<i class="${k}" style="width:${Math.max(0.6, pct(v)).toFixed(2)}%" data-tip="${esc(l)}<br><b>${fmt(v)}</b>건 (${pct(v).toFixed(1)}%)"></i>`).join("")}</div>
       <div class="mlegend">${parts.map(([k, l, v]) => `<span><i class="lgq-${k}"></i>${esc(l)} ${fmt(v)}</span>`).join("")}</div>`;
