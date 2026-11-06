@@ -171,8 +171,27 @@ def html_to_text(raw: str) -> str:
     return html.unescape(re.sub(r"<[^>]+>", " ", raw))
 
 
+# 회의록 본문을 받는 곳은 국회 사이트뿐이다. 주소는 API 응답·뷰어 페이지에서 오므로(외부 데이터), 서버(배포본의
+# /api/minutes-text·직접 수집)가 내부망이나 임의 호스트로 요청하지 않게 막는다.
+MINUTES_HOSTS = ("assembly.go.kr",)
+
+
+def is_minutes_url(url: str) -> bool:
+    from urllib.parse import urlsplit
+    try:
+        p = urlsplit(url)
+        host = (p.hostname or "").lower()
+    except ValueError:
+        return False
+    if "\\" in url or "@" in p.netloc:  # 해석기마다 호스트를 다르게 읽는 모양('a.com\@b', 'user@host')은 받지 않는다
+        return False
+    return p.scheme in ("http", "https") and any(host == h or host.endswith("." + h) for h in MINUTES_HOSTS)
+
+
 def download_minutes_text(url: str, dest_dir: Path, name: str,
-                          http: requests.Session | None = None) -> str:
+                          http: requests.Session | None = None, _hops: int = 1) -> str:
+    if not is_minutes_url(url):
+        raise ValueError(f"국회 회의록 주소가 아닙니다: {url[:200]}")
     http = http or requests.Session()
     resp = http.get(url, timeout=60)
     resp.raise_for_status()
@@ -183,10 +202,10 @@ def download_minutes_text(url: str, dest_dir: Path, name: str,
         (dest_dir / f"{safe}.pdf").write_bytes(data)
         return extract_pdf_text(data)
     text = resp.text
-    # 뷰어 페이지 안에 PDF 링크가 있는 경우 한 번 더 따라감
+    # 뷰어 페이지 안에 PDF 링크가 있는 경우 한 번 더 따라감(한 번만, 국회 사이트 주소만: 페이지끼리 서로 가리키면 끝없이 돌지 않게)
     m = re.search(r"""(https?://[^"'\s>]+\.pdf[^"'\s>]*)""", text, re.I)
-    if m and m.group(1) != url:
-        return download_minutes_text(m.group(1), dest_dir, name, http)
+    if m and m.group(1) != url and _hops > 0 and is_minutes_url(m.group(1)):
+        return download_minutes_text(m.group(1), dest_dir, name, http, _hops - 1)
     return html_to_text(text)
 
 

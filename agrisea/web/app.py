@@ -19,6 +19,10 @@ from ..store import Store
 
 STATIC = Path(__file__).parent / "static"
 FORBIDDEN_SPARQL = re.compile(r"\b(SERVICE|LOAD|INSERT|DELETE|DROP|CLEAR|CREATE|COPY|MOVE|ADD)\b", re.I)
+# 직접 수집(params)으로 넘길 수 있는 국회 API 거르기 인자: 대문자 이름만. 인증키(KEY)·응답 형식(Type)·
+# 쪽 번호(pIndex·pSize)나 파이썬 인자(p_size·max_pages 등)는 바꿔 쓰지 못하게 한다.
+API_FILTER_PARAM = re.compile(r"[A-Z][A-Z0-9_]{0,39}")
+API_RESERVED_PARAMS = {"KEY"}
 
 
 class KGCache:
@@ -73,6 +77,13 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         return value
     app = FastAPI(title="농해수위 인사이트", version="0.1.0")
     app.state.store = store
+
+    @app.middleware("http")
+    async def no_sniff(request: Request, call_next):
+        # 중계(/api/kstartup)·내려받기 응답을 브라우저가 HTML로 추측해 실행하지 않게
+        response = await call_next(request)
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        return response
 
     @app.get("/", include_in_schema=False)
     def index():
@@ -667,7 +678,7 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         return kg_call(lambda kg: kgview.describe(kg, iri))
 
     @app.get("/api/ontology/instances")
-    def ontology_instances(cls: str = Query(..., min_length=8, max_length=200), limit: int = Query(80, le=300)):
+    def ontology_instances(cls: str = Query(..., min_length=8, max_length=200), limit: int = Query(80, ge=1, le=300)):
         """클래스의 개체 목록(추론으로 속한 개체 포함)."""
         from .. import kgview
         return kg_call(lambda kg: kgview.instances(kg, cls, limit))
@@ -699,7 +710,7 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
 
     @app.get("/api/kstartup")
     def kstartup_relay(page: int = Query(1, ge=1, le=200), perPage: int = Query(500, ge=1, le=1000),
-                       returnType: str = "json"):
+                       returnType: str = Query("json", pattern=r"^(json|xml)$")):
         """자동 수집용 중계: 공공데이터포털이 해외(GitHub Actions) 접속을 막을 때 서울 리전에서 대신 받는다.
         공고 조회 오퍼레이션 하나만, 인증키는 서버에서 붙인다(임의 URL 프록시로 쓰일 수 없음)."""
         import requests
@@ -727,7 +738,11 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
             raise HTTPException(400, "ASSEMBLY_API_KEY가 설정되지 않았습니다.")
         if not (payload.get("date") or payload.get("date_from")):
             raise HTTPException(400, "회의일자를 입력하세요. 예: 2026-09-01 (기간은 31일 이내)")
-        extra = {str(k): str(v) for k, v in (payload.get("params") or {}).items()}
+        params = payload.get("params") or {}
+        if not isinstance(params, dict):
+            raise HTTPException(400, "params는 {이름: 값} 객체입니다.")
+        extra = {str(k): str(v) for k, v in params.items()
+                 if API_FILTER_PARAM.fullmatch(str(k)) and str(k) not in API_RESERVED_PARAMS}
         base = {"DAE_NUM": str(payload.get("dae") or "22"), **extra}
         log: list[str] = []
         if settings.serverless and payload.get("date_from"):

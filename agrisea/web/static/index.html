@@ -966,6 +966,11 @@ code{font-family:var(--font-mono);font-size:12px}
 <script>
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+// onclick="fn(…)" 속성 안의 JS 문자열 인자: esc만 하면 &#39; 가 속성에서 ' 로 풀려 문자열을 벗어난다(회의 ID·개체 주소·주소창 해시 등).
+// JSON 문자열로 만든 뒤 속성용으로 이스케이프한다. 쓰는 법: onclick="gotoMeeting(${jsq(id)})"
+const jsq = s => esc(JSON.stringify(String(s ?? "")));
+// 화면에 보일 수 있는 http(s) 주소만 링크로(javascript: 등은 버림)
+const safeUrl = u => /^https?:\/\//i.test(u || "") ? u : "";
 const fmt = n => (n ?? 0).toLocaleString("ko-KR");
 async function api(path, opt){
   const r = await fetch(path, opt);
@@ -977,7 +982,7 @@ const COMMITTEE = "농림축산식품해양수산위원회";
 function committeeOf(m){ return m.committee || (m.title || "").replace(/^.*?(?=농림축산식품해양수산위원회)/, "").replace(/\s*\(.*$/, "") }
 function meetingKind(m){ return committeeOf(m).replace(COMMITTEE, "").trim() || "전체회의" }
 function meetingShort(m){ return `제${m.session_no ?? "?"}회 ${((m.title || "").match(/제\d+차/) || [""])[0]} ${meetingKind(m)}` }
-const dot = d => (d || "").replaceAll("-", ".");
+const dot = d => esc(d || "").replaceAll("-", ".");   // 날짜는 API 원문이 그대로 올 수 있어 HTML로 넣기 전에 이스케이프
 const cut = (s, n) => !s ? "" : (s.length > n ? s.slice(0, n) + "…" : s);
 
 // ── 툴팁 ──
@@ -985,7 +990,9 @@ const tip = $("#tip");
 document.addEventListener("mousemove", e => {
   const t = e.target.closest?.("[data-tip]");
   if(!t){ tip.style.display = "none"; return }
-  tip.innerHTML = t.dataset.tip; tip.style.display = "block";
+  // data-tip 값은 속성에서 엔티티가 풀린 문자열이라 그대로 innerHTML에 넣으면 회의록 본문의 '<…>'가 태그가 된다.
+  // 화면에서 쓰는 <b>·</b>·<br>만 되살리고 나머지는 글자로 보인다.
+  tip.innerHTML = esc(t.dataset.tip).replace(/&lt;(\/?b|br)&gt;/g, "<$1>"); tip.style.display = "block";
   tip.style.left = Math.min(e.clientX + 14, innerWidth - tip.offsetWidth - 8) + "px";
   tip.style.top = (e.clientY + 14) + "px";
 });
@@ -1052,7 +1059,7 @@ function barsHtml(rows, {onclick = ""} = {}){
   const max = Math.max(1, ...rows.filter(r => !r.parentRow).map(r => r.count));
   return `<div class="bars">${rows.map(r => {
     const key = r.id ?? r.name, label = r.label ?? r.name;
-    return `<div class="hit ${onclick ? "click" : ""}" data-key="${esc(key)}" ${onclick ? `onclick="${onclick}('${esc(key)}')"` : ""} data-tip="${esc(label)} ${fmt(r.count)}회">
+    return `<div class="hit ${onclick ? "click" : ""}" data-key="${esc(key)}" ${onclick ? `onclick="${onclick}(${jsq(key)})"` : ""} data-tip="${esc(label)} ${fmt(r.count)}회">
       <span class="name ${r.parentRow ? "parent" : ""}" style="${r.indent ? "padding-left:14px" : ""}">${esc(label)}</span>
       <span>${r.parentRow ? "" : `<span class="fill" style="width:${r.count ? Math.max(2, r.count / max * 100) : 0}%"></span>`}</span>
       <span class="num">${fmt(r.count)}</span></div>` }).join("")}</div>`;
@@ -1073,7 +1080,7 @@ async function loadDash(){
   const renderHero = (topIssue, recentN) => { $("#kpis").innerHTML = `
     <div>
       <h2 class="dtitle">회의록 원장</h2>
-      <p>${dot(s.date_min)}부터 ${dot(s.date_max)}까지 회기 ${fmt(SESSIONS.length)}개의 회의록입니다.${recentN ? ` 최근 회기인 ${esc(latest.label)}에는 회의가 ${fmt(recentN)}건 열렸습니다.` : ""}${topIssue ? ` 가장 많이 다룬 쟁점은 <button class="link" onclick="gotoIssue('${esc(topIssue.id)}')">${esc(topIssue.label)}</button>입니다.` : ""}</p>
+      <p>${dot(s.date_min)}부터 ${dot(s.date_max)}까지 회기 ${fmt(SESSIONS.length)}개의 회의록입니다.${recentN ? ` 최근 회기인 ${esc(latest.label)}에는 회의가 ${fmt(recentN)}건 열렸습니다.` : ""}${topIssue ? ` 가장 많이 다룬 쟁점은 <button class="link" onclick="gotoIssue(${jsq(topIssue.id)})">${esc(topIssue.label)}</button>입니다.` : ""}</p>
       <p class="upd">${upd}</p>
     </div>
     <div class="kpirow">${[
@@ -1102,9 +1109,9 @@ async function loadDash(){
   $("#recent").innerHTML = ov.meetings.length ? `<table class="t ledger">
     <thead><tr><th scope="col">일자</th><th scope="col">회의와 대표 안건</th><th scope="col" class="c-iss">핵심 쟁점</th>
       <th scope="col" class="num c-utt">발언</th><th scope="col" class="num c-q">질의</th><th scope="col" class="num">약속</th></tr></thead>
-    <tbody>${ov.meetings.map(m => `<tr onclick="gotoMeeting('${esc(m.id)}')">
+    <tbody>${ov.meetings.map(m => `<tr onclick="gotoMeeting(${jsq(m.id)})">
       <td class="d">${dot(m.date)}</td>
-      <td><button class="link rowlink" onclick="event.stopPropagation();gotoMeeting('${esc(m.id)}')">${esc(meetingShort(m))}</button>
+      <td><button class="link rowlink" onclick="event.stopPropagation();gotoMeeting(${jsq(m.id)})">${esc(meetingShort(m))}</button>
         <div class="h">${esc(cut(m.headline || "", 90))}</div></td>
       <td class="iss c-iss">${chips(m.issues) || '<span class="muted">-</span>'}</td>
       <td class="num c-utt">${m.n_utterances == null ? "-" : fmt(m.n_utterances)}</td><td class="num c-q">${m.n_questions == null ? "-" : fmt(m.n_questions)}</td>
@@ -1131,7 +1138,7 @@ async function loadDash(){
     $("#progDash").innerHTML = progList(p.closing.length ? p.closing : p.latest) || '<div class="empty">아직 수집한 공고가 없습니다.</div>';
   }).catch(() => $("#progDash").innerHTML = '<div class="empty">공고를 불러오지 못했습니다.</div>');
   $("#recentCommit").innerHTML = ov.commitments.slice(0, 12).map(c => `
-    <div class="ci"><div class="who"><b>${esc(c.speaker)}</b><span class="sep"></span>${dot(c.date)}<span class="sep"></span><button class="link" onclick="gotoMeeting('${esc(c.meeting_id)}')">회의 보기</button></div>
+    <div class="ci"><div class="who"><b>${esc(c.speaker)}</b><span class="sep"></span>${dot(c.date)}<span class="sep"></span><button class="link" onclick="gotoMeeting(${jsq(c.meeting_id)})">회의 보기</button></div>
       <div class="t">${esc(cut(c.text, 90))}</div>
       ${c.question ? `<div class="q">${esc(c.question.member)} 위원 질의: ${esc(c.question.text)}</div>` : ""}</div>`).join("") || '<div class="empty">데이터 없음</div>';
 }
@@ -1294,8 +1301,8 @@ function turnsHtml(mid, turns){
   const nav = `<div class="turnnav">${turns.map((t, i) => `<button onclick="document.getElementById('tc${i}').scrollIntoView({block:'nearest',behavior:'smooth'})">${esc(t.member)}<b>${fmt(t.questions)}</b></button>`).join("")}</div>`;
   const cards = turns.map((t, i) => `<div class="tcard" id="tc${i}">
       <div class="th"><b>${esc(t.member)} 위원</b>${chips(t.issues)}<span class="meta">질문 ${fmt(t.questions)}${t.commitments ? `<span class="sep"></span>약속 ${fmt(t.commitments)}` : ""}${t.data_requests ? `<span class="sep"></span>자료요구 ${fmt(t.data_requests)}` : ""}</span>
-        <button class="link" onclick="gotoUtt('${esc(mid)}', ${t.start_idx})">원문 보기</button></div>
-      <ol>${t.items.map(x => `<li class="${x.short ? "short" : ""}${x.commitment ? " promise" : ""}" onclick="gotoUtt('${esc(mid)}', ${x.idx})">
+        <button class="link" onclick="gotoUtt(${jsq(mid)}, ${t.start_idx})">원문 보기</button></div>
+      <ol>${t.items.map(x => `<li class="${x.short ? "short" : ""}${x.commitment ? " promise" : ""}" onclick="gotoUtt(${jsq(mid)}, ${x.idx})">
         <div class="q">${easy(x.q)}</div>${x.a ? `<div class="a"><span class="lbl">답</span>${x.short ? "" : `<span class="who">${esc(x.answerer)}</span>`}${easy(x.a)}${x.commitment ? ' <span class="chip warn">약속</span>' : ""}</div>` : ""}</li>`).join("")}</ol></div>`).join("");
   return nav + `<div class="scrollbox tall">${cards}</div>`;
 }
@@ -1326,7 +1333,7 @@ async function showMeeting(id, useLlm = false){
           <a href="/api/meetings/${encodeURIComponent(id)}/export.md" target="_blank" rel="noopener">전문 링크 열기</a>
           <p>새 창이 열리면 붙여넣기(Ctrl+V)로 회의록 전문을 넣고 보내세요.</p>
         </div></details>
-        ${m.pdf_url ? `<a href="${esc(m.pdf_url)}" target="_blank" rel="noopener">원문 PDF</a>` : ""}
+        ${safeUrl(m.pdf_url) ? `<a href="${esc(m.pdf_url)}" target="_blank" rel="noopener">원문 PDF</a>` : ""}
         <button onclick="copyLink()">링크 복사</button>
         ${stats.llm_enabled && !llm ? `<button id="llmBtn">Claude 서술형 요약</button>` : ""}
       </div>
@@ -1588,7 +1595,7 @@ function renderSearch(){
   const byMeeting = {};
   rows.forEach(u => (byMeeting[u.meeting_id] ||= {date: u.meeting_date, title: u.meeting_title, session: u.session_no, items: []}).items.push(u));
   const groups = Object.entries(byMeeting).map(([mid, g]) => `<div class="card">
-      <div class="muted" style="font-size:13px">${dot(g.date)}<span class="sep"></span>${esc(SESS[g.session]?.label || "")}<span class="sep"></span><button class="link" onclick="showMeeting('${esc(mid)}')">회의 보기</button></div>
+      <div class="muted" style="font-size:13px">${dot(g.date)}<span class="sep"></span>${esc(SESS[g.session]?.label || "")}<span class="sep"></span><button class="link" onclick="showMeeting(${jsq(mid)})">회의 보기</button></div>
       <h2 style="margin:2px 0 8px">${esc(meetingShort({title: g.title, session_no: g.session}))} <span class="muted" style="font-size:13px;font-weight:400">${g.items.length}건</span></h2>
       <div class="points">${moreList(g.items.map(u => hitCard(u, q)), 3, "건", "points")}</div></div>`);
   selMeeting = null; document.querySelectorAll("#mList .item").forEach(el => el.classList.remove("sel"));
@@ -1648,7 +1655,7 @@ async function showIssue(id){
       <h2 style="margin:2px 0 8px;font-size:20px">${esc(d.label)}</h2>
       <div class="row" style="gap:6px"><span class="chip line">관련 발언 ${fmt(d.count)}건</span><span class="chip line">회의 ${fmt(d.meetings)}건</span>
         ${d.children.map(c => `<button class="chip" style="border:0;cursor:pointer" onclick="showIssue('${c.id}')">${esc(c.label)} ›</button>`).join("")}
-        <button class="link" style="font-size:13px" onclick="gotoKg(kgIri.issue('${esc(id)}'))">지식그래프에서 관계 보기</button></div>
+        <button class="link" style="font-size:13px" onclick="gotoKg(kgIri.issue(${jsq(id)}))">지식그래프에서 관계 보기</button></div>
       <div class="isplit"><div>
       <h3>회기별 언급 추이</h3>
       <div class="cols">${allSess.map(s => { const v = byS[s] || 0; return `<div class="c ${v ? "" : "zero"}" style="height:${v ? Math.max(3, v / cmax * 100) : 100}%" data-tip="${esc(SESS[s]?.label || "제" + s + "회")}<br>${fmt(v)}건">${v && v >= cmax * .12 ? `<b>${fmt(v)}</b>` : ""}</div>` }).join("")}</div>
@@ -1663,7 +1670,7 @@ async function showIssue(id){
     <div class="g32"><div class="card"><h2>질의와 정부 답변</h2><p class="sub">한 위원의 질의 순서에서 실제로 이어진 질의(왼쪽)와 정부 답변(오른쪽)입니다. <span class="chip warn">약속</span>은 구체적 조치 약속. 최근 회의 순.</p>
       <div class="scrollbox tall">${d.dialogue.map((t, i) => {
         const head = i === 0 || d.dialogue[i - 1].meeting_id !== t.meeting_id;
-        return `${head ? `<div class="chat-day"><span>${dot(t.date)}<span class="sep"></span>제${t.session}회<span class="sep"></span><button class="link" onclick="gotoMeeting('${esc(t.meeting_id)}')">회의 보기</button></span></div>` : ""}
+        return `${head ? `<div class="chat-day"><span>${dot(t.date)}<span class="sep"></span>제${t.session}회<span class="sep"></span><button class="link" onclick="gotoMeeting(${jsq(t.meeting_id)})">회의 보기</button></span></div>` : ""}
         <div class="qa">${t.turns.map(x => x.side === "q"
           ? `<div class="bubble q"><div class="who">${esc(x.speaker)}</div>${esc(x.text)}</div>`
           : `<div class="bubble a${x.commitment ? " promise" : ""}${!x.commitment && isShort(x.text) ? " short" : ""}"><div class="who">${esc(x.speaker)} ${x.commitment ? '<span class="chip warn">약속</span>' : ""}</div>${esc(x.text)}</div>`).join("")}</div>`;
@@ -1742,8 +1749,8 @@ async function showMember(name){
       <h2 style="margin:2px 0 6px;font-size:20px">${esc(d.name)} 의원</h2>
       <p style="margin:0 0 8px">${esc(d.headline)}</p>
       <div class="row" style="gap:12px;font-size:13px">
-        <button class="link" onclick="briefMemberFrom('${esc(d.name)}')">이 의원 국감 브리핑</button>
-        <button class="link" onclick="gotoKg(kgIri.member('${esc(d.name)}'))">지식그래프에서 관계 보기</button>
+        <button class="link" onclick="briefMemberFrom(${jsq(d.name)})">이 의원 국감 브리핑</button>
+        <button class="link" onclick="gotoKg(kgIri.member(${jsq(d.name)}))">지식그래프에서 관계 보기</button>
         <button class="link" onclick="copyLink()">이 화면 링크 복사</button>
       </div>
       <div class="mini">
@@ -1762,7 +1769,7 @@ async function showMember(name){
           <div class="q">${esc(q.question)}</div>
           <div class="why">근거: ${esc(q.why)}</div>
           ${q.basis ? `<details><summary>근거 발언 ${q.basis.date ? dot(q.basis.date) : ""}</summary><div style="margin:4px 0">${esc(q.basis.text)}</div>
-            <button class="link" style="font-size:12px" onclick="gotoMeeting('${esc(q.basis.meeting_id)}')">회의 보기</button></details>` : ""}
+            <button class="link" style="font-size:12px" onclick="gotoMeeting(${jsq(q.basis.meeting_id)})">회의 보기</button></details>` : ""}
         </div>`).join("") || '<div class="empty">근거가 되는 발언이 부족합니다.</div>'}</div>
       </div>
       <div class="segpanel" data-seg="mbTabs" data-k="int">
@@ -1782,7 +1789,7 @@ async function showMember(name){
       <div class="segpanel" data-seg="mbTabs" data-k="qa">
         <div class="mbqa">
           <div><h3 style="margin-top:0">대표 질의와 정부 답변</h3><p class="sub">쟁점이 많고 실질 답변·약속이 나온 대화 순</p>
-            <div class="scrollbox tall">${d.top_questions.map(q => `<div class="chat-day"><span>${dot(q.date)}<span class="sep"></span><button class="link" onclick="gotoMeeting('${esc(q.meeting_id)}')">회의 보기</button></span></div>${qaHtml(q)}`).join("") || '<div class="empty">-</div>'}</div></div>
+            <div class="scrollbox tall">${d.top_questions.map(q => `<div class="chat-day"><span>${dot(q.date)}<span class="sep"></span><button class="link" onclick="gotoMeeting(${jsq(q.meeting_id)})">회의 보기</button></span></div>${qaHtml(q)}`).join("") || '<div class="empty">-</div>'}</div></div>
           <div><h3 style="margin-top:0">받아낸 정부 약속 ${d.promises.length}건<span class="sep"></span>자료요구 ${d.data_requests.length}건</h3>
             <div class="scrollbox tall"><div class="points" style="grid-template-columns:1fr">${d.promises.map(p => `<div class="pt warn" onclick="this.classList.toggle('open')"><div class="who">${esc(p.speaker)}<span class="meta">${dot(p.date)}</span></div><div class="txt">${esc(p.text)}</div></div>`).join("")}
               ${d.data_requests.map(x => `<div class="pt member" onclick="this.classList.toggle('open')"><div class="who">자료요구<span class="meta">${dot(x.date)}</span></div><div class="txt">${esc(x.text)}</div></div>`).join("")}</div>
@@ -1808,7 +1815,7 @@ async function loadMeetingMembers(id){
       ${r.keywords.length ? `<div class="muted">핵심어: ${esc(r.keywords.join(", "))}</div>` : ""}
       ${d?.top_questions?.[0] ? `<div style="margin-top:6px"><b style="font-size:12px;color:var(--ink-2)">이 회의 주요 질의</b><div>${esc(cut(d.top_questions[0].question, 140))}</div></div>` : ""}
       ${q ? `<div style="margin-top:6px"><b style="font-size:12px;color:var(--member)">예상 질문</b><div>${esc(q.question)}</div></div>` : ""}
-      <button class="link" style="font-size:12px;margin-top:6px" onclick="gotoMember('${esc(r.name)}')">전체 기간 의원 분석</button></div>` }).join("")}</div>`
+      <button class="link" style="font-size:12px;margin-top:6px" onclick="gotoMember(${jsq(r.name)})">전체 기간 의원 분석</button></div>` }).join("")}</div>`
     : '<div class="empty">이 회의에는 의원 질의가 없습니다.</div>';
 }
 // ── 쟁점 신경망(3D): 위원(입력층) → 쟁점(은닉층) → 기관(출력층) ──
@@ -1975,7 +1982,7 @@ function netSide(data){
     .slice(0, 5);
   const block = (title, rows) => { const max = Math.max(1, ...rows.map(r => r.w)); return `<h3>${title}</h3>${rows.map(r => {
       const iss = r.from.kind === "issue" ? r.from : r.to;
-      return `<div class="nl" onclick="gotoIssue('${esc(iss.id.slice(6))}')" data-tip="${esc(r.from.label)} → ${esc(r.to.label)} · ${fmt(r.w)}회">
+      return `<div class="nl" onclick="gotoIssue(${jsq(iss.id.slice(6))})" data-tip="${esc(r.from.label)} → ${esc(r.to.label)} · ${fmt(r.w)}회">
         <div class="nl-t"><span>${esc(r.from.label)}</span><i>→</i><span>${esc(r.to.label)}</span><b>${fmt(r.w)}</b></div>
         <span class="nl-bar" style="width:${Math.max(4, r.w / max * 100)}%"></span></div>` }).join("")}` };
   $("#netSide").innerHTML = `<div class="muted" style="font-size:12px">가장 강한 연결, 누르면 쟁점 분석</div>`
@@ -2320,7 +2327,7 @@ function progCard(p, title = "지원사업 공고"){
     <div class="points scrollbox" style="--box-h:520px">${progList(p.items) || '<div class="empty">관련 공고가 없습니다.</div>'}</div></div>`;
 }
 function fuEvidence(e){
-  const link = e.meeting_id ? `<button class="link" onclick="gotoUtt('${esc(e.meeting_id)}', ${e.idx ?? -1})">회의록에서 보기</button>` : "";
+  const link = e.meeting_id ? `<button class="link" onclick="gotoUtt(${jsq(e.meeting_id)}, ${e.idx ?? -1})">회의록에서 보기</button>` : "";
   return `<li class="tl k-${e.kind}"><span class="tl-dot"></span><div class="tl-d">${dot(e.date)}</div>
     <div class="tl-h"><span class="chip line">${esc(FU_SRC[e.source] || e.source)}</span><span class="fukind k-${e.kind}">${esc(FU_KIND[e.kind] || e.kind)}</span><b>${esc(e.title)}</b></div>
     <div class="tl-t">${esc(e.text)}</div>${link}</li>`;
@@ -2338,7 +2345,7 @@ function renderFollowup(x){
   const ev = x.evidence || [];
   $("#fuDetail").innerHTML = `<div class="card">
     <div class="fubanner st-${x.status}"><b>${esc(x.status_label)}</b><span>${esc(x.status_desc || "")}</span></div>
-    <div class="muted" style="font-size:13px;margin-top:10px">${dot(x.date)}<span class="sep"></span>${esc(SESS[x.session]?.label || "")}<span class="sep"></span><button class="link" onclick="gotoUtt('${esc(x.meeting_id)}', ${x.idx})">회의록에서 보기</button><span class="sep"></span><button class="link" onclick="gotoKg(kgIri.utt('${esc(x.meeting_id)}', ${x.idx}))">지식그래프에서 보기</button></div>
+    <div class="muted" style="font-size:13px;margin-top:10px">${dot(x.date)}<span class="sep"></span>${esc(SESS[x.session]?.label || "")}<span class="sep"></span><button class="link" onclick="gotoUtt(${jsq(x.meeting_id)}, ${x.idx})">회의록에서 보기</button><span class="sep"></span><button class="link" onclick="gotoKg(kgIri.utt(${jsq(x.meeting_id)}, ${x.idx}))">지식그래프에서 보기</button></div>
     <div class="fugrid">
       <div>
         ${x.question ? `<div class="bubble q" style="max-width:100%"><div class="who">${esc(x.question.member)} 위원 질의</div>${esc(x.question.text)}</div>` : ""}
@@ -2372,9 +2379,9 @@ function briefStarter(orgs, tax, sp){
   $("#bOut").innerHTML = `<div class="card starter">
     <h2>이렇게 사용하세요</h2>
     <ol><li>위에서 <b>피감기관·쟁점·위원</b> 중 하나 이상을 고르고(키워드는 선택)</li><li><b>브리핑 만들기</b>를 누르면 핵심 쟁점, 주요 질의와 답변, 정부 약속 추적표가 정리됩니다.</li><li>결과는 Markdown으로 내려받아 보고서에 붙일 수 있습니다.</li></ol>
-    <h3>기관으로 바로 만들기</h3><div class="ex">${topOrgs.map(o => btn(o.name, `quickBrief('bOrg','${esc(o.name)}')`)).join("")}</div>
-    <h3>쟁점으로</h3><div class="ex">${leafIssues.map(t => btn(t.label, `quickBrief('bIssue','${esc(t.id)}')`)).join("")}</div>
-    <h3>질의 많은 위원으로</h3><div class="ex">${members.map(m => btn(m.speaker_name + " 위원", `quickBrief('bMember','${esc(m.speaker_name)}')`)).join("")}</div>
+    <h3>기관으로 바로 만들기</h3><div class="ex">${topOrgs.map(o => btn(o.name, `quickBrief('bOrg',${jsq(o.name)})`)).join("")}</div>
+    <h3>쟁점으로</h3><div class="ex">${leafIssues.map(t => btn(t.label, `quickBrief('bIssue',${jsq(t.id)})`)).join("")}</div>
+    <h3>질의 많은 위원으로</h3><div class="ex">${members.map(m => btn(m.speaker_name + " 위원", `quickBrief('bMember',${jsq(m.speaker_name)})`)).join("")}</div>
   </div>`;
 }
 function briefOrg(name){
@@ -2426,7 +2433,7 @@ $("#bBtn").onclick = async () => {
       ${(b.key_point_items || []).length ? pointCards(b.key_point_items) : "<div class='muted'>-</div>"}
     </div>
     <div class="segpanel scrollbox tall" data-seg="bTabs" data-k="qa">
-      ${b.top_questions.map(q => `<div class="chat-day"><span>${dot(q.date)}<span class="sep"></span><button class="link" onclick="gotoMeeting('${esc(q.meeting_id)}')">회의 보기</button></span></div>${qaHtml(q)}`).join("") || '<div class="empty">-</div>'}
+      ${b.top_questions.map(q => `<div class="chat-day"><span>${dot(q.date)}<span class="sep"></span><button class="link" onclick="gotoMeeting(${jsq(q.meeting_id)})">회의 보기</button></span></div>${qaHtml(q)}`).join("") || '<div class="empty">-</div>'}
     </div>
     <div class="segpanel scrollbox tall" data-seg="bTabs" data-k="cm">
       ${Object.keys(orgs).length ? `<div class="legend" style="margin-bottom:8px">${Object.entries(orgs).sort((a, b) => b[1].length - a[1].length).map(([o, xs]) => `<span><b>${esc(o)}</b> ${xs.length}건</span>`).join("")}</div>` : ""}
@@ -2440,7 +2447,7 @@ $("#bBtn").onclick = async () => {
         <div><h3 style="margin-top:0">질의한 위원</h3>${b.active_members.length ? barsHtml(b.active_members.map(m => ({id: m.name, label: m.name + " 위원", count: m.count})), {onclick: "briefMember"}) : "-"}
           <p class="muted" style="font-size:12px">위원 이름을 누르면 그 위원의 브리핑(질의 쟁점·질의응답·관련 회의)으로 바뀝니다.</p></div>
         <div><h3 style="margin-top:0">관련 회의 <span class="muted" style="font-weight:400;font-size:12px">관련 발언 수</span></h3>
-          <div class="rowlist scrollbox" style="--box-h:420px">${moreList(b.meetings.map(m => `<div class="r" onclick="gotoMeeting('${esc(m.id)}')"><span class="d">${dot(m.date)}</span><span>${esc(meetingShort(m))}</span><span class="n">${fmt(m.count || 0)}건</span></div>`), 10, "개 회의") || "-"}</div></div>
+          <div class="rowlist scrollbox" style="--box-h:420px">${moreList(b.meetings.map(m => `<div class="r" onclick="gotoMeeting(${jsq(m.id)})"><span class="d">${dot(m.date)}</span><span>${esc(meetingShort(m))}</span><span class="n">${fmt(m.count || 0)}건</span></div>`), 10, "개 회의") || "-"}</div></div>
       </div>
     </div>
   </div>`;
@@ -2482,9 +2489,9 @@ function ontoStart(){
   $("#oEnt").innerHTML = `<div class="ostart"><h3 style="margin-top:0">이렇게 탐색해 보세요</h3>
     <p class="sub">개체를 누르면 그 개체가 가진 관계가 나오고, 관계 끝의 개체를 누르면 그쪽으로 이동합니다. 점선 테두리는 추론으로 도출된 관계입니다.</p>
     <div class="ex">${[["쌀·식량안보", kgIri.issue("rice")], ["농림축산식품부", kgIri.org("농림축산식품부")], ["해양수산부", kgIri.org("해양수산부")]]
-      .map(([l, i]) => `<button class="ov" onclick="showEntity('${esc(i)}')">${esc(l)}</button>`).join("")}</div>
+      .map(([l, i]) => `<button class="ov" onclick="showEntity(${jsq(i)})">${esc(l)}</button>`).join("")}</div>
     <h3>클래스로 시작하기</h3><div class="ex">${pick(["OpenCommitment", "Bill", "Legislator", "AuditedAgency", "SupportProgram"])
-      .map(c => `<button class="ov" onclick="showClass('${esc(c.iri)}')">${esc(c.label)} <small>${fmt(c.count)}</small></button>`).join("")}</div></div>`;
+      .map(c => `<button class="ov" onclick="showClass(${jsq(c.iri)})">${esc(c.label)} <small>${fmt(c.count)}</small></button>`).join("")}</div></div>`;
 }
 function ontoNav(){
   return onto.hist.length > 1 ? `<button class="link" style="font-size:13px" onclick="ontoBack()">이전 개체로</button>` : "";
@@ -2493,10 +2500,10 @@ function ontoBack(){ onto.hist.pop(); const prev = onto.hist.pop(); if(prev) (pr
 function ontoLink(iri){
   // 이 개체를 다른 화면에서 보기(쟁점·의원·회의·발언)
   const p = iri.startsWith(AGD) ? iri.slice(AGD.length).split("/") : [];
-  if(p[0] === "issue") return `<button class="link" onclick="gotoIssue('${esc(p[1])}')">쟁점 분석에서 보기</button>`;
-  if(p[0] === "person" && p[1] === "member") return `<button class="link" onclick="gotoMember(decodeURIComponent('${encodeURIComponent(p[2])}'))">의원 분석에서 보기</button>`;
-  if(p[0] === "meeting") return `<button class="link" onclick="gotoMeeting('${esc(p[1])}')">회의록에서 보기</button>`;
-  if(p[0] === "utt") return `<button class="link" onclick="gotoUtt('${esc(p[1])}', ${+p[2]})">회의록에서 보기</button>`;
+  if(p[0] === "issue") return `<button class="link" onclick="gotoIssue(${jsq(p[1])})">쟁점 분석에서 보기</button>`;
+  if(p[0] === "person" && p[1] === "member") return `<button class="link" onclick="gotoMember(${jsq(p[2])})">의원 분석에서 보기</button>`;
+  if(p[0] === "meeting") return `<button class="link" onclick="gotoMeeting(${jsq(p[1])})">회의록에서 보기</button>`;
+  if(p[0] === "utt") return `<button class="link" onclick="gotoUtt(${jsq(p[1])}, ${+p[2]})">회의록에서 보기</button>`;
   return "";
 }
 async function showEntity(iri){
@@ -2508,13 +2515,13 @@ async function showEntity(iri){
   if(onto.cur !== iri) return;
   const rule = r => r ? (d.rules[r] || r) : "";
   const item = it => it.literal ? `<span class="ov lit">${esc(cut(it.label, 160))}</span>`
-    : `<button class="ov ${it.inferred ? "inf" : ""}" onclick="showEntity('${esc(it.value)}')" ${it.inferred ? `data-tip="추론: ${esc(rule(it.rule))}"` : ""}>${esc(cut(it.label, 70))}</button>`;
+    : `<button class="ov ${it.inferred ? "inf" : ""}" onclick="showEntity(${jsq(it.value)})" ${it.inferred ? `data-tip="추론: ${esc(rule(it.rule))}"` : ""}>${esc(cut(it.label, 70))}</button>`;
   const group = g => `<div class="og"><div class="og-h"><b>${esc(g.label)}</b> <span class="muted">${fmt(g.count)}건</span></div>
     <div class="og-items">${g.items.map(item).join("")}${g.count > g.items.length ? `<span class="muted">외 ${fmt(g.count - g.items.length)}건</span>` : ""}</div></div>`;
   $("#oEnt").innerHTML = `<div class="oent">
     <div class="row" style="justify-content:space-between">${ontoNav()}<span>${ontoLink(iri)}</span></div>
     <h2 style="margin:4px 0 6px;font-size:20px">${esc(cut(d.label, 120))}</h2>
-    <div class="row" style="gap:6px">${d.types.map(t => `<button class="chip ${t.inferred ? "line inf" : ""}" style="cursor:pointer" onclick="showClass('${esc(t.iri)}')" ${t.inferred ? `data-tip="추론: ${esc(rule(t.rule))}"` : ""}>${esc(t.label)}</button>`).join("")}</div>
+    <div class="row" style="gap:6px">${d.types.map(t => `<button class="chip ${t.inferred ? "line inf" : ""}" style="cursor:pointer" onclick="showClass(${jsq(t.iri)})" ${t.inferred ? `data-tip="추론: ${esc(rule(t.rule))}"` : ""}>${esc(t.label)}</button>`).join("")}</div>
     <p class="muted" style="font-size:12px;margin:6px 0 0;overflow-wrap:anywhere">${esc(iri)}</p>
     <h3>이 개체에서 나가는 관계</h3>${d.out.map(group).join("") || '<p class="muted">없음</p>'}
     <h3>이 개체로 들어오는 관계</h3>${d.in.map(group).join("") || '<p class="muted">없음</p>'}
@@ -2530,14 +2537,14 @@ async function showClass(cls){
   $("#oEnt").innerHTML = `<div class="oent">${ontoNav()}
     <h2 style="margin:4px 0 6px;font-size:20px">${esc(d.label)} <span class="muted" style="font-size:14px;font-weight:400">클래스, 개체 ${fmt(d.total)}개</span></h2>
     ${c?.comment ? `<p class="sub">${esc(c.comment)}</p>` : ""}
-    <div class="og-items">${d.items.map(it => `<button class="ov ${it.inferred ? "inf" : ""}" onclick="showEntity('${esc(it.iri)}')">${esc(cut(it.label, 70))}</button>`).join("")}
+    <div class="og-items">${d.items.map(it => `<button class="ov ${it.inferred ? "inf" : ""}" onclick="showEntity(${jsq(it.iri)})">${esc(cut(it.label, 70))}</button>`).join("")}
     ${d.total > d.items.length ? `<span class="muted">외 ${fmt(d.total - d.items.length)}개</span>` : ""}</div></div>`;
 }
 function renderOntoClasses(){
   const s = onto.summary, kids = {};
   s.classes.forEach(c => (kids[c.parent || ""] ||= []).push(c));
   Object.values(kids).forEach(a => a.sort((x, y) => y.count - x.count));
-  const row = (c, d) => `<div class="ot-row" style="--d:${d}" onclick="showClass('${esc(c.iri)}')" data-tip="${esc(c.comment || c.label)}">
+  const row = (c, d) => `<div class="ot-row" style="--d:${d}" onclick="showClass(${jsq(c.iri)})" data-tip="${esc(c.comment || c.label)}">
       <span>${esc(c.label)}</span><span class="num">${fmt(c.count)}</span>${c.inferred ? `<span class="chip line inf">추론 ${fmt(c.inferred)}</span>` : ""}</div>`
     + (kids[c.iri] || []).map(k => row(k, d + 1)).join("");
   $("#oTree").innerHTML = (kids[""] || []).map(c => row(c, 0)).join("");
@@ -2554,7 +2561,7 @@ function renderOntoRules(){
 function renderOntoSchemes(){
   $("#oSchemes").innerHTML = onto.summary.schemes.map(sc => {
     const kids = {}; sc.concepts.forEach(c => (kids[c.broader || ""] ||= []).push(c));
-    const row = (c, d) => `<div class="ot-row" style="--d:${d}" onclick="showEntity('${esc(c.iri)}')"><span>${esc(c.label)}</span><span class="num">${fmt(c.count)}</span></div>`
+    const row = (c, d) => `<div class="ot-row" style="--d:${d}" onclick="showEntity(${jsq(c.iri)})"><span>${esc(c.label)}</span><span class="num">${fmt(c.count)}</span></div>`
       + (kids[c.iri] || []).sort((a, b) => b.count - a.count).map(k => row(k, d + 1)).join("");
     return `<div><h3 style="margin-top:0">${esc(sc.label)}</h3><div class="otree">${(kids[""] || []).sort((a, b) => b.count - a.count).map(c => row(c, 0)).join("")}</div></div>`;
   }).join("");
@@ -2570,7 +2577,7 @@ async function loadCheck(){
   const row = c => `<tr><td><span class="vchip ${c.severity}">${word[c.severity]}</span></td><td class="muted nowrap">${esc(c.group)}</td>
       <td>${esc(c.title)}${c.desc ? `<div class="muted" style="font-size:12px">${esc(c.desc)}</div>` : ""}</td>
       <td class="num">${c.severity === "pass" ? "" : fmt(c.count) + (c.total ? ` / ${fmt(c.total)}` : "")}</td>
-      <td>${c.examples.map(e => `<button class="ov" onclick="showEntity('${esc(e.iri)}')">${esc(cut(e.label, 30))}</button>`).join("")}</td></tr>`;
+      <td>${c.examples.map(e => `<button class="ov" onclick="showEntity(${jsq(e.iri)})">${esc(cut(e.label, 30))}</button>`).join("")}</td></tr>`;
   const head = '<tr><th>결과</th><th>분류</th><th>점검</th><th class="num">해당</th><th>예시</th></tr>';
   const open = oCheck.checks.filter(c => c.severity !== "pass").sort((a, b) => rank[a.severity] - rank[b.severity]);
   const passed = oCheck.checks.filter(c => c.severity === "pass"), groups = {};
@@ -2588,7 +2595,7 @@ $("#oQ").oninput = () => { clearTimeout(oTimer); oTimer = setTimeout(async () =>
   if(!q){ $("#oHits").innerHTML = ""; return }
   try{
     const hits = await api("/api/ontology/search?q=" + encodeURIComponent(q));
-    $("#oHits").innerHTML = hits.map(h => `<div class="item" onclick="showEntity('${esc(h.iri)}')"><div class="d">${esc(h.type)}${h.note ? `<span class="sep"></span>${esc(h.note)}` : ""}</div><div class="t">${esc(cut(h.label, 80))}</div></div>`).join("")
+    $("#oHits").innerHTML = hits.map(h => `<div class="item" onclick="showEntity(${jsq(h.iri)})"><div class="d">${esc(h.type)}${h.note ? `<span class="sep"></span>${esc(h.note)}` : ""}</div><div class="t">${esc(cut(h.label, 80))}</div></div>`).join("")
       || '<div class="empty">찾은 개체가 없습니다.</div>';
   }catch(e){ $("#oHits").innerHTML = `<div class="notice">${esc(e.message)}</div>` }
 }, 250) };
