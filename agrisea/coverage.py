@@ -89,8 +89,10 @@ def data_status(store: Store, meta: dict | None = None, today: date | None = Non
         proc, expert = cls.get("ProceduralQuestion", 0), cls.get("ExpertQuestion", 0)
         unresolved = next((ch.get("count") for ch in (report or {}).get("checks", [])
                            if ch.get("title", "").startswith("질의는 어느 기관을 향한다")), None)
+        props = {p.get("id"): p.get("count", 0) for p in (store.kv_get("ontology") or {}).get("properties", [])}
         questions = {"total": cls["Question"], "procedural": proc, "expert": expert,
-                     "agency": cls["Question"] - proc - expert, "agency_unresolved": unresolved}
+                     "agency": cls["Question"] - proc - expert, "agency_unresolved": unresolved,
+                     "agency_estimated": props.get("likelyAddressedTo", 0)}
 
     gaps = []
     if s["samples"]:
