@@ -1,15 +1,15 @@
 {
-  "hash": "v19:p1:2a7e9a04ff6beb51863afbc6c1609d41ea12026fe0410f353d805ff6ee83d798",
-  "exported_at": "2026-11-07T01:52:28+00:00",
-  "size_bytes": 7054870,
-  "kg_triples": 576836,
-  "kg_inferred": 114158,
-  "meetings": 114,
-  "parsed": 114,
-  "utterances": 51681,
+  "hash": "v19:p1:493eb5e712c836be08f5388f1144d9f932682b011ee0780dc4462177a5c6a9b9",
+  "exported_at": "2026-11-07T16:28:26+00:00",
+  "size_bytes": 7081095,
+  "kg_triples": 577601,
+  "kg_inferred": 114321,
+  "meetings": 115,
+  "parsed": 115,
+  "utterances": 51736,
   "commitments": 430,
-  "questions": 11174,
+  "questions": 11185,
   "programs": 174,
   "date_min": "2024-06-20",
-  "date_max": "2026-10-19"
+  "date_max": "2026-11-03"
 }
