@@ -59,6 +59,9 @@ def test_question_kind_rules():
     assert question_kind("3호에는 지역이 없지 않습니까?", ["staff", "chair"]) == "procedural"
     assert question_kind("위원장님, 1분만 더 주시겠어요?", ["chair"]) == "procedural"
     assert question_kind("몇 페이지요?", ["member"]) == "procedural"
+    assert question_kind("1분도 안 주시렵니까? 마저 좀 마무리 하겠습니다.", ["chair"]) == "procedural"
+    assert question_kind("마무리 하시지요. 6시 전에도 안 끝난다니까요.", ["member"]) == "procedural"
+    assert question_kind("그 사업 마무리는 언제 됩니까?", ["chair"]) is None   # 사업의 마무리를 묻는 정부 질의
     # 정부에 던진 질의가 위원장의 시간 안내로 끊긴 경우는 회의 진행 질의가 아니다
     assert question_kind("급한 불을 꺼야 하지 않겠습니까?", ["chair"]) is None
     # 정부 직함을 부르거나 정부가 답했으면 회의 진행·진술인 질의가 아니다
