@@ -21,7 +21,8 @@ from .store import Store
 # 15: 소관 기관 5곳 추가(해양수산연수원·해양교통안전공단 등, 기관장 소속 식별)
 # 16: 질의 대상 기관 식별(사람 단위 소속, 연달은 질의, 직함 호칭)
 # 17: 회의 진행 질의·진술인 질의 분류(스키마 0.3)
-PRECOMPUTE_VERSION = 18  # 18: 같은 질의 차례로 추정 질의 대상 기관(ag:likelyAddressedTo)
+# 18: 같은 질의 차례로 추정 질의 대상 기관(ag:likelyAddressedTo)
+PRECOMPUTE_VERSION = 19  # 19: 회의 진행 표현 보강('1분도', '마무리 하시지요')
 
 
 def current_policy() -> dict:
