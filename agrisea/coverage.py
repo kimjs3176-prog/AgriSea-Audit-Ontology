@@ -116,9 +116,6 @@ def data_status(store: Store, meta: dict | None = None, today: date | None = Non
     if other:
         gaps.append({"level": "info", "title": f"발언자 유형을 정하지 못한 발언 {other:,}건",
                      "detail": "직함: " + ", ".join(f"{r['role']} {r['count']:,}건" for r in other_roles)})
-    if not s["programs"]:
-        gaps.append({"level": "info", "title": "지원사업 공고가 아직 없습니다",
-                     "detail": "공공데이터포털 인증키(KSTARTUP_API_KEY)가 있어야 수집합니다."})
 
     return {
         "as_of": t,

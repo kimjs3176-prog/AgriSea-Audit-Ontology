@@ -91,7 +91,8 @@ def test_programs_in_issue_briefing_dashboard(tmp_path):
     b = c.get("/api/briefing", params={"org": "농림축산식품부"}).json()
     assert b["programs"]["total"] == 1
     md = c.get("/api/briefing", params={"org": "농림축산식품부", "format": "md"}).text
-    assert "지원사업 공고" in md and "가축분뇨 퇴비화" in md
+    # 브리핑 문서에는 지원사업 공고 절을 싣지 않는다(약속 문장의 '가축분뇨 퇴비화'는 남는다)
+    assert "지원사업 공고" not in md and "가축분뇨 퇴비화 스마트팜 지원사업" not in md
     assert c.get("/api/kstartup").status_code == 400  # 배포본에 키가 없으면 중계하지 않음
     assert c.get("/api/stats").json()["programs"] == 1
 
