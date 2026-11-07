@@ -384,23 +384,15 @@ h3{font-size:14.5px;color:var(--ink)}
 @media (max-width:1200px){.isplit{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:1100px){.sumgrid.on{grid-template-columns:minmax(0,1fr)}}
 .scrollbox{max-height:var(--box-h,440px);overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;padding-right:8px}
-.dash-a,.dash-b{display:grid;gap:16px;margin-bottom:16px;align-items:stretch}
-.dash-a{grid-template-columns:minmax(0,1.75fr) minmax(300px,1fr)}
-.dash-b{grid-template-columns:repeat(3,minmax(0,1fr))}
-@media (max-width:1300px) and (min-width:1001px){.dash-b{grid-template-columns:repeat(2,minmax(0,1fr))}.dash-b>.card:last-child{grid-column:1/-1}}
-/* 쟁점 상세: 질의·답변과 지원사업 공고를 나란히(세로로 길게 쌓지 않게) */
+.dash-a{display:grid;gap:16px;margin-bottom:16px;align-items:stretch}
+/* 3:2 두 칸 배치(지식그래프 클래스·관계 등) */
 .g32{display:grid;gap:16px;grid-template-columns:minmax(0,3fr) minmax(0,2fr);align-items:start}
 .g32>.card{margin:0}
 @media (max-width:1100px){.g32{grid-template-columns:minmax(0,1fr)}}
-.prog{border:1px solid var(--line)}
-.prog.open{border-left-color:var(--brand)} .prog.upcoming{border-left-color:var(--member)}
-.prog .txt a{color:inherit;text-decoration:none} .prog .txt a:hover{text-decoration:underline}
-.sigbox{border-radius:10px;padding:12px 12px;background:var(--brand-weak);margin-bottom:12px;font-size:13px}
-.sigbox b{font-size:15px;margin-right:8px}
-.sigbox.gap{background:var(--warn-weak)} .sigbox.gap b{color:var(--warn)}
-.dash-a>.card,.dash-b>.card{margin:0}
+.dash-a{grid-template-columns:minmax(0,1.75fr) minmax(300px,1fr)}
+.dash-a>.card{margin:0}
 #rank .bars{gap:4px 12px}
-@media (max-width:1000px){.dash-a,.dash-b{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:1000px){.dash-a{grid-template-columns:minmax(0,1fr)}}
 /* 흐름도(3열 리본): 굵기 = 함께 언급된 횟수 */
 .flow{position:relative;min-width:0}
 .flow svg{display:block;width:100%;height:auto;overflow:visible}
@@ -566,7 +558,6 @@ button.primary:hover{border-color:var(--color-ink)}
 .quote.warn{border:1px solid color-mix(in oklab,var(--warn) 30%,var(--color-rule));padding:8px 12px;border-radius:var(--radius-pill)}
 .quote.member .who{color:var(--member)} .quote.gov .who{color:var(--gov)}
 .quote .ctx{border-left:0;padding-left:0}
-.prog,.prog.open,.prog.upcoming{border-left:1px solid var(--color-rule)}
 .bubble.a.promise,.turn.promise{box-shadow:none}
 .bubble{border-radius:var(--radius-entry)}
 /* 숫자: 표처럼 맞춤 */
@@ -620,15 +611,12 @@ table.ledger .h{color:var(--ink-2);font-size:13px;margin-top:2px}
 table.ledger td.iss{max-width:260px}
 @media (max-width:760px){table.ledger .c-iss,table.ledger .c-utt{display:none}}
 @media (max-width:480px){table.ledger .c-q{display:none}table.ledger td,table.ledger th{padding:8px 4px}}
-/* 대시보드 배치: 원장 → (쟁점 흐름 | 많이 논의된 쟁점) → (정부 약속 | 지원사업 공고) → 관계 흐름 */
-.dash-b{grid-template-columns:repeat(2,minmax(0,1fr))}
-@media (max-width:1300px) and (min-width:1001px){.dash-b{grid-template-columns:repeat(2,minmax(0,1fr))}.dash-b>.card:last-child{grid-column:auto}}
+/* 대시보드 배치: 원장 → (쟁점 흐름 | 많이 논의된 쟁점) → 최근 정부 약속 → 관계 흐름 */
 /* 상자 속 상자 없애기: 카드 안의 작은 상자는 괘선 행으로 */
 .points{gap:0 24px}
-.pt,.pt.member,.pt.gov,.pt.staff,.pt.warn,.prog,.prog.open,.prog.upcoming{border:0;border-top:1px solid var(--color-rule);border-radius:0;background:none;padding:12px 0;cursor:pointer}
+.pt,.pt.member,.pt.gov,.pt.staff,.pt.warn{border:0;border-top:1px solid var(--color-rule);border-radius:0;background:none;padding:12px 0;cursor:pointer}
 .pt:hover{background:linear-gradient(var(--color-paper-3),var(--color-paper-3)) no-repeat 0 0/100% 100%}
 .pt.warn .who{color:var(--warn)}
-.prog{cursor:default}
 .eq,.eq.follow,.eq.repeat{border:0;border-top:1px solid var(--color-rule);border-radius:0;background:none;padding:12px 0}
 .eqs{gap:0 24px}
 .mcards{gap:0 24px}
@@ -668,9 +656,8 @@ button.link:hover{text-decoration:underline;text-underline-offset:.2em}
 .vchip.warn{background:var(--warn-weak);color:var(--warn);border-color:transparent}
 .vchip.info{color:var(--ink-2)}
 /* 데이터 현황 */
-.dstat .mini{grid-template-columns:repeat(5,1fr)}
-@media (max-width:860px){.dstat .mini{grid-template-columns:repeat(3,1fr)}.dstat .mini div:nth-child(4){border-left:0;padding-left:0}}
-@media (max-width:640px){.dstat .mini{grid-template-columns:repeat(2,1fr)}.dstat .mini div:nth-child(3),.dstat .mini div:nth-child(5){border-left:0;padding-left:0}.dstat .mini div:nth-child(4){border-left:1px solid var(--color-rule);padding-left:16px}}
+.dstat .mini{grid-template-columns:repeat(4,1fr)}
+@media (max-width:860px){.dstat .mini{grid-template-columns:repeat(2,1fr)}.dstat .mini div:nth-child(3){border-left:0;padding-left:0}}
 .dstat .mini small{display:block;font-size:11px;color:var(--muted)}
 .mstrip{display:grid;grid-template-columns:repeat(var(--n),minmax(0,1fr));gap:2px;align-items:end;height:84px;border-bottom:1px solid var(--line)}
 .mstrip .m{display:flex;flex-direction:column-reverse;height:100%;cursor:default}
@@ -770,17 +757,10 @@ code{font-family:var(--font-mono);font-size:12px}
       <div id="rank" class="scrollbox" style="--box-h:380px"></div>
     </div>
   </div>
-  <div class="dash-b">
-    <div class="card">
+  <div class="card">
       <div class="cardhead"><h2>최근 정부 약속</h2><button class="link" onclick="openTab('followups')">이행 추적</button></div>
       <p class="sub">무엇을 하겠다고 답했는지 앞선 위원 질의와 함께 봅니다. 국감 사후 점검 대상입니다.</p>
       <div id="recentCommit" class="clist scrollbox"><div class="empty">불러오는 중…</div></div>
-    </div>
-    <div class="card">
-      <h2>지원사업 공고</h2>
-      <p class="sub" id="progSub">공공데이터포털(K-Startup)의 농림·해양수산 관련 공고를 마감이 가까운 순으로 보여 줍니다.</p>
-      <div id="progDash" class="points scrollbox"><div class="empty">불러오는 중…</div></div>
-    </div>
   </div>
   <div class="card">
     <div class="row" style="align-items:baseline"><h2>위원 → 쟁점 → 기관 관계 흐름</h2>
@@ -1133,10 +1113,6 @@ async function loadDash(){
     : '<div class="empty">데이터 없음</div>';
   $("#heat").scrollLeft = $("#heat").scrollWidth;  // 좁은 화면에서도 최근 회기(오른쪽)부터 보이게
 
-  api("/api/programs/overview").then(p => {
-    $("#progSub").textContent = `공공데이터포털(K-Startup)의 농림·해양수산 관련 공고 ${fmt(p.total)}건, 접수 중 ${fmt(p.open)}건, 마감이 가까운 순`;
-    $("#progDash").innerHTML = progList(p.closing.length ? p.closing : p.latest) || '<div class="empty">아직 수집한 공고가 없습니다.</div>';
-  }).catch(() => $("#progDash").innerHTML = '<div class="empty">공고를 불러오지 못했습니다.</div>');
   $("#recentCommit").innerHTML = ov.commitments.slice(0, 12).map(c => `
     <div class="ci"><div class="who"><b>${esc(c.speaker)}</b><span class="sep"></span>${dot(c.date)}<span class="sep"></span><button class="link" onclick="gotoMeeting(${jsq(c.meeting_id)})">회의 보기</button></div>
       <div class="t">${esc(cut(c.text, 90))}</div>
@@ -1156,7 +1132,6 @@ async function loadDataStatus(){
     ["회의", fmt(r.meetings), `전체회의 ${fmt(r.plenary)} · 소위 ${fmt(r.subcommittee)}`],
     ["본문 처리", `${fmt(r.parsed)}/${fmt(r.meetings)}`, r.parsed === r.meetings ? "모든 회의 발언 분석" : `미처리 ${fmt(r.meetings - r.parsed)}건`],
     ["최신 회의", ago || "-", `${dot(f.latest_meeting)} · 매일 ${f.schedule.join("·")} 확인`],
-    ["지원사업 공고", fmt(d.programs.total), `접수 중 ${fmt(d.programs.open)}건`],
   ];
   // 월별 수록 회의: 막대 = 전체회의(진한 색) + 소위원회(옅은 색), 점선 = 수록된 회의 없음
   const ms = d.months, mmax = Math.max(1, ...ms.map(m => m.meetings)), last = (r.date_max || "").slice(0, 7);
@@ -1667,15 +1642,14 @@ async function showIssue(id){
       <p class="flowhint">옆으로 밀어서 전체를 볼 수 있습니다.</p><div class="flowscroll"><div class="flow" id="iFlow" style="min-width:520px"></div></div>
       </div></div>
     </div>
-    <div class="g32"><div class="card"><h2>질의와 정부 답변</h2><p class="sub">한 위원의 질의 순서에서 실제로 이어진 질의(왼쪽)와 정부 답변(오른쪽)입니다. <span class="chip warn">약속</span>은 구체적 조치 약속. 최근 회의 순.</p>
+    <div class="card"><h2>질의와 정부 답변</h2><p class="sub">한 위원의 질의 순서에서 실제로 이어진 질의(왼쪽)와 정부 답변(오른쪽)입니다. <span class="chip warn">약속</span>은 구체적 조치 약속. 최근 회의 순.</p>
       <div class="scrollbox tall">${d.dialogue.map((t, i) => {
         const head = i === 0 || d.dialogue[i - 1].meeting_id !== t.meeting_id;
         return `${head ? `<div class="chat-day"><span>${dot(t.date)}<span class="sep"></span>제${t.session}회<span class="sep"></span><button class="link" onclick="gotoMeeting(${jsq(t.meeting_id)})">회의 보기</button></span></div>` : ""}
         <div class="qa">${t.turns.map(x => x.side === "q"
           ? `<div class="bubble q"><div class="who">${esc(x.speaker)}</div>${esc(x.text)}</div>`
           : `<div class="bubble a${x.commitment ? " promise" : ""}${!x.commitment && isShort(x.text) ? " short" : ""}"><div class="who">${esc(x.speaker)} ${x.commitment ? '<span class="chip warn">약속</span>' : ""}</div>${esc(x.text)}</div>`).join("")}</div>`;
-      }).join("") || '<div class="empty">-</div>'}</div></div>
-    ${d.programs ? progCard(d.programs) : ""}</div>`;
+      }).join("") || '<div class="empty">-</div>'}</div></div>`;
   const iid = "issue:" + d.id, ms = d.members.slice(0, 8), os = d.orgs.slice(0, 8);
   flowRender($("#iFlow"), {
     aria: `${d.label} 관련 위원·기관 흐름도`, unit: "건", height: Math.max(220, 26 * Math.max(ms.length, os.length)), padL: 72, padR: 168, minW: 520,
@@ -2306,26 +2280,6 @@ function renderFuList(){
     || '<div class="empty">조건에 맞는 약속이 없습니다.</div>';
   document.querySelectorAll("#fuList .item").forEach(el => el.onclick = () => showFollowup(+el.dataset.id).then(() => toDetail("#fuDetail")));
 }
-// ── 지원사업 공고(공공데이터포털 K-Startup) ──
-const PROG_STATUS = {open: "접수 중", upcoming: "접수 예정", closed: "마감"};
-function progList(items){
-  return items.map(a => {
-    const url = /^https?:\/\//.test(a.url || "") ? a.url : "";
-    return `<div class="pt prog ${a.status}"><div class="who"><span class="chip ${a.status === "open" ? "" : "line"}">${PROG_STATUS[a.status] || ""}</span>${esc(a.org || "")}
-      <span class="meta">${dot(a.start)} ~ ${dot(a.end) || "미정"}</span></div>
-      <div class="txt">${url ? `<a href="${esc(url)}" target="_blank" rel="noopener" title="공고 원문(새 창)">${esc(a.title)}</a>` : esc(a.title)}</div></div>` }).join("");
-}
-function progSignal(sig){
-  if(!sig) return "";
-  return `<div class="sigbox ${sig.quadrant}" data-tip="국회 발언: 데이터 마지막 회의 기준 최근 12개월 · 공고: 오늘 기준 최근 12개월 접수 시작"><b>${esc(sig.label)}</b>${esc(sig.desc)}
-    <div class="muted" style="margin-top:4px">국회 발언 ${fmt(sig.talk_12m)}건<span class="sep"></span>공고 ${fmt(sig.programs_12m)}건(최근 12개월)<span class="sep"></span>접수 중 ${fmt(sig.open)}건</div></div>`;
-}
-function progCard(p, title = "지원사업 공고"){
-  return `<div class="card"><h2>${title} <span class="muted" style="font-size:13px;font-weight:400">${fmt(p.total)}건</span></h2>
-    <p class="sub">공공데이터포털(창업진흥원 K-Startup)의 농림·해양수산 관련 공고, 제목을 누르면 공고 원문</p>
-    ${progSignal(p.signal)}
-    <div class="points scrollbox" style="--box-h:520px">${progList(p.items) || '<div class="empty">관련 공고가 없습니다.</div>'}</div></div>`;
-}
 function fuEvidence(e){
   const link = e.meeting_id ? `<button class="link" onclick="gotoUtt(${jsq(e.meeting_id)}, ${e.idx ?? -1})">회의록에서 보기</button>` : "";
   return `<li class="tl k-${e.kind}"><span class="tl-dot"></span><div class="tl-d">${dot(e.date)}</div>
@@ -2421,8 +2375,7 @@ $("#bBtn").onclick = async () => {
   $("#bOut").innerHTML = `
   <div class="mini" style="margin:0 0 16px">${[["관련 회의", c.meetings], ["관련 발언", c.utterances], ["질의·답변", c.qa_pairs], ["구체적 정부 약속", b.commitments.length]].map(([l, v]) => `<div><b>${fmt(v)}</b><span>${l}</span></div>`).join("")}</div>
   <div class="card"><div class="muted" style="font-size:13px">${scopeLabel()}</div><h2 style="font-size:19px">${esc(b.target)}</h2>
-    ${segTabs("bTabs", [["sum", "요약"], ["qa", `질의와 답변 ${b.top_questions.length}`], ["cm", `약속 추적 ${b.commitments.length}`], ["mt", `위원·회의 ${b.meetings.length}`],
-      ...(b.programs ? [["pg", `지원사업 공고 ${b.programs.total}`]] : [])])}
+    ${segTabs("bTabs", [["sum", "요약"], ["qa", `질의와 답변 ${b.top_questions.length}`], ["cm", `약속 추적 ${b.commitments.length}`], ["mt", `위원·회의 ${b.meetings.length}`]])}
     <div class="segpanel on" data-seg="bTabs" data-k="sum">
       <div class="grid g2">
         <div><h3 style="margin-top:0">핵심 쟁점</h3>${b.key_issues.length ? barsHtml(b.key_issues.map(i => ({id: i.id, label: i.label, count: i.count})), {onclick: "gotoIssue"}) : "-"}</div>
@@ -2439,9 +2392,6 @@ $("#bBtn").onclick = async () => {
       ${Object.keys(orgs).length ? `<div class="legend" style="margin-bottom:8px">${Object.entries(orgs).sort((a, b) => b[1].length - a[1].length).map(([o, xs]) => `<span><b>${esc(o)}</b> ${xs.length}건</span>`).join("")}</div>` : ""}
       <div class="points">${b.commitments.map(x => `<div class="pt warn" onclick="this.classList.toggle('open')"><div class="who">${esc(x.speaker)}<span class="meta">${dot(x.date)}</span>${chips(x.issues)}</div><div class="txt">${esc(x.text)}</div></div>`).join("") || '<div class="empty">-</div>'}</div>
     </div>
-    ${b.programs ? `<div class="segpanel" data-seg="bTabs" data-k="pg">
-      <p class="sub">이 기관이 주관·전담한 지원사업 공고(공공데이터포털 K-Startup), 접수 중 ${fmt(b.programs.open)}건</p>
-      <div class="points scrollbox tall">${progList(b.programs.items) || '<div class="empty">이 기관의 공고가 없습니다.</div>'}</div></div>` : ""}
     <div class="segpanel" data-seg="bTabs" data-k="mt">
       <div class="grid g2">
         <div><h3 style="margin-top:0">질의한 위원</h3>${b.active_members.length ? barsHtml(b.active_members.map(m => ({id: m.name, label: m.name + " 위원", count: m.count})), {onclick: "briefMember"}) : "-"}

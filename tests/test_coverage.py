@@ -45,7 +45,7 @@ def test_data_status_flags_missing_audit_minutes():
     d = data_status(s, today=date(2026, 9, 3))
     assert d["range"]["audit"] == 0 and d["quality"] is None
     assert any(g["level"] == "warn" and "국정감사" in g["title"] for g in d["gaps"])
-    assert any("지원사업 공고" in g["title"] for g in d["gaps"])
+    assert not any("지원사업" in g["title"] for g in d["gaps"])   # 화면에서 지원사업 섹션을 뺐다
 
 
 def test_data_status_endpoint_and_dashboard_card(store, settings):
