@@ -72,6 +72,14 @@ def test_index_has_no_governance_display(store, settings):
         assert marker not in html, marker
 
 
+def test_index_has_no_support_program_sections(store, settings):
+    """대시보드·쟁점 상세·국감 브리핑·데이터 현황에서 지원사업 공고 섹션을 뺐다."""
+    html = TestClient(create_app(settings, store)).get("/").text
+    for marker in ('id="progDash"', "function progList", "function progCard", "/api/programs/overview",
+                   '"pg", `지원사업 공고', '["지원사업 공고"'):
+        assert marker not in html, marker
+
+
 def test_index_has_no_ontology_wording(store, settings):
     """화면 문구에는 '온톨로지' 대신 '지식그래프'를 쓴다. 공유 주소는 #/kg(예전 #/ontology 도 열림)."""
     html = TestClient(create_app(settings, store)).get("/").text
