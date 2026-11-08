@@ -72,6 +72,27 @@ def test_index_has_no_governance_display(store, settings):
         assert marker not in html, marker
 
 
+def test_sparql_blocks_service_even_when_glued_to_a_number(store, settings):
+    """SERVICE 는 서버가 외부 주소로 요청을 보내게 하므로 어떤 모양으로 써도 막는다.
+
+    예전 검사(\\bSERVICE\\b)는 '1SERVICE'처럼 숫자를 붙이면 통과했고, pyoxigraph 는 이를 SERVICE 로 실행했다.
+    """
+    c = TestClient(create_app(settings, store))
+    pre = "PREFIX ag: <https://w3id.org/agrisea/ontology#> "
+    for q in (pre + "SELECT * WHERE { ?u ag:orderIndex 1SERVICE <http://127.0.0.1:9/x> { ?a ?b ?c } }",
+              pre + "select * where { ?u ag:orderIndex 2service <http://127.0.0.1:9/x> { ?a ?b ?c } }",
+              "SELECT * WHERE { SeRvIcE <http://127.0.0.1:9/x> { ?s ?p ?o } }",
+              "SELECT * WHERE { ?s ?p ?o } 1INSERT"):
+        r = c.post("/api/sparql", json={"query": q})
+        assert r.status_code == 400 and "읽기 전용" in r.json()["detail"], q
+    # 정상 질의는 그대로: 'add'·'load'가 이름 속에 든 변수, 기본 질의 예시 전부
+    ok = c.post("/api/sparql", json={"query": "SELECT ?address ?download WHERE { ?address ?p ?download } LIMIT 1"})
+    assert ok.status_code == 200
+    for preset in c.get("/api/sparql/presets").json().values():
+        q = preset["query"] if isinstance(preset, dict) else preset
+        assert c.post("/api/sparql", json={"query": q}).status_code == 200
+
+
 def test_index_has_no_support_program_sections(store, settings):
     """대시보드·쟁점 상세·국감 브리핑·데이터 현황에서 지원사업 공고 섹션을 뺐다."""
     html = TestClient(create_app(settings, store)).get("/").text
