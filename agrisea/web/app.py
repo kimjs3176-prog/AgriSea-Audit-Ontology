@@ -18,7 +18,12 @@ from ..ontology import SCHEMA_PATH
 from ..store import Store
 
 STATIC = Path(__file__).parent / "static"
-FORBIDDEN_SPARQL = re.compile(r"\b(SERVICE|LOAD|INSERT|DELETE|DROP|CLEAR|CREATE|COPY|MOVE|ADD)\b", re.I)
+# SPARQL 질의창에서 막는 말. SERVICE 는 서버가 질의에 적힌 외부 주소로 요청을 보내게 한다(pyoxigraph 가 실제로
+# 실행하고, 끄는 옵션이 없다). 단어 경계(\b)로 찾으면 '?u ag:orderIndex 1SERVICE <주소> {…}'처럼 숫자를 붙여
+# 빠져나가므로, 'service'는 질의문 어디에 있든(문자열·주석·IRI 안이라도) 거절한다. 갱신 키워드(INSERT 등)는
+# Store.query 가 실행하지 않지만 함께 막되, 앞에 숫자가 붙어도 걸리게 앞쪽은 영문자·밑줄만 경계로 본다.
+FORBIDDEN_SPARQL = re.compile(
+    r"service|(?<![A-Za-z_])(LOAD|INSERT|DELETE|DROP|CLEAR|CREATE|COPY|MOVE|ADD)(?![A-Za-z0-9_])", re.I)
 # 직접 수집(params)으로 넘길 수 있는 국회 API 거르기 인자: 대문자 이름만. 인증키(KEY)·응답 형식(Type)·
 # 쪽 번호(pIndex·pSize)나 파이썬 인자(p_size·max_pages 등)는 바꿔 쓰지 못하게 한다.
 API_FILTER_PARAM = re.compile(r"[A-Z][A-Z0-9_]{0,39}")
