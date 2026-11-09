@@ -22,7 +22,8 @@ from .store import Store
 # 16: 질의 대상 기관 식별(사람 단위 소속, 연달은 질의, 직함 호칭)
 # 17: 회의 진행 질의·진술인 질의 분류(스키마 0.3)
 # 18: 같은 질의 차례로 추정 질의 대상 기관(ag:likelyAddressedTo)
-PRECOMPUTE_VERSION = 19  # 19: 회의 진행 표현 보강('1분도', '마무리 하시지요')
+# 19: 회의 진행 표현 보강('1분도', '마무리 하시지요')
+PRECOMPUTE_VERSION = 20  # 20: 회의록 끝 부록(출석 위원·참석자·증인 명단)을 마지막 발언에서 떼어 냄
 
 
 def current_policy() -> dict:
@@ -67,6 +68,42 @@ def fix_spacing(store: Store, progress: Callable[[str], None] = print) -> int:
     changed = sum(1 for (new, _, _), r in zip(updates, pending) if new != r["text"])
     progress(f"띄어쓰기 교정: 대상 {len(pending)}건 중 {changed}건 수정")
     return changed
+
+
+def strip_appendix(store: Store) -> int:
+    """저장된 회의록에서 끝 부록(출석 위원·참석자·증인 명단 등)을 떼어 낸다(PDF 재수집 없이).
+
+    부록은 마지막 위원장 발언에 붙어 있거나, 부록 속 '◯출석 전문위원' 때문에 가짜 발언자 행으로 갈라져 있다.
+    부록이 시작되는 발언은 본문만 남기고, 그 뒤 행은 모두 부록이라 지운다. 부록 자리 뒤에 발언 문장이
+    있는 회의는 건드리지 않는다. 바뀐(지운 것 포함) 행 수를 돌려준다.
+    """
+    from .parser import APPENDIX_START, SPOKEN_ENDING, split_appendix
+    rows = store.conn.execute("SELECT id, meeting_id, idx, text FROM utterances "
+                              "ORDER BY meeting_id, idx").fetchall()
+    by_meeting: dict[str, list] = {}
+    for r in rows:
+        by_meeting.setdefault(r["meeting_id"], []).append(r)
+    updates, deletes = [], []
+    for utts in by_meeting.values():
+        at = next((i for i, r in enumerate(utts) if APPENDIX_START.search(r["text"])), None)
+        if at is None:
+            continue
+        head, appendix = split_appendix(utts[at]["text"])
+        rest = utts[at + 1:]
+        if not appendix or any(SPOKEN_ENDING.search(r["text"]) for r in rest):
+            continue
+        if head:
+            updates.append((head, utts[at]["id"]))
+        else:
+            deletes.append((utts[at]["id"],))
+        deletes.extend((r["id"],) for r in rest)
+    if updates or deletes:
+        with store.tx() as conn:
+            conn.executemany("UPDATE utterances SET text=? WHERE id=?", updates)
+            conn.executemany("DELETE FROM utterances WHERE id=?", deletes)
+            conn.execute("DELETE FROM kv")
+            conn.execute("DELETE FROM summaries WHERE kind='rule'")
+    return len(updates) + len(deletes)
 
 
 def reclassify(store: Store) -> int:
@@ -117,6 +154,7 @@ def reclassify(store: Store) -> int:
 
 def precompute(store: Store, kg_path: Path | None = None,
                progress: Callable[[str], None] = print) -> dict:
+    trimmed = strip_appendix(store)
     spaced = fix_spacing(store, progress)
     fixed = reclassify(store)
     n = 0
@@ -126,7 +164,8 @@ def precompute(store: Store, kg_path: Path | None = None,
             n += 1
     for key, fn in CACHED_VIEWS.items():
         store.kv_set(key, fn(store))
-    out = {"spacing": spaced, "reclassified": fixed, "summaries": n, "views": list(CACHED_VIEWS)}
+    out = {"appendix": trimmed, "spacing": spaced, "reclassified": fixed, "summaries": n,
+           "views": list(CACHED_VIEWS)}
     if kg_path:
         from . import kgview, validate
         kg, counts = build_kg(store, text_limit=500)
@@ -138,6 +177,6 @@ def precompute(store: Store, kg_path: Path | None = None,
         out["validation"] = report["counts"]
         out["triples"] = summary["triples"]
         out["inferred"] = summary["inferred"]
-    progress(f"사전 계산: 발언자 재분류 {fixed}건, 회의 요약 {n}건, 집계 {len(CACHED_VIEWS)}종"
+    progress(f"사전 계산: 회의록 끝 부록 정리 {trimmed}건, 발언자 재분류 {fixed}건, 회의 요약 {n}건, 집계 {len(CACHED_VIEWS)}종"
              + (f", 지식그래프 트리플 {out['triples']}개(추론 {out['inferred']}개)" if kg_path else ""))
     return out
