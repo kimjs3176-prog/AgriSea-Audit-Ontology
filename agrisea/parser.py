@@ -97,6 +97,32 @@ def clean_text(raw: str) -> str:
     return "\n".join(lines)
 
 
+# 회의록 끝 부록: 산회 뒤에 출석 위원·출석 전문위원·정부측 참석자 명단, 증인·참고인 명단, 소위원회 구성 명단,
+# 【보고사항】(의안 회부 목록)이 붙는다. 발언이 아니라서 떼어 낸다. 그대로 두면 마지막 위원장 발언에 붙어
+# 쟁점·기관 언급을 부풀리고(명단의 기관명·의안명), 부록 속 '◯출석 전문위원'이 가짜 발언자 행이 된다.
+APPENDIX_START = re.compile(r"출\s*석\s*위\s*원\s*\(\s*\d+\s*인\s*\)")
+MEETING_CLOSE = re.compile(
+    r"(?:산\s*회|정\s*회)\s*[를을]?\s*선\s*포\s*(?:합\s*니\s*다|하\s*겠\s*습\s*니\s*다)\s*\.?"
+    r"(?:\s*\(\s*계\s*속\s*개\s*의\s*되\s*지\s*않\s*았\s*음\s*\))?"
+    r"|산\s*회\s*하\s*겠\s*습\s*니\s*다\s*\.?")
+# 부록(명단·표)에는 없는 말끝. 부록 자리 뒤에 이런 문장이 있으면 발언이 이어지는 것으로 보고 자르지 않는다.
+SPOKEN_ENDING = re.compile(r"습\s*니\s*다|니\s*까\s*\?|십\s*시\s*오")
+
+
+def split_appendix(text: str) -> tuple[str, str]:
+    """(본문, 부록)으로 나눈다. 부록은 '출석위원(N인)'부터인데, 그 앞에 산회·정회 선포가 있고 그 사이에 발언
+    문장이 없으면(증인 명단·소위원회 구성 명단 같은 표만 있으면) 선포 바로 뒤부터 부록으로 본다.
+    부록 자리 뒤에 발언 문장이 있으면 회의가 끝난 것이 아니므로 나누지 않는다."""
+    m = APPENDIX_START.search(text)
+    if not m or SPOKEN_ENDING.search(text, m.start()):
+        return text, ""
+    cut = m.start()
+    closes = list(MEETING_CLOSE.finditer(text, 0, m.start()))
+    if closes and not SPOKEN_ENDING.search(text, closes[-1].end(), m.start()):
+        cut = closes[-1].end()
+    return text[:cut].rstrip(), text[cut:].strip()
+
+
 # 직위 뒤에 붙는 대행·후보 표시: '해양경찰청장 직무대행 장인식', '해양수산부장관 후보자 황종우'.
 # 띄어쓰기가 사라지면 '직무대'가 이름으로, '후보자'가 이름으로 잡히므로 바로잡는다.
 ROLE_QUALIFIER = re.compile(r"^((?:전담)?직무대[행리]|권한대행|후보자)\s*([가-힣]{2,4})(?=\s|$)")
@@ -143,7 +169,7 @@ def _norm(s: str) -> str:
 
 
 def parse_minutes(raw_text: str) -> MinutesDoc:
-    text = clean_text(raw_text)
+    text, _appendix = split_appendix(clean_text(raw_text))
     parts = SPEAKER_MARK.split(text)
     preamble, chunks = parts[0], parts[1:]
     doc = MinutesDoc(preamble=preamble.strip(), agendas=_extract_agendas(preamble))
