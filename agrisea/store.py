@@ -149,7 +149,15 @@ class Store:
 
     # ── 쓰기 ─────────────────────────────────────────────
     def upsert_meeting(self, m: dict[str, Any], is_sample: bool = False) -> None:
+        agendas = list(m.get("agendas", []))
         with self.tx() as c:
+            # 열린국회정보 API는 같은 회의의 안건을 요청마다 다른 순서로 줄 때가 있다. 같은 안건 묶음이면 저장된
+            # 순서를 지킨다(순서만 바뀌어도 내용 해시가 달라져 전체 재계산·데이터 커밋이 되풀이되던 것을 막음).
+            row = c.execute("SELECT agendas_json FROM meetings WHERE id=?", (m["meeting_id"],)).fetchone()
+            if row and row["agendas_json"]:
+                stored = json.loads(row["agendas_json"])
+                if sorted(stored) == sorted(agendas):
+                    agendas = stored
             c.execute("DELETE FROM kv")
             c.execute("DELETE FROM summaries WHERE meeting_id=? AND kind='rule'", (m["meeting_id"],))
             c.execute(
@@ -166,7 +174,7 @@ class Store:
                 (m["meeting_id"], m.get("dae"), m.get("title"), m.get("committee"), m.get("date"),
                  m.get("class_name"), m.get("session_no"), m.get("conf_no"), m.get("pdf_url"),
                  m.get("link_url"), m.get("vod_url"),
-                 json.dumps(m.get("agendas", []), ensure_ascii=False),
+                 json.dumps(agendas, ensure_ascii=False),
                  json.dumps(m.get("raw", {}), ensure_ascii=False), int(is_sample)),
             )
 
