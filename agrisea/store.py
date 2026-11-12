@@ -46,6 +46,8 @@ CREATE TABLE IF NOT EXISTS programs (
 CREATE INDEX IF NOT EXISTS ix_prog_start ON programs(start_date);
 -- 집계 결과 캐시(쟁점·기관·관계망 등). 데이터가 바뀌면 비운다.
 CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT);
+-- 조회에 실패한 회의일자(자동 수집이 다음 실행에 다시 조회). kv와 달리 비우지 않고 초기 데이터에 함께 싣는다.
+CREATE TABLE IF NOT EXISTS collect_gaps (day TEXT PRIMARY KEY);
 """
 
 # 전문검색 인덱스(FTS5 trigram). 런타임 SQLite가 지원하지 않으면 LIKE 검색으로 대체한다.
@@ -376,6 +378,14 @@ class Store:
             rows = [d for d in rows if ids & set(d["issues"])]
         return rows[:limit] if limit else rows
 
+    def collect_gaps(self) -> list[str]:
+        return [r[0] for r in self.conn.execute("SELECT day FROM collect_gaps ORDER BY day")]
+
+    def update_collect_gaps(self, failed: list[str], succeeded: list[str]) -> None:
+        with self.tx() as c:
+            c.executemany("DELETE FROM collect_gaps WHERE day=?", [(d,) for d in succeeded])
+            c.executemany("INSERT OR IGNORE INTO collect_gaps VALUES (?)", [(d,) for d in failed])
+
     def kv_get(self, key: str) -> Any:
         r = self.conn.execute("SELECT value FROM kv WHERE key=?", (key,)).fetchone()
         return json.loads(r["value"]) if r else None
@@ -433,6 +443,9 @@ class Store:
             h.update(repr(tuple(r)).encode())
         for r in self.conn.execute("SELECT id, title, start_date, end_date, issues_json FROM programs ORDER BY id"):
             h.update(repr(tuple(r)).encode())
+        gaps = self.collect_gaps()
+        if gaps:  # 실패일이 생기거나 풀리면 초기 데이터를 다시 써서 다음 실행에 넘긴다(없으면 해시는 예전과 같음)
+            h.update(repr(("collect_gaps", gaps)).encode())
         return h.hexdigest()
 
     def stats(self) -> dict:
