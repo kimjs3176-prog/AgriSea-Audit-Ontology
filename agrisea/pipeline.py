@@ -31,42 +31,57 @@ def collect(store: Store, settings: Settings, params: dict[str, Any],
 
 
 STOP_AFTER_FAILS = 3  # 처음부터 연속으로 이만큼 날짜가 막히면 API 장애로 보고 중단
+GAP_RETRY_DAYS = 90   # 조회에 실패한 날은 이 기간 안이면 다음 수집(--resume)에서 다시 조회한다
 
 
 def collect_range(store: Store, settings: Settings, date_from: str, date_to: str,
                   params: dict[str, Any] | None = None, only_target: bool = True,
-                  progress: Callable[[str], None] = print) -> list[dict]:
-    """회의일자(CONF_DATE)를 하루씩 바꿔 가며 수집(API가 일자 인자를 요구하는 경우)."""
+                  progress: Callable[[str], None] = print, retry_gaps: bool = False) -> list[dict]:
+    """회의일자(CONF_DATE)를 하루씩 바꿔 가며 수집(API가 일자 인자를 요구하는 경우).
+
+    조회에 실패한 날은 기록해 두고(collect_gaps), retry_gaps 이면 기간보다 앞선 기록된 날도 함께 다시 조회한다.
+    그렇지 않으면 실패한 날 뒤로 회의가 8일 넘게 쌓였을 때 --resume 창이 그날을 지나쳐 영영 빠진다.
+    """
     from datetime import date, timedelta
 
     start, end = date.fromisoformat(date_from), date.fromisoformat(date_to)
     if end < start:
         raise ValueError("종료일이 시작일보다 빠릅니다.")
+    days = [(start + timedelta(days=i)).isoformat() for i in range((end - start).days + 1)]
+    if retry_gaps:
+        floor = (end - timedelta(days=GAP_RETRY_DAYS)).isoformat()
+        older = [g for g in store.collect_gaps() if floor <= g < days[0]]
+        if older:
+            progress(f"지난 수집에서 조회에 실패한 날 다시 조회: {', '.join(older)}")
+        days = older + days
     client = AssemblyClient(settings)
     found: list[dict] = []
     failed: list[str] = []
-    day = start
-    while day <= end:
-        q = {**(params or {}), "CONF_DATE": day.isoformat()}
-        try:
-            for m in client.committee_meetings(only_target=only_target, **q):
-                store.upsert_meeting(m)
-                found.append(m)
-        except AssemblyAPIError as e:
-            # 하루 조회가 막혀도(접속 시간 초과 등) 나머지 날짜와 이미 모은 회의는 살린다
-            if e.code != "HTTP":
-                raise
-            failed.append(day.isoformat())
-            progress(f"[조회 실패] {day.isoformat()}: {e.message}")
-            # 처음부터 연속으로 막히면 국회 API 전체 장애: 남은 날짜도 모두 실패하므로(하루 수 분씩 낭비)
-            # 일찍 멈추고 다음 예약 실행에 맡긴다. 중간에 한두 날만 막힌 경우는 계속해 나머지를 살린다
-            if len(failed) >= STOP_AFTER_FAILS and len(failed) == (day - start).days + 1:
-                progress(f"연속 {STOP_AFTER_FAILS}일 접속 실패: 국회 API가 막힌 것으로 보고 중단(다음 예약 실행에서 재시도)")
-                raise AssemblyAPIError("HTTP", f"국회 API 접속 불가(연속 {STOP_AFTER_FAILS}일 실패)")
-        day += timedelta(days=1)
+    done: list[str] = []
+    try:
+        for i, day in enumerate(days):
+            q = {**(params or {}), "CONF_DATE": day}
+            try:
+                for m in client.committee_meetings(only_target=only_target, **q):
+                    store.upsert_meeting(m)
+                    found.append(m)
+                done.append(day)
+            except AssemblyAPIError as e:
+                # 하루 조회가 막혀도(접속 시간 초과 등) 나머지 날짜와 이미 모은 회의는 살린다
+                if e.code != "HTTP":
+                    raise
+                failed.append(day)
+                progress(f"[조회 실패] {day}: {e.message}")
+                # 처음부터 연속으로 막히면 국회 API 전체 장애: 남은 날짜도 모두 실패하므로(하루 수 분씩 낭비)
+                # 일찍 멈추고 다음 예약 실행에 맡긴다. 중간에 한두 날만 막힌 경우는 계속해 나머지를 살린다
+                if len(failed) >= STOP_AFTER_FAILS and len(failed) == i + 1:
+                    progress(f"연속 {STOP_AFTER_FAILS}일 접속 실패: 국회 API가 막힌 것으로 보고 중단(다음 예약 실행에서 재시도)")
+                    raise AssemblyAPIError("HTTP", f"국회 API 접속 불가(연속 {STOP_AFTER_FAILS}일 실패)")
+    finally:
+        store.update_collect_gaps(failed=failed, succeeded=done)
     progress(f"{date_from}~{date_to}: 회의 {len(found)}건 메타데이터 저장"
              + (f" · 조회 실패 {len(failed)}일({', '.join(failed)})" if failed else ""))
-    total_days = (end - start).days + 1
+    total_days = len(days)
     if failed and len(failed) == total_days:
         raise AssemblyAPIError("HTTP", f"모든 날짜 조회 실패({total_days}일): 국회 API에 접속할 수 없습니다.")
     return found

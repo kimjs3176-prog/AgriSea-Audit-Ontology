@@ -151,3 +151,29 @@ def test_collect_range_stops_early_when_api_is_down(store, settings, monkeypatch
         pipeline.collect_range(store, settings, "2024-10-01", "2024-10-15", {"DAE_NUM": "22"},
                                progress=lambda _: None)
     assert len(calls) == pipeline.STOP_AFTER_FAILS
+
+
+def test_failed_day_is_retried_by_next_resume(store, settings, monkeypatch):
+    """조회에 실패한 날은 기록돼 다음 수집(retry_gaps)에서 기간보다 앞서 있어도 다시 조회하고, 성공하면 기록이 지워진다.
+    (예전에는 실패일 뒤 8일 넘게 회의가 쌓이면 --resume 창이 그날을 지나쳐 그날 회의가 영영 빠졌다)"""
+    from agrisea import pipeline
+    calls, down = [], {"2024-10-08"}
+
+    def fake_meetings(self, only_target=True, **q):
+        calls.append(q["CONF_DATE"])
+        if q["CONF_DATE"] in down:
+            raise AssemblyAPIError("HTTP", "Connection timed out")
+        return [{**normalize_row(ROW_A1), "agendas": []}] if q["CONF_DATE"] == "2024-10-08" else []
+
+    monkeypatch.setattr(AssemblyClient, "committee_meetings", fake_meetings)
+    quiet = {"progress": lambda _: None, "retry_gaps": True}
+    pipeline.collect_range(store, settings, "2024-10-07", "2024-10-09", {"DAE_NUM": "22"}, **quiet)
+    assert store.collect_gaps() == ["2024-10-08"]
+    h_gap = store.content_hash()
+    down.clear(); calls.clear()
+    found = pipeline.collect_range(store, settings, "2024-10-20", "2024-10-21", {"DAE_NUM": "22"}, **quiet)
+    assert calls == ["2024-10-08", "2024-10-20", "2024-10-21"] and len(found) == 1
+    assert store.collect_gaps() == [] and store.content_hash() != h_gap
+    calls.clear()   # 기록이 없으면 기간만 조회
+    pipeline.collect_range(store, settings, "2024-10-20", "2024-10-20", {"DAE_NUM": "22"}, **quiet)
+    assert calls == ["2024-10-20"]

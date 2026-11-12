@@ -131,7 +131,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.date_from:
             meetings = collect_range(store, settings, args.date_from,
                                      args.date_to or date.today().isoformat(), params,
-                                     only_target=not args.all_committees)
+                                     only_target=not args.all_committees, retry_gaps=args.resume)
         else:
             meetings = collect(store, settings, {**params, "CONF_DATE": args.date},
                                only_target=not args.all_committees)
