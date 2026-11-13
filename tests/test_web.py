@@ -150,3 +150,15 @@ def test_security_headers_and_param_bounds(store, settings):
     # 음수 개수는 SPARQL 문법 오류(500) 대신 입력 오류
     assert c.get("/api/ontology/instances", params={"cls": "https://w3id.org/agrisea/ontology#Meeting",
                                                     "limit": -1}).status_code == 422
+
+
+def test_detail_views_ignore_stale_responses(store, settings):
+    """회의·쟁점을 빠르게 연달아 고르면 늦게 온 앞선 응답이 새 선택을 덮어쓰지 않는다(최신 요청 번호만 그림).
+    브라우저 재현: 첫 응답을 늦추고 57590→57571을 고르면 고치기 전에는 주소는 57571인데 57590 내용이 보였다."""
+    import re
+    html = TestClient(create_app(settings, store)).get("/").text
+    for fn, key, box in (("showMeeting", "meeting", "mDetail"), ("showIssue", "issue", "iDetail")):
+        body = re.search(rf"async function {fn}\(.*?\n}}\n", html, re.S).group(0)
+        assert f"const tok = ++seq.{key};" in body
+        first_render = body.index(f'$("#{box}").innerHTML = `\n')   # 본문 그리기(오류 안내 한 줄은 제외)
+        assert body.index(f"if(tok !== seq.{key}) return;") < first_render

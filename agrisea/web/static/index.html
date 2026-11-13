@@ -1235,6 +1235,8 @@ function columns(rows, {label = r => r.label, tip = r => ""} = {}){
 
 // ── 회의록 ──
 let meetingsCache = [], selMeeting = null;
+// 화면별 요청 번호: 빠르게 연달아 고르면 늦게 도착한 앞선 응답이 새 선택을 덮어쓰지 않게 최신 요청만 그린다
+const seq = {meeting: 0, issue: 0};
 async function loadMeetings(){ meetingsCache = await api("/api/meetings?" + sessParam()); renderMeetingList() }
 function renderMeetingList(){
   const f = $("#mq").value.trim();
@@ -1282,15 +1284,17 @@ function turnsHtml(mid, turns){
   return nav + `<div class="scrollbox tall">${cards}</div>`;
 }
 async function showMeeting(id, useLlm = false){
+  const tok = ++seq.meeting;
   selMeeting = id; document.querySelectorAll("#mList .item").forEach(el => el.classList.toggle("sel", el.dataset.id === id));
   setHash("meetings/" + id);
   $("#mDetail").innerHTML = '<div class="card empty">불러오는 중…</div>';
   let s, tr;
   try{ [s, tr] = await Promise.all([api(`/api/meetings/${encodeURIComponent(id)}/summary?llm=${useLlm}`),
                                      api(`/api/meetings/${encodeURIComponent(id)}/turns`).catch(() => ({turns: []})), loadReadable()]) }
-  catch(e){ $("#mDetail").innerHTML = `<div class="card">오류: ${esc(e.message)}</div>`; return }
+  catch(e){ if(tok === seq.meeting) $("#mDetail").innerHTML = `<div class="card">오류: ${esc(e.message)}</div>`; return }
   const turns = tr.turns;
   const m = s.meeting, llm = s.llm, stats = await api("/api/stats");
+  if(tok !== seq.meeting) return;
   const agendas = s.agenda_summaries.filter(a => a.summary.length);
   transcript = {id, utts: null, agendas: m.agendas, filter: "", find: "", speaker: "", limit: 300};
   const nMain = m.agendas.filter(a => /^\s*\d+\s*\./.test(a)).length || m.agendas.length;
@@ -1615,11 +1619,13 @@ async function loadIssues(){
 function pickIssue(id){ return showIssue(id).then(() => toDetail("#iDetail")) }
 function markSelected(){ document.querySelectorAll("#tree .hit").forEach(el => el.classList.toggle("sel", el.dataset.key === selIssue)) }
 async function showIssue(id){
+  const tok = ++seq.issue;
   selIssue = id; markSelected(); setHash("issues/" + id);
   $("#iDetail").innerHTML = '<div class="card empty">불러오는 중…</div>';
   let d;
   try{ d = await api(`/api/issues/${encodeURIComponent(id)}?` + sessParam()) }
-  catch(e){ $("#iDetail").innerHTML = `<div class="card">오류: ${esc(e.message)}</div>`; return }
+  catch(e){ if(tok === seq.issue) $("#iDetail").innerHTML = `<div class="card">오류: ${esc(e.message)}</div>`; return }
+  if(tok !== seq.issue) return;
   const allSess = SESSIONS.map(s => s.session_no).sort((a, b) => a - b);
   const byS = Object.fromEntries(d.by_session.map(x => [x.session, x.count]));
   const cmax = Math.max(1, ...d.by_session.map(x => x.count));
