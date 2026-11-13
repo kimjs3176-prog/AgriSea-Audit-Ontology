@@ -49,3 +49,21 @@ def test_upsert_keeps_stored_agenda_order_when_api_reshuffles():
     assert s.content_hash() == before
     s.upsert_meeting({**base, "agendas": ["1. 농협법(갑)", "3. 양곡법(정)"]})
     assert s.meeting("M1")["agendas"] == ["1. 농협법(갑)", "3. 양곡법(정)"]
+
+
+def test_parsed_meeting_keeps_minutes_agendas():
+    """회의록을 받으면 안건 목록은 회의록 첫머리 순서(발언 agenda_idx 기준)가 되고, 이후 API가 다른 순서·일부만 줘도
+    바뀌지 않는다(예전에는 API 목록으로 덮여 발언에 다른 안건 제목이 붙었다)."""
+    from agrisea.parser import parse_minutes
+    from agrisea.store import Store
+    s = Store(":memory:")
+    base = {"meeting_id": "M1", "title": "제439회 제3차 소위원회", "date": "2026-11-03", "session_no": 439}
+    s.upsert_meeting({**base, "agendas": ["2. 기본법(을)(의안번호 2200002)", "1. 농협법(갑)(의안번호 2200001)"]})
+    s.save_minutes("M1", parse_minutes("의사일정\n1. 농협법(갑)(의안번호 2200001)\n2. 기본법(을)(의안번호 2200002)\n"
+                                       "◯위원장 홍길동 상정합니다.\n2. 기본법(을)(의안번호 2200002)\n"
+                                       "◯김가람 위원 기본법 질의입니다.\n"))
+    want = ["1. 농협법(갑)(의안번호 2200001)", "2. 기본법(을)(의안번호 2200002)"]
+    assert s.meeting("M1")["agendas"] == want
+    assert [u["agenda_idx"] for u in s.utterances(meeting_id="M1")] == [0, 1]
+    s.upsert_meeting({**base, "agendas": ["2. 기본법(을)(의안번호 2200002)"]})
+    assert s.meeting("M1")["agendas"] == want

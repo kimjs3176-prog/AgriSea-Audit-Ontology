@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, Iterator
 
 from .lexicon import match_issues, match_organizations
-from .parser import MinutesDoc
+from .parser import MinutesDoc, align_agendas
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS meetings (
@@ -155,10 +155,12 @@ class Store:
         with self.tx() as c:
             # 열린국회정보 API는 같은 회의의 안건을 요청마다 다른 순서로 줄 때가 있다. 같은 안건 묶음이면 저장된
             # 순서를 지킨다(순서만 바뀌어도 내용 해시가 달라져 전체 재계산·데이터 커밋이 되풀이되던 것을 막음).
-            row = c.execute("SELECT agendas_json FROM meetings WHERE id=?", (m["meeting_id"],)).fetchone()
+            # 회의록을 이미 받은 회의는 회의록 첫머리에서 정한 안건 목록(발언의 agenda_idx 기준)을 지킨다.
+            row = c.execute("SELECT agendas_json, text_status FROM meetings WHERE id=?",
+                            (m["meeting_id"],)).fetchone()
             if row and row["agendas_json"]:
                 stored = json.loads(row["agendas_json"])
-                if sorted(stored) == sorted(agendas):
+                if (row["text_status"] == "parsed" and stored) or sorted(stored) == sorted(agendas):
                     agendas = stored
             c.execute("DELETE FROM kv")
             c.execute("DELETE FROM summaries WHERE meeting_id=? AND kind='rule'", (m["meeting_id"],))
@@ -186,12 +188,13 @@ class Store:
             c.execute("DELETE FROM utterances WHERE meeting_id=?", (meeting_id,))
             c.execute("DELETE FROM summaries WHERE meeting_id=?", (meeting_id,))
             if doc.agendas:
+                # 발언의 agenda_idx 는 회의록 첫머리 안건 목록의 자리이므로 그 목록을 회의 안건으로 둔다
+                # (API 안건 목록은 순서가 다르거나 일부가 빠져 있어 그대로 쓰면 발언에 다른 안건 제목이 붙었다).
                 row = c.execute("SELECT agendas_json FROM meetings WHERE id=?",
                                 (meeting_id,)).fetchone()
-                existing = json.loads(row["agendas_json"]) if row else []
-                if not existing:
-                    c.execute("UPDATE meetings SET agendas_json=? WHERE id=?",
-                              (json.dumps(doc.agendas, ensure_ascii=False), meeting_id))
+                api = json.loads(row["agendas_json"]) if row and row["agendas_json"] else []
+                c.execute("UPDATE meetings SET agendas_json=? WHERE id=?",
+                          (json.dumps(align_agendas(doc.agendas, api), ensure_ascii=False), meeting_id))
             for u in doc.utterances:
                 c.execute(
                     """INSERT INTO utterances (meeting_id, idx, speaker_name, speaker_role,

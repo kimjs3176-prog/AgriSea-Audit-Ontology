@@ -23,7 +23,7 @@ PAGE_NOISE = [
     re.compile(r"^\s*제\s*\d+\s*회.{0,40}제\s*\d+\s*호\s*$"),
     re.compile(r"^\s*국\s*회\s*사\s*무\s*처\s*$"),
 ]
-AGENDA_LINE = re.compile(r"^\s*(\d{1,2})\s*\.\s*(.{4,120}?)\s*(?:[·.…]{3,}\s*\d+)?\s*$")
+AGENDA_LINE = re.compile(r"^\s*(\d{1,3})\s*\.\s*(.{4,120}?)\s*(?:[·.…]{3,}\s*\d+)?\s*$")
 OFFICIAL_SUFFIX = (r"(?:장관|차관|청장|처장|실장|국장|본부장|원장|사장|이사장|회장|대표이사|대표|"
                    r"정책관|단장|과장|총장|전문위원|수석전문위원|입법조사관|증인|참고인|진술인)")
 
@@ -155,19 +155,51 @@ def parse_speaker(chunk: str) -> tuple[str, str, str] | None:
     return None
 
 
+# 목차 줄 끝의 점선과 쪽 번호: '출석 요구의 건 ········ 1 1'
+_LEADER_TAIL = re.compile(r"(?:\s*[·.…‧∙・]){3,}[\s\d]*$")
+
+
 def _extract_agendas(preamble: str) -> list[str]:
+    """회의록 첫머리(의사일정·상정된 안건)의 안건 목록. 발언의 agenda_idx 는 이 목록의 자리다.
+    의사일정과 상정된 안건에 같은 안건이 띄어쓰기·점선·쪽 번호만 달리 두 번 나오므로 한 번만 넣는다."""
     agendas: list[str] = []
+    keys: set[str] = set()
     for line in preamble.split("\n"):
         m = AGENDA_LINE.match(line)
         if m:
-            title = re.sub(r"\s+", " ", m.group(2)).strip(" ·.")
-            if title and title not in agendas:
+            title = _LEADER_TAIL.sub("", re.sub(r"\s+", " ", m.group(2))).strip(" ·.")
+            if title and _norm(title) not in keys:
+                keys.add(_norm(title))
                 agendas.append(title)
     return agendas
 
 
 def _norm(s: str) -> str:
     return re.sub(r"\s+", "", s)
+
+
+_AGENDA_NO = re.compile(r"^\s*(?:\d{1,3}|[가-힣])\s*\.\s*")
+_BILL_NO = re.compile(r"의안번호\s*(\d{5,})")
+
+
+def align_agendas(minutes: list[str], api: list[str]) -> list[str]:
+    """회의 안건 목록 = 회의록 첫머리 순서(발언의 agenda_idx 기준). 표기는 같은 안건의 API 문구가 있으면 그것을
+    쓴다(PDF 추출 문구는 띄어쓰기가 깨지기 쉬움). 짝은 의안번호, 없으면 띄어쓰기·번호를 뺀 제목으로 찾는다."""
+    key = lambda s: re.sub(r"[\s·ㆍ.,]", "", _AGENDA_NO.sub("", s))  # noqa: E731
+    pool = list(api)
+    out = []
+    for i, a in enumerate(minutes):
+        b, k = _BILL_NO.search(a), key(a)
+        hit = next((x for x in pool if b and (bx := _BILL_NO.search(x)) and bx.group(1) == b.group(1)), None)
+        if hit is None and k:
+            hit = next((x for x in pool if key(x)[:40] == k[:40]), None)
+        if hit is None and len(k) >= 12:  # 줄바꿈으로 '(의안번호'에서 끊긴 회의록 제목 등: 한쪽이 다른 쪽의 앞부분
+            hit = next((x for x in pool if len(key(x)) >= 12 and (key(x).startswith(k) or k.startswith(key(x)))),
+                       None)
+        if hit is not None:
+            pool.remove(hit)
+        out.append(f"{i + 1}. " + (_AGENDA_NO.sub("", hit).strip() if hit is not None else a))
+    return out
 
 
 def parse_minutes(raw_text: str) -> MinutesDoc:
