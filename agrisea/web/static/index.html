@@ -1039,7 +1039,7 @@ function barsHtml(rows, {onclick = ""} = {}){
   const max = Math.max(1, ...rows.filter(r => !r.parentRow).map(r => r.count));
   return `<div class="bars">${rows.map(r => {
     const key = r.id ?? r.name, label = r.label ?? r.name;
-    return `<div class="hit ${onclick ? "click" : ""}" data-key="${esc(key)}" ${onclick ? `onclick="${onclick}(${jsq(key)})"` : ""} data-tip="${esc(label)} ${fmt(r.count)}회">
+    return `<div class="hit ${onclick ? "click" : ""}" data-key="${esc(key)}" ${onclick ? `onclick="${onclick}(${jsq(key)})" tabindex="0" role="button"` : ""} data-tip="${esc(label)} ${fmt(r.count)}회">
       <span class="name ${r.parentRow ? "parent" : ""}" style="${r.indent ? "padding-left:14px" : ""}">${esc(label)}</span>
       <span>${r.parentRow ? "" : `<span class="fill" style="width:${r.count ? Math.max(2, r.count / max * 100) : 0}%"></span>`}</span>
       <span class="num">${fmt(r.count)}</span></div>` }).join("")}</div>`;
@@ -1106,7 +1106,7 @@ async function loadDash(){
   $("#heat").innerHTML = rows.length ? `<table><thead><tr><th></th>${cols.map(c => {
       const ss = SESS[c];
       return `<th class="${ss?.kind === "정기회" ? "reg" : ""}" data-tip="${esc(ss ? ss.label : "제" + c + "회")}">${c}</th>` }).join("")}<th style="text-align:right">계</th></tr></thead>
-    <tbody>${rows.map(r => `<tr><th class="rowh" onclick="gotoIssue('${r.id}')">${esc(r.label)}</th>${cols.map(c => {
+    <tbody>${rows.map(r => `<tr><th class="rowh" tabindex="0" role="button" onclick="gotoIssue('${r.id}')">${esc(r.label)}</th>${cols.map(c => {
       const v = r.by_session[c] || 0, pct = v ? 8 + 92 * Math.sqrt(v / hmax) : 0;
       return `<td class="${pct > 58 ? "hi" : ""}" style="${v ? `background:color-mix(in oklab, var(--seq) ${pct.toFixed(0)}%, var(--panel))` : "border:1px dashed var(--line)"}"
         data-tip="${esc(SESS[c]?.label || "제" + c + "회")}<br><b>${esc(r.label)}</b> ${fmt(v)}회">${v || ""}</td>` }).join("")}<td class="tot">${fmt(r.recent)}</td></tr>`).join("")}</tbody></table>`
@@ -1244,7 +1244,7 @@ function renderMeetingList(){
   let html = "", last = null;
   for(const m of ms){
     if(m.session_no !== last){ last = m.session_no; html += `<div class="group">${esc(SESS[m.session_no]?.label || "제" + m.session_no + "회")}</div>` }
-    html += `<div class="item ${m.id === selMeeting ? "sel" : ""}" data-id="${esc(m.id)}">
+    html += `<div class="item ${m.id === selMeeting ? "sel" : ""}" tabindex="0" role="button" data-id="${esc(m.id)}">
       <div class="d">${dot(m.date)}<span class="sep"></span>안건 ${m.agendas.length}건 ${m.text_status !== "parsed" ? '<span class="chip warn">본문 미수집</span>' : ""}</div>
       <div class="t">${esc(meetingShort(m))}</div></div>`;
   }
@@ -1597,6 +1597,14 @@ async function doSearch(){
   catch(e){ $("#mDetail").innerHTML = `<div class="card">검색 오류: ${esc(e.message)}</div>`; return }
   renderSearch();
 }
+// 목록 항목(div·th에 role="button")을 키보드로도 고른다: Tab으로 옮겨 가고 Enter·Space로 연다
+document.addEventListener("keydown", e => {
+  const t = e.target;
+  // SVG 흐름도 노드는 자체 처리(onkeydown)가 있어 HTML 요소만
+  if((e.key === "Enter" || e.key === " ") && t instanceof HTMLElement && t.matches('[role="button"][tabindex]:not(button)')){
+    e.preventDefault(); t.click();
+  }
+});
 $("#qBtn").onclick = doSearch; $("#q").onkeydown = e => { if(e.key === "Enter") doSearch() };
 
 // ── 쟁점 ──
@@ -1698,7 +1706,7 @@ async function loadMembers(force = false){
 function renderMemberList(){
   const f = $("#mbq").value.trim(), rows = mbState.rows || [];
   const hit = r => !f || (r.name + r.top_issues.map(i => i.label).join(" ") + r.keywords.join(" ")).includes(f);
-  $("#mbList").innerHTML = rows.filter(hit).map(r => `<div class="item ${r.name === mbState.sel ? "sel" : ""}" data-name="${esc(r.name)}">
+  $("#mbList").innerHTML = rows.filter(hit).map(r => `<div class="item ${r.name === mbState.sel ? "sel" : ""}" tabindex="0" role="button" data-name="${esc(r.name)}">
       <div class="d">질의 ${fmt(r.counts.questions)}<span class="sep"></span>회의 ${fmt(r.counts.meetings)}${r.counts.promises ? `<span class="sep"></span>받아낸 약속 ${fmt(r.counts.promises)}` : ""}</div>
       <div class="t">${esc(r.name)} 의원</div>
       <div class="h">${chips(r.top_issues.slice(0, 2).map(i => i.label), "member")}${r.perspectives[0] ? `<span class="chip line">${esc(r.perspectives[0].label)}</span>` : ""}</div>
@@ -2279,7 +2287,7 @@ function fuKeepSelection(){
 }
 function renderFuList(){
   const rows = fuRows();
-  $("#fuList").innerHTML = rows.map(x => `<div class="item fuitem ${x.id === fuState.sel ? "sel" : ""}" data-id="${x.id}">
+  $("#fuList").innerHTML = rows.map(x => `<div class="item fuitem ${x.id === fuState.sel ? "sel" : ""}" tabindex="0" role="button" data-id="${x.id}">
       <div class="d">${fuChip(x.status, x.status_label)} ${dot(x.date)}<span class="sep"></span>${esc(x.org || x.speaker)}${x.n_evidence ? `<span class="sep"></span>근거 ${x.n_evidence}` : ""}</div>
       <div class="t fut">${esc(cut(x.text, 110))}</div>
       <div class="h muted" style="font-size:12px">${esc(x.action_label)}${x.laws.length ? ", " + esc(x.laws.join(", ")) : ""}${x.keywords.length ? ", " + esc(x.keywords.slice(0, 3).join(", ")) : ""}</div></div>`).join("")
@@ -2500,7 +2508,7 @@ function renderOntoClasses(){
   const s = onto.summary, kids = {};
   s.classes.forEach(c => (kids[c.parent || ""] ||= []).push(c));
   Object.values(kids).forEach(a => a.sort((x, y) => y.count - x.count));
-  const row = (c, d) => `<div class="ot-row" style="--d:${d}" onclick="showClass(${jsq(c.iri)})" data-tip="${esc(c.comment || c.label)}">
+  const row = (c, d) => `<div class="ot-row" tabindex="0" role="button" style="--d:${d}" onclick="showClass(${jsq(c.iri)})" data-tip="${esc(c.comment || c.label)}">
       <span>${esc(c.label)}</span><span class="num">${fmt(c.count)}</span>${c.inferred ? `<span class="chip line inf">추론 ${fmt(c.inferred)}</span>` : ""}</div>`
     + (kids[c.iri] || []).map(k => row(k, d + 1)).join("");
   $("#oTree").innerHTML = (kids[""] || []).map(c => row(c, 0)).join("");
@@ -2551,7 +2559,7 @@ $("#oQ").oninput = () => { clearTimeout(oTimer); oTimer = setTimeout(async () =>
   if(!q){ $("#oHits").innerHTML = ""; return }
   try{
     const hits = await api("/api/ontology/search?q=" + encodeURIComponent(q));
-    $("#oHits").innerHTML = hits.map(h => `<div class="item" onclick="showEntity(${jsq(h.iri)})"><div class="d">${esc(h.type)}${h.note ? `<span class="sep"></span>${esc(h.note)}` : ""}</div><div class="t">${esc(cut(h.label, 80))}</div></div>`).join("")
+    $("#oHits").innerHTML = hits.map(h => `<div class="item" tabindex="0" role="button" onclick="showEntity(${jsq(h.iri)})"><div class="d">${esc(h.type)}${h.note ? `<span class="sep"></span>${esc(h.note)}` : ""}</div><div class="t">${esc(cut(h.label, 80))}</div></div>`).join("")
       || '<div class="empty">찾은 개체가 없습니다.</div>';
   }catch(e){ $("#oHits").innerHTML = `<div class="notice">${esc(e.message)}</div>` }
 }, 250) };

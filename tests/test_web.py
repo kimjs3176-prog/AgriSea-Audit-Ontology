@@ -162,3 +162,16 @@ def test_detail_views_ignore_stale_responses(store, settings):
         assert f"const tok = ++seq.{key};" in body
         first_render = body.index(f'$("#{box}").innerHTML = `\n')   # 본문 그리기(오류 안내 한 줄은 제외)
         assert body.index(f"if(tok !== seq.{key}) return;") < first_render
+
+
+def test_list_items_are_keyboard_accessible(store, settings):
+    """회의·의원·이행 추적·쟁점 목록, 쟁점 표 행, 지식그래프 클래스·검색 결과는 마우스로만 고를 수 있었다(WCAG 2.1.1).
+    Tab으로 포커스를 받고(tabindex), Enter·Space로 열리게(role=button + 공통 키 처리) 한다."""
+    html = TestClient(create_app(settings, store)).get("/").text
+    for marker in ('<div class="item ${m.id === selMeeting ? "sel" : ""}" tabindex="0" role="button"',
+                   '<div class="item ${r.name === mbState.sel ? "sel" : ""}" tabindex="0" role="button"',
+                   '<div class="item fuitem ${x.id === fuState.sel ? "sel" : ""}" tabindex="0" role="button"',
+                   '<th class="rowh" tabindex="0" role="button"', '<div class="ot-row" tabindex="0" role="button"',
+                   '<div class="item" tabindex="0" role="button" onclick="showEntity('):
+        assert marker in html, marker
+    assert "matches('[role=\"button\"][tabindex]:not(button)')" in html and 'e.key === " "' in html
