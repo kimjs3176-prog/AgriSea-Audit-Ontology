@@ -175,3 +175,15 @@ def test_list_items_are_keyboard_accessible(store, settings):
                    '<div class="item" tabindex="0" role="button" onclick="showEntity('):
         assert marker in html, marker
     assert "matches('[role=\"button\"][tabindex]:not(button)')" in html and 'e.key === " "' in html
+
+
+def test_in_app_navigation_adds_history_entries(store, settings):
+    """앱 안 이동은 history.pushState 로 기록을 남겨 뒤로 가기가 앞 화면으로 돌아온다(예전엔 replaceState 뿐이라
+    뒤로 가기가 앱을 벗어났다). 주소에서 다시 그리는 동안은 기록을 늘리지 않고, 깨진 주소는 대시보드로 연다."""
+    import re
+    html = TestClient(create_app(settings, store)).get("/").text
+    body = re.search(r"function setHash\(h\)\{.*?\n\}\n", html, re.S).group(0)
+    assert "history.pushState(null, \"\", nh)" in body and "routing || now - lastPush < 400" in body
+    route = re.search(r"function routeFromHash\(\)\{.*?\n\}\n", html, re.S).group(0)
+    assert "try{ path = decodeURIComponent(path) }catch(e){ path = \"\" }" in route
+    assert 'addEventListener("hashchange", () => { if(!routeFromHash())' in html
