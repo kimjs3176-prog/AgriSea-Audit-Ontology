@@ -1002,11 +1002,27 @@ $("#session").onchange = () => {
 
 // ── 탭 ──
 // ── 주소(해시)로 화면 공유: #/meetings/회의ID, #/issues/쟁점ID, #/brief, #/data(데이터 현황) ──
-function setHash(h){ try{ history.replaceState(null, "", "#/" + h) }catch(e){} }
+// 앱 안 이동을 브라우저 기록에 남겨 뒤로 가기·앞으로 가기가 앞 화면으로 돌아오게 한다.
+// 한 동작(탭 열기 → 항목 고르기)이 잇달아 부르는 setHash 는 한 기록으로 합치고, 주소에서 화면을 다시 그리는
+// 동안(routing: 처음 열 때·뒤로 가기)에는 기록을 늘리지 않는다.
+let routing = null, lastPush = 0;
+function setHash(h){
+  const nh = "#/" + h;
+  try{
+    if(location.hash === nh){ if(routing && nh === routing.target) routing = null; return }
+    const now = performance.now();
+    if(routing || now - lastPush < 400){ history.replaceState(null, "", nh); if(routing && nh === routing.target) routing = null }
+    else{ history.pushState(null, "", nh); lastPush = now }
+  }catch(e){}
+}
 // 좁은 화면에서는 목록 아래에 상세가 있으므로, 고르면 상세로 내려가 보여 준다
 function toDetail(sel){ if(matchMedia("(max-width:860px)").matches) $(sel)?.scrollIntoView({block: "start", behavior: "smooth"}) }
 function routeFromHash(){
-  let [tab, ...rest] = decodeURIComponent(location.hash.replace(/^#\/?/, "")).split("/");
+  const target = location.hash;
+  routing = {target}; setTimeout(() => { if(routing?.target === target) routing = null }, 3000);
+  let path = location.hash.replace(/^#\/?/, "");
+  try{ path = decodeURIComponent(path) }catch(e){ path = "" }   // 깨진 주소(%E0%A4%A 등)는 대시보드로
+  let [tab, ...rest] = path.split("/");
   if(tab === "kg") tab = "ontology";   // 지식그래프 탭 주소는 #/kg(예전 #/ontology 주소도 그대로 열림)
   const id = rest.join("/");  // 지식그래프 개체 주소는 '/'를 포함한다
   if(tab === "meetings" && id){ gotoMeeting(id).then(() => toDetail("#mDetail")); return true }
@@ -1017,6 +1033,7 @@ function routeFromHash(){
   if(tab === "sparql"){ gotoSparql(); return true }
   if(tab === "data"){ gotoDataStatus(); return true }
   if(["meetings", "issues", "members", "followups", "brief", "ontology"].includes(tab)){ openTab(tab); return true }
+  routing = null;   // 주소가 화면을 가리키지 않으면(대시보드) 다음 이동부터 기록을 쌓는다
   return false;
 }
 function openTab(t, load = true){
@@ -2620,8 +2637,12 @@ function globalSearch(){
 (async () => {
   try{ await loadSessions() }catch(e){}
   loadDash(); fillBriefSelectors().catch(() => {});
-  addEventListener("hashchange", routeFromHash);   // 링크로 들어오거나 뒤로 가기
-  if(!routeFromHash()){ try{ const t = localStorage.getItem("agrisea-tab"); if(t && !["dash", "search"].includes(t)) openTab(t) }catch(e){} }
+  // 링크로 들어오거나 뒤로 가기. 주소가 비면(처음 화면) 대시보드로 돌아간다(기록은 늘리지 않음)
+  addEventListener("hashchange", () => { if(!routeFromHash()){ routing = {target: null}; openTab("dash"); routing = null } });
+  if(!routeFromHash()){
+    // 지난번 탭을 다시 여는 것은 사용자의 이동이 아니므로 기록을 남기지 않는다
+    try{ const t = localStorage.getItem("agrisea-tab"); if(t && !["dash", "search"].includes(t)){ routing = {target: null}; openTab(t); routing = null } }catch(e){ routing = null }
+  }
 })();
 </script>
 </body>
