@@ -153,3 +153,11 @@ def test_agendas_dedupe_and_three_digit_numbers():
         "1. 농업협동조합법 일부개정법률안(박덕흠 의원 대표발의)(의안번호 2209214)",
         "2. 농업·농촌 및 식품산업 기본법 일부개정법률안(서천호 의원 대표발의)(의안번호 2213533)",
         "3. 업무현황보고"]
+
+
+def test_eopseoyo_statement_is_not_a_question():
+    """'없어요'로 끝나는 진술은 질의가 아니다(물음표가 있을 때만 질의)."""
+    from agrisea.lexicon import QUESTION_PATTERNS
+    assert not QUESTION_PATTERNS.search("가공시설이 하나도 없어요. 대책을 세워 주세요.")
+    assert QUESTION_PATTERNS.search("그런 계획은 없어요?")
+    assert QUESTION_PATTERNS.search("대책이 있습니까")
