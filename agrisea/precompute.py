@@ -23,7 +23,8 @@ from .store import Store
 # 17: 회의 진행 질의·진술인 질의 분류(스키마 0.3)
 # 18: 같은 질의 차례로 추정 질의 대상 기관(ag:likelyAddressedTo)
 # 19: 회의 진행 표현 보강('1분도', '마무리 하시지요')
-PRECOMPUTE_VERSION = 20  # 20: 회의록 끝 부록(출석 위원·참석자·증인 명단)을 마지막 발언에서 떼어 냄
+# 20: 회의록 끝 부록(출석 위원·참석자·증인 명단)을 마지막 발언에서 떼어 냄
+PRECOMPUTE_VERSION = 21  # 21: '없어요'를 물음표가 있을 때만 질의로 판정
 
 
 def current_policy() -> dict:
