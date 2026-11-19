@@ -161,3 +161,15 @@ def test_eopseoyo_statement_is_not_a_question():
     assert not QUESTION_PATTERNS.search("가공시설이 하나도 없어요. 대책을 세워 주세요.")
     assert QUESTION_PATTERNS.search("그런 계획은 없어요?")
     assert QUESTION_PATTERNS.search("대책이 있습니까")
+
+
+def test_commitment_variants_and_hedged_sentences():
+    """'검토해 보겠습니다'·'확인해 보겠습니다'·'보고드리도록 하겠습니다'도 약속이고, '하겠습니다마는 …'처럼
+    단서가 붙은 문장은 앞만 떼어 약속으로 보지 않는다."""
+    from agrisea.lexicon import is_commitment
+    assert is_commitment("예, 그 부분은 저희가 검토해 보겠습니다")
+    assert is_commitment("그건 다시 한번 확인해 보겠습니다")
+    assert is_commitment("대책이 마련되는 대로 결과를 위원님께 보고드리도록 하겠습니다")
+    assert is_commitment("관계 부처하고 협의해 보도록 하겠습니다")
+    assert not is_commitment("검토를 하겠습니다마는 예산 사정상 어렵습니다")
+    assert not is_commitment("오늘 업무현황을 보고드리겠습니다")   # 업무보고 인사는 여전히 제외
