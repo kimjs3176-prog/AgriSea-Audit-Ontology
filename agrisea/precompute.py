@@ -25,7 +25,8 @@ from .store import Store
 # 19: 회의 진행 표현 보강('1분도', '마무리 하시지요')
 # 20: 회의록 끝 부록(출석 위원·참석자·증인 명단)을 마지막 발언에서 떼어 냄
 # 21: '없어요'를 물음표가 있을 때만 질의로 판정
-PRECOMPUTE_VERSION = 22  # 22: '검토해 보겠습니다'·'보고드리도록 하겠습니다' 등을 약속으로, '하겠습니다마는'은 제외
+# 22: '검토해 보겠습니다'·'보고드리도록 하겠습니다' 등을 약속으로, '하겠습니다마는'은 제외
+PRECOMPUTE_VERSION = 23  # 23: 대시보드·위원 분석·브리핑의 약속을 이행 추적 대상과 같은 기준으로
 
 
 def current_policy() -> dict:
@@ -33,6 +34,8 @@ def current_policy() -> dict:
     return governance.policy_from_file(os.environ.get("AGRISEA_GOVERNANCE_LEDGER"))
 
 CACHED_VIEWS: dict[str, Callable[[Store], object]] = {
+    # 이행 추적을 먼저: 대시보드·위원 분석·브리핑이 같은 기준(추적 대상 약속)으로 약속을 보여 준다
+    "followups": lambda s: followup.track_all(s, current_policy()),  # 정부 약속 이행 추적(정책 반영)
     "issues": analysis.issue_overview,
     "orgs": analysis.org_overview,
     "graph": analysis.issue_network,
@@ -41,7 +44,6 @@ CACHED_VIEWS: dict[str, Callable[[Store], object]] = {
     "issue_by_session": analysis.issue_by_session,
     "overview": analysis.overview,
     "members_all": members.member_profiles,  # 전체 회기 위원별 분석(가장 무거움: 사전 계산)
-    "followups": lambda s: followup.track_all(s, current_policy()),  # 정부 약속 이행 추적(정책 반영)
     analysis.briefing_cache_key(): analysis.briefing,  # 조건 없는 전체 국감 브리핑(가장 무거운 조합)
     "program_signals": programs.supply_signals,   # 쟁점별 국회 관심 대비 지원사업 공고 공급
     "readable": readable.glossary,                # '읽기 쉽게' 보기: 끊긴 낱말 잇기·기관 약칭·법률 이름

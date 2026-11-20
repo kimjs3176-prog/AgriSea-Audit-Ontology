@@ -149,3 +149,25 @@ def test_briefing_unknown_issue_and_org_commitments(store):
         briefing(store, issue="없는쟁점")
     b = briefing(store, org="해양수산부")
     assert b["commitments"] and all(c["org"] == "해양수산부" for c in b["commitments"])
+
+
+def test_dashboard_and_briefing_show_the_same_promises_as_followups(store):
+    """대시보드(overview)·브리핑·위원 분석이 보여 주는 약속은 이행 추적이 추적하는 약속과 같은 기준이다
+    (예전엔 화면마다 기준이 달라 대시보드의 약속이 이행 추적에선 '추적 불가'였다). 추적 결과가 없으면 예전 판정."""
+    from agrisea import analysis, followup, members
+    store.kv_set("followups", followup.track_all(store))
+    tracked = analysis.tracked_promises(store)
+    ov = analysis.overview(store)
+    br = analysis.briefing(store)
+    keys = lambda vs: {(v["meeting_id"], v.get("idx")) for v in vs}  # noqa: E731
+    assert all(c["meeting_id"] in {m for m, _ in tracked} for c in ov["commitments"])
+    assert len(br["commitments"]) == sum(1 for u in store.utterances() if u["is_commitment"]
+                                         and (u["meeting_id"], u["idx"]) in tracked)
+    profiles = members.member_profiles(store)["members"]
+    shown = [p for prof in profiles.values() for p in prof.get("promises", [])]
+    assert all(p["meeting_id"] in {m for m, _ in tracked} for p in shown)
+    # 추적 결과가 없으면 낱말 기준으로 되돌아간다
+    store.conn.execute("DELETE FROM kv WHERE key='followups'"); store.conn.commit()
+    assert analysis.tracked_promises(store) is None
+    assert analysis.shown_promise(None, {"meeting_id": "x", "idx": 0}, "쌀값 안정 대책을 마련하겠습니다")
+    del keys

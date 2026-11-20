@@ -26,6 +26,22 @@ def _specific_promise(text: str) -> bool:
     return len([t for t in tokenize(text) if t not in _GENERIC_PROMISE]) >= 3
 
 
+def tracked_promises(store: Store) -> set[tuple[str, int]] | None:
+    """이행 추적(사전 계산 'followups')이 추적하는 약속의 (회의ID, 발언 순번). 아직 계산 전이면 None."""
+    fu = store.kv_get("followups")
+    if not fu:
+        return None
+    return {(x["meeting_id"], x["idx"]) for x in fu.get("items", [])}
+
+
+def shown_promise(tracked: set[tuple[str, int]] | None, u: dict, text: str) -> bool:
+    """브리핑·대시보드·위원 분석에 '구체적 약속'으로 보일지: 이행 추적과 같은 기준(추적 대상)으로 고른다.
+    (예전엔 화면마다 낱말 수로 따로 판정해, 대시보드의 약속이 이행 추적에선 '추적 불가'이거나 그 반대였다.)"""
+    if tracked is not None:
+        return (u["meeting_id"], u["idx"]) in tracked
+    return _specific_promise(text)
+
+
 def key_point_items(utts: list[dict], n: int) -> list[dict]:
     """중요 문장 n개를 누가 한 말인지와 함께: 화면에서 발언자·쟁점을 붙인 카드로 보여 주기 위함."""
     owner: dict[str, dict] = {}
@@ -196,6 +212,7 @@ def briefing(store: Store, org: str = "", issue: str = "", keyword: str = "",
              member: str = "", date_from: str = "", date_to: str = "",
              top: int = 10, session: int | None = None) -> dict[str, Any]:
     """국정감사 대비 브리핑: 대상(기관/쟁점/키워드/위원) 관련 과거 회의록을 모아 정리."""
+    tracked = tracked_promises(store)
     issue_ids = set()
     if issue:
         issue_ids = {iid for iid, (label, parent, _) in ISSUES.items()
@@ -271,9 +288,9 @@ def briefing(store: Store, org: str = "", issue: str = "", keyword: str = "",
         "key_point_items": points,
         "top_questions": [_pair_view(p) for p in pairs_sorted[:top]],
         # 추적표에는 무엇을 하겠다는지 드러나는 약속만('지적하신 취지에 공감합니다' 류 제외)
-        "commitments": [v for v in (commitment_view(u) for u in
+        "commitments": [v for u, v in ((u, commitment_view(u)) for u in
                         sorted(commitments, key=lambda u: u["meeting_date"] or "", reverse=True))
-                        if _specific_promise(v["text"])],
+                        if shown_promise(tracked, u, v["text"])],
         "active_members": [{"name": n, "count": c} for n, c in members.most_common(10)],
         "timeline": [{"date": d, "count": c} for d, c in sorted(timeline.items())],
         "by_session": [{"session": k, "count": v} for k, v in
@@ -572,6 +589,7 @@ def agenda_headline(agendas: list[str]) -> str:
 def overview(store: Store, recent: int = 6, ledger: int = 10) -> dict:
     """대시보드용: 최근 회의 원장(대표 안건·핵심 쟁점·발언·질의·약속 수),
     최근 정부 약속(무엇을 하겠다는지 드러나는 것만, 질의 맥락 포함)."""
+    tracked = tracked_promises(store)
     out_m = []
     for m in store.meetings()[:ledger]:
         s = store.summary(m["id"], "rule") or {}
@@ -592,7 +610,7 @@ def overview(store: Store, recent: int = 6, ledger: int = 10) -> dict:
     for r in rows:
         u = store._utt(r)
         view = commitment_view(u)
-        if not _specific_promise(view["text"]):
+        if not shown_promise(tracked, u, view["text"]):
             continue
         q = next((x for x in reversed(_neighbors(store, u, before=6, after=0)[:-1])
                   if x["speaker_type"] == "member"), None)
