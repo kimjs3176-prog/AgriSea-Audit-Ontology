@@ -12,7 +12,7 @@ import re
 from collections import Counter, defaultdict
 from typing import Any
 
-from .analysis import (_HANGUL, _pair_score, _pair_view, _specific_promise, _substantive,
+from .analysis import (_HANGUL, _pair_score, _pair_view, _substantive, shown_promise, tracked_promises,
                        commitment_view, qa_pairs)
 from .lexicon import ISSUES, PERSPECTIVES, issue_label, match_organizations
 from .nlp import JOSA, STOPWORDS, WORD, _DOMAIN_TERMS, strip_josa, truncate
@@ -177,7 +177,8 @@ def _expected_questions(mine: list[dict], top_issues: list[dict], keywords: list
 
 
 def _profile(name: str, mine: list[dict], pairs: list[dict], words: dict, n_members: int,
-             min_count: int, base: dict, issue_base: dict) -> dict[str, Any]:
+             min_count: int, base: dict, issue_base: dict,
+             tracked: set[tuple[str, int]] | None = None) -> dict[str, Any]:
     questions = [u for u in mine if u["is_question"]]
     tf, kw_meetings = Counter(), defaultdict(set)
     for u in mine:
@@ -233,7 +234,7 @@ def _profile(name: str, mine: list[dict], pairs: list[dict], words: dict, n_memb
         for a in p["answers"]:
             if a["is_commitment"]:
                 v = commitment_view(a)
-                if _specific_promise(v["text"]):
+                if shown_promise(tracked, a, v["text"]):
                     promises.append({**v, "question": _pair_view(p)["question"]})
                 break
     meetings = sorted({u["meeting_id"] for u in mine})
@@ -267,6 +268,7 @@ def member_profiles(store: Store, session: int | None = None,
                     meeting_ids: list[str] | None = None) -> dict[str, Any]:
     """범위 안에서 질의한 모든 위원의 분석 결과 {scope, members: {이름: 분석}}."""
     v = vocab(store)
+    tracked = tracked_promises(store)
     utts = _scope_utts(store, session, meeting_ids)
     by_member: dict[str, list[dict]] = defaultdict(list)
     for u in utts:
@@ -286,7 +288,7 @@ def member_profiles(store: Store, session: int | None = None,
         if not any(_substantive(u) for u in mine):
             continue
         members[name] = _profile(name, mine, pairs_by.get(name, []), v["words"],
-                                 v["n_members"], min_count, v["persp_base"], v["issue_base"])
+                                 v["n_members"], min_count, v["persp_base"], v["issue_base"], tracked)
     return {"scope": {"session": session, "meetings": meeting_ids or [], "n_meetings": n_meet},
             "members": members}
 
