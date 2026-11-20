@@ -67,3 +67,19 @@ def test_parsed_meeting_keeps_minutes_agendas():
     assert [u["agenda_idx"] for u in s.utterances(meeting_id="M1")] == [0, 1]
     s.upsert_meeting({**base, "agendas": ["2. 기본법(을)(의안번호 2200002)"]})
     assert s.meeting("M1")["agendas"] == want
+
+
+def test_agenda_groups_saved_and_labelled():
+    """일괄 상정 묶음은 회의에 저장되고, 회의 정보에 발언용 안건 이름('첫 안건 외 N건')이 붙는다."""
+    from agrisea.parser import MinutesDoc, Utterance
+    from agrisea.store import Store
+    s = Store(":memory:")
+    s.upsert_meeting({"meeting_id": "G1", "title": "제439회 예산결산", "date": "2026-11-01", "session_no": 439})
+    s.save_minutes("G1", MinutesDoc(agendas=["2027년도 예산안", "2027년도 기금운용계획안", "농지법 일부개정법률안"],
+                                    agenda_groups={1: [0, 1]},
+                                    utterances=[Utterance(0, "김가람", "위원", "member", None, "질의입니다.", 1)]))
+    m = s.meeting("G1")
+    assert m["agenda_groups"] == {"1": [0, 1]}
+    assert m["agenda_labels"] == ["1. 2027년도 예산안", "1. 2027년도 예산안 외 1건", "3. 농지법 일부개정법률안"]
+    s.upsert_meeting({"meeting_id": "G2", "title": "제439회", "date": "2026-11-02", "session_no": 439})
+    assert "agenda_labels" not in s.meeting("G2")

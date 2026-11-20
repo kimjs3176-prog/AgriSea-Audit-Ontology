@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, Iterator
 
 from .lexicon import match_issues, match_organizations
-from .parser import MinutesDoc, align_agendas
+from .parser import MinutesDoc, agenda_labels, align_agendas
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS meetings (
@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS meetings (
     session_no INTEGER, conf_no INTEGER,
     pdf_url TEXT, link_url TEXT, vod_url TEXT,
     agendas_json TEXT DEFAULT '[]',
+    agenda_groups_json TEXT DEFAULT '{}',   -- 일괄 상정 묶음 {끝 안건 자리: [묶음 안건 자리…]}
     raw_json TEXT,
     text_status TEXT DEFAULT 'pending',   -- pending | parsed | failed | metadata_only
     is_sample INTEGER DEFAULT 0
@@ -130,6 +131,9 @@ class Store:
         if "spacing" not in cols:  # 이전 형식 DB
             with self.conn:
                 self.conn.execute("ALTER TABLE utterances ADD COLUMN spacing INTEGER DEFAULT 0")
+        if "agenda_groups_json" not in {r[1] for r in self.conn.execute("PRAGMA table_info(meetings)")}:
+            with self.conn:  # 일괄 상정 묶음(이전 형식 DB)
+                self.conn.execute("ALTER TABLE meetings ADD COLUMN agenda_groups_json TEXT DEFAULT '{}'")
         self.fts = False
         if fts:
             existed = self.conn.execute(
@@ -195,6 +199,8 @@ class Store:
                 api = json.loads(row["agendas_json"]) if row and row["agendas_json"] else []
                 c.execute("UPDATE meetings SET agendas_json=? WHERE id=?",
                           (json.dumps(align_agendas(doc.agendas, api), ensure_ascii=False), meeting_id))
+            c.execute("UPDATE meetings SET agenda_groups_json=? WHERE id=?",
+                      (json.dumps(doc.agenda_groups), meeting_id))
             for u in doc.utterances:
                 c.execute(
                     """INSERT INTO utterances (meeting_id, idx, speaker_name, speaker_role,
@@ -224,6 +230,10 @@ class Store:
     def _meeting(row: sqlite3.Row) -> dict:
         d = dict(row)
         d["agendas"] = json.loads(d.pop("agendas_json") or "[]")
+        groups = json.loads(d.pop("agenda_groups_json", None) or "{}")
+        if groups:  # 일괄 상정 묶음과 발언에 붙일 안건 이름('첫 안건 외 N건')
+            d["agenda_groups"] = groups
+            d["agenda_labels"] = agenda_labels(d["agendas"], groups)
         d.pop("raw_json", None)
         return d
 

@@ -1313,7 +1313,8 @@ async function showMeeting(id, useLlm = false){
   const m = s.meeting, llm = s.llm, stats = await api("/api/stats");
   if(tok !== seq.meeting) return;
   const agendas = s.agenda_summaries.filter(a => a.summary.length);
-  transcript = {id, utts: null, agendas: m.agendas, filter: "", find: "", speaker: "", limit: 300};
+  // 일괄 상정 묶음은 '첫 안건 외 N건'으로(agenda_labels), 묶음의 안건 목록은 머리줄 풍선 도움말로
+  transcript = {id, utts: null, agendas: m.agenda_labels || m.agendas, all: m.agendas, groups: m.agenda_groups || {}, filter: "", find: "", speaker: "", limit: 300};
   const nMain = m.agendas.filter(a => /^\s*\d+\s*\./.test(a)).length || m.agendas.length;
   $("#mDetail").innerHTML = `
     <div class="card">
@@ -1428,6 +1429,11 @@ function openInAI(kind){
   window.open(url, "_blank", "noopener");
   copied.then(ok => toast(ok ? "회의록 전문을 복사했습니다. 열린 창에 붙여넣기(Ctrl+V) 하세요" : "분석 요청을 열었습니다. 전문은 링크로 전달됩니다"));
 }
+// 안건 이름 줄임: 일괄 상정 묶음의 '외 N건'은 남긴다
+function cutAgenda(a, n){
+  const m = a.match(/^(.*)( 외 \d+건)$/);
+  return m ? cut(m[1], n - m[2].length) + m[2] : cut(a, n);
+}
 function loadTranscript(){
   const t = transcript; if(!t) return Promise.resolve();
   return t.loading ||= fetchTranscript(t);
@@ -1446,7 +1452,7 @@ async function fetchTranscript(t){
   const firstOf = {};
   t.utts.forEach(u => { if(u.agenda_idx != null && !(u.agenda_idx in firstOf)) firstOf[u.agenda_idx] = u.idx });
   const ags = Object.keys(firstOf).map(Number).sort((a, b) => a - b).filter(i => t.agendas[i]);
-  $("#tAgenda").innerHTML = '<option value="">안건으로 이동…</option>' + ags.map(i => `<option value="${firstOf[i]}">${esc(cut(t.agendas[i], 46))}</option>`).join("");
+  $("#tAgenda").innerHTML = '<option value="">안건으로 이동…</option>' + ags.map(i => `<option value="${firstOf[i]}">${esc(cutAgenda(t.agendas[i], 46))}</option>`).join("");
   $("#tAgenda").hidden = !ags.length;
   $("#tFind").oninput = e => { t.find = e.target.value.trim(); t.limit = 300; renderTranscript() };
   $("#tSpeaker").onchange = e => { t.speaker = e.target.value; t.limit = 300; renderTranscript() };
@@ -1549,7 +1555,9 @@ function renderTranscript(){
     if(u.agenda_idx != null && u.agenda_idx !== last && t.agendas[u.agenda_idx]){
       last = u.agenda_idx;
       const a = t.agendas[u.agenda_idx], no = (a.match(/^\s*(\d+)\s*\./) || [])[1];
-      html += `<div class="agenda-h"><span class="no">안건${no ? " " + no : ""}</span><span>${esc(cut(a.replace(/^\s*\d+\.\s*/, ""), 90))}</span><span class="n">발언 ${fmt(perAgenda[u.agenda_idx])}</span></div>`;
+      const grp = (t.groups[u.agenda_idx] || []).slice().sort((x, y) => x - y).map(i => t.all[i]).filter(Boolean);
+      const tip = grp.length > 1 ? ` title="${esc("한꺼번에 상정된 안건 " + grp.length + "건\n" + grp.slice(0, 15).join("\n") + (grp.length > 15 ? "\n…" : ""))}"` : "";
+      html += `<div class="agenda-h"${tip}><span class="no">안건${no ? " " + no : ""}${grp.length > 1 ? " 등" : ""}</span><span>${esc(cutAgenda(a.replace(/^\s*\d+\.\s*/, ""), 90))}</span><span class="n">발언 ${fmt(perAgenda[u.agenda_idx])}</span></div>`;
     }
     html += turnHtml(u, t.find);
   }
