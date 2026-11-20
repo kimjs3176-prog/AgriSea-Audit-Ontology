@@ -61,6 +61,8 @@ class Utterance:
 @dataclass
 class MinutesDoc:
     agendas: list[str] = field(default_factory=list)
+    # 일괄 상정: 발언 속 안건 줄이 잇달아 나온 묶음. {묶음 끝 안건 자리(발언의 agenda_idx): 묶음 안건 자리들}
+    agenda_groups: dict[int, list[int]] = field(default_factory=dict)
     utterances: list[Utterance] = field(default_factory=list)
     preamble: str = ""
 
@@ -159,10 +161,10 @@ def parse_speaker(chunk: str) -> tuple[str, str, str] | None:
 _LEADER_TAIL = re.compile(r"(?:\s*[·.…‧∙・]){3,}[\s\d]*$")
 
 
-def _extract_agendas(preamble: str) -> list[str]:
-    """회의록 첫머리(의사일정·상정된 안건)의 안건 목록. 발언의 agenda_idx 는 이 목록의 자리다.
+def _agenda_entries(preamble: str) -> list[tuple[str, str]]:
+    """회의록 첫머리(의사일정·상정된 안건)의 (번호, 안건) 목록. 발언의 agenda_idx 는 이 목록의 자리다.
     의사일정과 상정된 안건에 같은 안건이 띄어쓰기·점선·쪽 번호만 달리 두 번 나오므로 한 번만 넣는다."""
-    agendas: list[str] = []
+    entries: list[tuple[str, str]] = []
     keys: set[str] = set()
     for line in preamble.split("\n"):
         m = AGENDA_LINE.match(line)
@@ -170,8 +172,12 @@ def _extract_agendas(preamble: str) -> list[str]:
             title = _LEADER_TAIL.sub("", re.sub(r"\s+", " ", m.group(2))).strip(" ·.")
             if title and _norm(title) not in keys:
                 keys.add(_norm(title))
-                agendas.append(title)
-    return agendas
+                entries.append((m.group(1), title))
+    return entries
+
+
+def _extract_agendas(preamble: str) -> list[str]:
+    return [t for _, t in _agenda_entries(preamble)]
 
 
 def _norm(s: str) -> str:
@@ -180,6 +186,21 @@ def _norm(s: str) -> str:
 
 _AGENDA_NO = re.compile(r"^\s*(?:\d{1,3}|[가-힣])\s*\.\s*")
 _BILL_NO = re.compile(r"의안번호\s*(\d{5,})")
+
+
+# 안건 줄 사이에 끼어도 묶음을 끊지 않는 줄(줄바꿈된 제목 끝·쪽 머리글·시각)과 끊는 발언 문장
+_SPOKEN = re.compile(r"[다요까죠]\s*[.?!]|습니다|합니다")
+
+
+def agenda_labels(agendas: list[str], groups: dict) -> list[str]:
+    """발언에 붙일 안건 이름. 한꺼번에 상정한 묶음의 끝 안건 자리에는 '묶음에서 목록 순서가 가장 앞선 안건 외 N건'을 붙인다."""
+    out = list(agendas)
+    for k, members in (groups or {}).items():
+        i = int(k)
+        first = min(members) if members else -1
+        if 0 <= i < len(out) and len(members) > 1 and 0 <= first < len(agendas):
+            out[i] = f"{agendas[first]} 외 {len(members) - 1}건"
+    return out
 
 
 def align_agendas(minutes: list[str], api: list[str]) -> list[str]:
@@ -206,8 +227,19 @@ def parse_minutes(raw_text: str) -> MinutesDoc:
     text, _appendix = split_appendix(clean_text(raw_text))
     parts = SPEAKER_MARK.split(text)
     preamble, chunks = parts[0], parts[1:]
-    doc = MinutesDoc(preamble=preamble.strip(), agendas=_extract_agendas(preamble))
+    entries = _agenda_entries(preamble)
+    doc = MinutesDoc(preamble=preamble.strip(), agendas=[t for _, t in entries])
     agenda_keys = [_norm(a)[:25] for a in doc.agendas]
+
+    def agenda_of(no: str, title: str, after: int | None) -> int | None:
+        """발언 속 안건 줄 → 안건 자리. 앞부분이 같은 안건(같은 법률의 개정안 여러 건)은 번호로, 번호도 같으면
+        직전 안건 다음 자리로 가린다."""
+        key = _norm(title)[:25]
+        cands = [i for i, k in enumerate(agenda_keys) if k == key]
+        if len(cands) > 1:
+            cands = [i for i in cands if entries[i][0] == no] or [i for i in cands if after is None or i > after] \
+                or cands
+        return cands[0] if cands else None
 
     current_agenda: int | None = 0 if doc.agendas else None
     for chunk in chunks:
@@ -219,16 +251,25 @@ def parse_minutes(raw_text: str) -> MinutesDoc:
             continue
         role, name, body = parsed
 
-        # 발언 중간에 등장하는 단독 안건 제목 줄 → 이후 발언의 안건 전환
-        kept_lines = []
+        # 발언 중간에 등장하는 단독 안건 제목 줄 → 이후 발언의 안건 전환.
+        # 사이에 발언 문장 없이 잇달아 나온 안건 줄은 한꺼번에 상정한 묶음이다(마지막 줄이 이후 발언의 안건).
+        kept_lines: list[str] = []
         next_agenda = None
+        run: list[int] = []
+        spoken = False
         for line in body.split("\n"):
             m = AGENDA_LINE.match(line)
             if m and agenda_keys:
-                key = _norm(m.group(2))[:25]
-                if key in agenda_keys:
-                    next_agenda = agenda_keys.index(key)
+                ai = agenda_of(m.group(1), m.group(2), current_agenda if next_agenda is None else next_agenda)
+                if ai is not None:
+                    if spoken:
+                        run, spoken = [], False
+                    if ai not in run:
+                        run.append(ai)
+                    next_agenda = ai
                     continue
+            if _SPOKEN.search(line):
+                spoken = True
             kept_lines.append(line)
         body = clean_utterance_text(TIME_NOTE.sub(" ", " ".join(kept_lines)))
 
@@ -246,6 +287,8 @@ def parse_minutes(raw_text: str) -> MinutesDoc:
             doc.utterances.append(utt)
         if next_agenda is not None:
             current_agenda = next_agenda
+            if len(run) > 1 and len(run) > len(doc.agenda_groups.get(next_agenda, ())):
+                doc.agenda_groups[next_agenda] = run
 
     annotate(doc.utterances)
     return doc
