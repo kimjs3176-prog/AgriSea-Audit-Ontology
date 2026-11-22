@@ -153,7 +153,8 @@ def summarize_meeting(store: Store, meeting_id: str) -> dict[str, Any]:
     full_text = " ".join(u["text"] for u in substantive)
 
     agenda_summaries = []
-    for i, a in enumerate(m["agendas"]):
+    # 한꺼번에 상정한 안건 묶음의 발언은 묶음 끝 안건 자리에 모여 있어 '첫 안건 외 N건'으로 보인다
+    for i, a in enumerate(m.get("agenda_labels") or m["agendas"]):
         a_utts = [u for u in substantive if u["agenda_idx"] == i]
         if not a_utts:
             agenda_summaries.append({"agenda": a, "summary": [], "speakers": [], "issues": []})
@@ -631,6 +632,7 @@ def meeting_markdown(store: Store, meeting_id: str, base_url: str = "") -> str |
     utts = store.utterances(meeting_id=meeting_id)
     s = store.summary(meeting_id, "rule") or summarize_meeting(store, meeting_id)
     agendas = [re.sub(r"^\s*\d+\.\s*", "", a) for a in (m.get("agendas") or [])]
+    labels = [re.sub(r"^\s*\d+\.\s*", "", a) for a in (m.get("agenda_labels") or m.get("agendas") or [])]
     lines = [f"# {m.get('title') or '국회 농림축산식품해양수산위원회 회의록'}", "",
              f"- 회의일: {m.get('date') or '-'}",
              f"- 회기: 제{m.get('session_no') or '?'}회 국회",
@@ -651,7 +653,7 @@ def meeting_markdown(store: Store, meeting_id: str, base_url: str = "") -> str |
         ai = u.get("agenda_idx")
         if ai is not None and ai != last and 0 <= ai < len(agendas):
             last = ai
-            lines += ["", f"### {agendas[ai]}"]
+            lines += ["", f"### {labels[ai]}"]
         role, name = u.get("speaker_role") or "", u.get("speaker_name") or ""
         who = f"{name} 위원" if role == "위원" else f"{role} {name}".strip()
         tags = "".join(t for k, t in (("is_question", "[질의]"), ("is_commitment", "[약속]"),

@@ -173,3 +173,36 @@ def test_commitment_variants_and_hedged_sentences():
     assert is_commitment("관계 부처하고 협의해 보도록 하겠습니다")
     assert not is_commitment("검토를 하겠습니다마는 예산 사정상 어렵습니다")
     assert not is_commitment("오늘 업무현황을 보고드리겠습니다")   # 업무보고 인사는 여전히 제외
+
+
+BATCH_TEXT = """제439회국회
+상정된 안건
+1. 2027년도 농림축산식품부 소관 세입세출예산안
+2. 2027년도 농림축산식품부 소관 농산물가격안정기금 운용계획안
+3. 농수산물 유통 및 가격안정에 관한 법률 일부개정법률안(이원택 의원 대표발의)(의안번호 2200001)
+4. 농수산물 유통 및 가격안정에 관한 법률 일부개정법률안(이병진 의원 대표발의)(의안번호 2200002)
+◯위원장 홍길동 의사일정 제1항부터 제2항까지 일괄하여 상정합니다.
+1. 2027년도 농림축산식품부 소관 세입세출예산안
+2. 2027년도 농림축산식품부 소관 농산물가격안정기금 운용
+계획안
+(10시05분)
+◯김가람 위원 예산 질의입니다. 언제 집행합니까?
+◯위원장 홍길동 다음 안건입니다.
+4. 농수산물 유통 및 가격안정에 관한 법률 일부개정법률안(이병진 의원 대표발의)(의안번호
+2200002)
+◯이나래 위원 농안법 질의입니다.
+"""
+
+
+def test_batch_agendas_grouped_and_same_prefix_titles():
+    """한꺼번에 상정한 안건 줄(줄바꿈된 제목·시각 표기가 끼어도)은 묶음으로 '첫 안건 외 N건'이 붙고,
+    앞부분이 같은 안건(같은 법률 개정안 여러 건)은 번호로 가린다."""
+    from agrisea.parser import agenda_labels
+    doc = parse_minutes(BATCH_TEXT)
+    assert [u.agenda_idx for u in doc.utterances] == [0, 1, 1, 3]
+    assert doc.agenda_groups == {1: [0, 1]}
+    labels = agenda_labels(doc.agendas, doc.agenda_groups)
+    assert labels[1] == "2027년도 농림축산식품부 소관 세입세출예산안 외 1건" and labels[3] == doc.agendas[3]
+    # 안건 줄 사이에 발언 문장이 있으면 묶음이 아니다(차례로 처리한 안건)
+    seq = parse_minutes(BATCH_TEXT.replace("\n2. 2027년도 농림축산식품부 소관 농산물", "\n가결되었습니다.\n2. 2027년도 농림축산식품부 소관 농산물"))
+    assert seq.agenda_groups == {}
