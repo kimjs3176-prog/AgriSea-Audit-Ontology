@@ -177,3 +177,17 @@ def test_failed_day_is_retried_by_next_resume(store, settings, monkeypatch):
     calls.clear()   # 기록이 없으면 기간만 조회
     pipeline.collect_range(store, settings, "2024-10-20", "2024-10-20", {"DAE_NUM": "22"}, **quiet)
     assert calls == ["2024-10-20"]
+
+
+def test_resume_start_covers_publication_lag():
+    """이어 받기 시작일: 회의록은 회의 4~10일 뒤 올라오므로, 마지막 저장 회의일 7일 전과 오늘 21일 전 중
+    이른 날부터 조회한다(늦게 올라온 앞선 회의를 놓치지 않게). 휴회가 길어도 최근 45일까지만."""
+    from datetime import date
+
+    from agrisea.pipeline import resume_start
+    today = date(2026, 11, 22)
+    # 11-11 회의가 저장된 뒤 11-03 회의가 늦게 올라와도 잡힌다(예전: 11-04부터라 놓침)
+    assert resume_start("2026-11-11", today, "2024-05-30") == "2026-11-01"
+    assert resume_start("2026-11-20", today, "2024-05-30") == "2026-11-01"
+    assert resume_start("2026-08-01", today, "2024-05-30") == "2026-10-08"   # 45일 제한
+    assert resume_start(None, today, "2024-05-30") == "2024-05-30"

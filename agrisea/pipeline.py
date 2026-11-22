@@ -31,6 +31,22 @@ def collect(store: Store, settings: Settings, params: dict[str, Any],
 
 
 STOP_AFTER_FAILS = 3  # 처음부터 연속으로 이만큼 날짜가 막히면 API 장애로 보고 중단
+# 회의록은 회의 4~10일 뒤에 올라온다(2026.10~11 관측). 늦게 올라온 앞선 회의를 놓치지 않도록
+# 이어 받기(--resume)는 오늘 기준으로 최소 이만큼은 되돌아가 조회한다.
+PUBLISH_LOOKBACK_DAYS = 21
+RESUME_MAX_DAYS = 45   # 휴회가 길어도 조회 일수가 끝없이 늘지 않게(더 길게 멈췄다면 --from 으로 지정)
+
+
+def resume_start(last_meeting: str | None, today, term_start: str) -> str:
+    """이어 받기 시작일: 마지막 저장 회의일 7일 전과 오늘 21일 전 중 이른 날, 단 최근 45일 안.
+    저장된 회의가 없으면 임기 시작일부터."""
+    from datetime import date, timedelta
+    if not last_meeting:
+        return term_start
+    start = min(date.fromisoformat(last_meeting) - timedelta(days=7), today - timedelta(days=PUBLISH_LOOKBACK_DAYS))
+    return max(start, today - timedelta(days=RESUME_MAX_DAYS)).isoformat()
+
+
 GAP_RETRY_DAYS = 90   # 조회에 실패한 날은 이 기간 안이면 다음 수집(--resume)에서 다시 조회한다
 
 

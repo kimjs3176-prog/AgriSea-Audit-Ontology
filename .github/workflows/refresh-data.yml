@@ -1,7 +1,10 @@
 # 회의록 자동 수집: 열린국회정보 API로 농해수위 회의록을 모아 data/seed.sqlite3.gz 로 커밋한다.
 # 커밋되면 Vercel이 새로 배포하면서 이 데이터를 싣는다(배포 환경의 저장소는 임시라서 이 방식으로 영구 보관).
-#  - 하루 3번(07:17·13:17·19:17 KST) 실행: 저장된 마지막 회의일 7일 전부터 오늘까지 수집
-#    (정각 예약은 GitHub 혼잡으로 2~4시간씩 늦게 시작돼 정각을 피함. 회의록이 낮에 올라와도 당일 반영)
+#  - 실제 회의 일정에 맞춘 예약: 농해수위 회의는 평일(주로 화·수·목)에 열리고 회의록은 4~10일 뒤 올라온다.
+#      평일 하루 3번(09:47·13:17·18:47 KST), 주말 하루 1번(11:17 KST, 금요일 밤에 올라온 회의록 대비)
+#      휴회 중(마지막 회의가 21일 넘게 지남)에는 평일 아침 1번만 수집하고 나머지 예약은 건너뜀
+#    (정각 예약은 GitHub 혼잡으로 2~4시간씩 늦게 시작돼 정각을 피함)
+#  - 수집 범위: 마지막 저장 회의일 7일 전과 오늘 21일 전 중 이른 날부터 오늘까지(늦게 올라온 앞선 회의 대비)
 #  - 국회 API 접속이 일부 날짜만 막히면 나머지는 저장하고 계속, 실행이 실패하면 이슈로 알림
 #  - 초기 데이터가 없으면 22대 임기 시작일(2024-05-30)부터 전체 수집
 #  - 수집 후 회의 요약·쟁점/기관 집계·관계망·지식그래프(data/kg.nq.gz, 추론 포함)를 미리 계산해 함께 커밋
@@ -11,9 +14,10 @@ name: 회의록 데이터 갱신
 
 on:
   schedule:
-    - cron: "17 22 * * *"   # 07:17 KST
-    - cron: "17 4 * * *"    # 13:17 KST
-    - cron: "17 10 * * *"   # 19:17 KST
+    - cron: "47 0 * * 1-5"   # 평일 09:47 KST(휴회 중에도 실행)
+    - cron: "17 4 * * 1-5"   # 평일 13:17 KST
+    - cron: "47 9 * * 1-5"   # 평일 18:47 KST
+    - cron: "17 2 * * 0,6"   # 주말 11:17 KST
   workflow_dispatch:
     inputs:
       date_from:
@@ -84,7 +88,26 @@ jobs:
           if [ -f data/seed.sqlite3.gz ]; then gunzip -c data/seed.sqlite3.gz > var/agrisea.sqlite3; fi
           python -m agrisea stats
 
+      # 휴회 중(마지막 회의가 21일 넘게 지남)이면 평일 아침 예약만 수집한다. 수동 실행·분석 규칙 변경(push)은 항상.
+      - name: 수집 여부(휴회 판단)
+        id: gate
+        env:
+          SCHEDULE: ${{ github.event.schedule }}
+        run: |
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json, os
+          from datetime import date
+          meta = json.load(open("data/seed.meta.json")) if os.path.exists("data/seed.meta.json") else {}
+          last = meta.get("date_max")
+          idle = (date.today() - date.fromisoformat(last)).days if last else 0
+          sched = os.environ.get("SCHEDULE", "")
+          run = not sched or idle <= 21 or sched == "47 0 * * 1-5"
+          print(f"마지막 회의 {last}, {idle}일 지남, 예약 '{sched}' → {'수집' if run else '휴회 중이라 건너뜀'}", file=__import__("sys").stderr)
+          print(f"run={'true' if run else 'false'}")
+          PY
+
       - name: 수집
+        if: steps.gate.outputs.run == 'true'
         id: collect
         # 분석 규칙이 바뀌어 실행된 경우(push)에는 국회 API가 막혀도 멈추지 않고, 저장된 데이터로
         # 아래 사전 계산을 계속해 새 규칙을 반영한다(예약 실행은 그대로 실패로 알림)
@@ -103,6 +126,7 @@ jobs:
           python -m agrisea stats
 
       - name: 지원사업 공고 수집(공공데이터포털)
+        if: steps.gate.outputs.run == 'true'
         continue-on-error: true   # 공고 수집이 막혀도 회의록 갱신은 계속한다(저장된 공고 유지)
         run: |
           if [ -z "$KSTARTUP_API_KEY" ]; then echo "::warning::KSTARTUP_API_KEY secret이 없어 지원사업 공고 수집을 건너뜁니다."; exit 0; fi
@@ -112,16 +136,19 @@ jobs:
           } || { echo "::warning::지원사업 공고 수집 실패(이전 공고 유지)"; exit 1; }
 
       - name: 운영 관문 정책 받기(governance-log 브랜치)
+        if: steps.gate.outputs.run == 'true'
         run: |
           (git fetch --depth=1 origin governance-log && git show origin/governance-log:governance/events.jsonl > var/governance.jsonl) \
             || { rm -f var/governance.jsonl; echo "원장 없음 → 초기 정책"; }
 
       - name: 사전 계산(요약·집계·지식그래프) 및 초기 데이터 내보내기
+        if: steps.gate.outputs.run == 'true'
         run: |
           python -m agrisea export-seed
           ls -la data/
 
       - name: 커밋
+        if: steps.gate.outputs.run == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -134,6 +161,7 @@ jobs:
 
       # G1 접수 증거: AI가 판정한 실행 기록(데이터 해시·정책 버전·경로별 건수)을 원장에 커밋
       - name: 운영 관문 실행 기록
+        if: steps.gate.outputs.run == 'true'
         env:
           AGRISEA_GOV_GITHUB_REPO: ${{ github.repository }}
           AGRISEA_GOV_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -144,6 +172,9 @@ jobs:
         run: |
           {
             echo "### 회의록 데이터 갱신"
+            if [ "${{ steps.gate.outputs.run }}" = "false" ]; then
+              echo "> 휴회 중(마지막 회의가 21일 넘게 지남)이라 이번 예약은 건너뛰었습니다. 평일 아침 예약은 계속 수집합니다."
+            fi
             if [ "${{ steps.collect.outcome }}" = "failure" ]; then
               echo "> 국회 API 수집은 실패해 저장된 데이터로 사전 계산만 다시 했습니다(다음 예약 실행에서 수집 재시도)."
             fi
@@ -169,7 +200,7 @@ jobs:
 
       # 성공하면 열려 있는 실패 알림 이슈를 닫는다
       - name: 실패 알림 정리
-        if: success() && github.event_name == 'schedule'
+        if: success() && github.event_name == 'schedule' && steps.gate.outputs.run == 'true'
         uses: actions/github-script@v8
         with:
           retries: 3   # GitHub API 일시 오류(502) 대비

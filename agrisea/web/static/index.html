@@ -1118,7 +1118,7 @@ async function loadDash(){
   catch(e){ $("#noticeArea").innerHTML = `<div class="notice">서버 응답 오류: ${esc(e.message)} — <a href="/api/health" target="_blank">/api/health</a></div>`; return }
   const kst = iso => { const d = new Date(iso); return isNaN(d) ? iso : new Date(d.getTime() + 9 * 3600e3).toISOString().slice(0, 16).replace("T", " ") };
   const upd = (s.date_max ? `최신 회의 ${dot(s.date_max)}<span class="sep"></span>` : "")
-    + (s.data_updated ? `데이터 반영 ${esc(kst(s.data_updated))} (한국시간)<span class="sep"></span>자동 확인 하루 3회` : "자동 수집 데이터 없음")
+    + (s.data_updated ? `데이터 반영 ${esc(kst(s.data_updated))} (한국시간)<span class="sep"></span>회의 일정에 맞춰 자동 확인(평일 3회)` : "자동 수집 데이터 없음")
     + `<span class="sep"></span><button class="link" onclick="gotoDataStatus()">데이터 현황 보기</button><span id="dsFlag"></span>`;
   $("#noticeArea").innerHTML = s.samples ? `<div class="notice">가상 예시 회의록 ${s.samples}건이 포함되어 있습니다.</div>` : "";
   $("#sampleBtn").hidden = s.meetings - s.samples > 0;  // 실제 회의록이 있으면 예시 데이터를 섞지 않는다

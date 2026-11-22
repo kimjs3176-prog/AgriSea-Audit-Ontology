@@ -119,12 +119,10 @@ def main(argv: list[str] | None = None) -> int:
         from .pipeline import collect, collect_range, fetch_minutes, rebuild_graph
         params = {"DAE_NUM": args.dae, **_kv(args.param)}
         if args.resume:
-            # 마지막 회의일 7일 전부터(늦게 올라오는 회의록 대비). 휴회가 길어도 조회 일수가
-            # 끝없이 늘지 않도록 최근 45일로 제한(45일 넘게 수집이 멈췄다면 --from 으로 직접 지정)
-            last = store.stats()["date_max"]
-            floor = date.today() - timedelta(days=45)
-            args.date_from = (max(date.fromisoformat(last) - timedelta(days=7), floor).isoformat()
-                              if last else TERM_START)
+            # 마지막 회의일 7일 전과 오늘 21일 전 중 이른 날부터(회의록은 회의 4~10일 뒤에 올라와
+            # 앞선 회의가 늦게 올라올 수 있음). 휴회가 길어도 최근 45일로 제한.
+            from .pipeline import resume_start
+            args.date_from = resume_start(store.stats()["date_max"], date.today(), TERM_START)
             print(f"수집 기간: {args.date_from} ~ {args.date_to or date.today().isoformat()}")
         elif args.days:
             args.date_from = (date.today() - timedelta(days=args.days)).isoformat()
