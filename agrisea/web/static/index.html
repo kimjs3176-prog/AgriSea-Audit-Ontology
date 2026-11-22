@@ -705,6 +705,39 @@ button.link:hover{text-decoration:underline;text-underline-offset:.2em}
 td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 code{font-family:var(--font-mono);font-size:12px}
 @media (max-width:860px){.otwo{grid-template-columns:minmax(0,1fr)}}
+/* ── 긴 글 가독성: 한국어 낱말 단위 줄바꿈, 본문 글꼴·크기·줄 간격 통일, 사용자가 고르는 글자 크기 ── */
+:root{--read-size:16px;--read-lh:1.8;--meta-size:12.5px;
+  --font-read:"Pretendard Variable",Pretendard,"Red Hat Text",ui-sans-serif,system-ui,sans-serif}
+:root[data-read="l"]{--read-size:17.5px;--meta-size:13.5px}
+:root[data-read="xl"]{--read-size:19px;--read-lh:1.85;--meta-size:14.5px}
+/* 낱말 중간에서 줄이 바뀌지 않게(긴 URL·숫자는 어디서든 끊어 넘침 방지) */
+body{word-break:keep-all;overflow-wrap:anywhere}
+h1,h2,h3,.agenda-h,.item .t,.fuitem b,.tl-h b{text-wrap:balance}
+p,li,.sub,.turn .tx,.pt,.quote,.bubble,.hit-snip,.tl-t,.fuitem .fut,.brief3 span{text-wrap:pretty}
+/* 본문(발언·요약·검색 결과·이행 근거·브리핑): 한글에 맞춘 글꼴, 넉넉한 크기와 줄 간격 */
+.turn .tx,.pt,.quote,.bubble,.hit-snip,.tl-t,.fuitem .fut,.brief3,.eq .q,.qa{font-family:var(--font-read)}
+.turn .tx{font-size:var(--read-size);line-height:var(--read-lh);max-width:42em}
+.turn.chair .tx,.turn.other .tx{font-size:calc(var(--read-size) - 1px)}
+.pt,.quote,.bubble,.hit-snip,.tl-t{font-size:calc(var(--read-size) - .5px);line-height:var(--read-lh)}
+.bubble.short{font-size:calc(var(--read-size) - 2px)}
+.fuitem .fut{font-size:calc(var(--read-size) - 1px);line-height:1.6}
+.brief3{font-size:calc(var(--read-size) - 1px);line-height:var(--read-lh)}
+.hit-snip{max-width:46em}
+/* 설명 문장은 한 줄이 너무 길지 않게, 작은 보조 글씨는 조금 크게 */
+.sub{max-width:60em;font-size:13.5px;line-height:1.7}
+.pt .who,.bubble .who,.quote .who,.quote .meta,.tl-d,.item .d,.turn .tw,.rowlist .r .d{font-size:var(--meta-size)}
+@media (max-width:640px){.turn .tx{font-size:var(--read-size)}}
+/* 글자 크기 고르기 */
+.readsize{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--panel)}
+.readsize button{border:0;background:none;color:var(--ink-2);cursor:pointer;padding:4px 8px;font-family:var(--font-read);line-height:1.2;min-width:32px;min-height:32px}
+.readsize button+button{border-left:1px solid var(--line)}
+.readsize button[aria-pressed="true"]{background:var(--color-paper-3);color:var(--ink);font-weight:700}
+.readsize button:focus-visible{outline:2px solid var(--color-focus);outline-offset:-2px}
+@media (min-width:1280px){header .readsize{order:5;align-self:center;flex:none}header .readsize button{min-width:28px;padding:2px 6px}
+  /* 한 줄 머리글에 자리 만들기: 메뉴는 줄이지 않고, '회기' 글자는 화면에서만 숨김(선택 상자의 이름으로는 남음) */
+  header nav{flex-shrink:0} header .sessionbar{font-size:0;gap:0} header .sessionbar select{font-size:13px;max-width:150px}}
+@media (max-width:640px){header .sessionbar{width:auto;flex:1 1 0;min-width:0}header .readsize{flex:none}}
+@media (min-width:641px) and (max-width:1279px){header .sessionbar select{width:200px}}
 </style>
 </head>
 <body>
@@ -720,6 +753,9 @@ code{font-family:var(--font-mono);font-size:12px}
         <input type="search" id="gq" placeholder="회의록 검색 — 쌀값, 산불, 오염수…" aria-label="회의록 전체 검색">
       </form>
       <label class="sessionbar">회기 <select id="session"><option value="">전체 회기</option></select></label>
+      <div class="readsize" role="group" aria-label="본문 글자 크기">
+        <button type="button" data-read="" style="font-size:13px" title="본문 글자 보통">가</button><button type="button" data-read="l" style="font-size:15.5px" title="본문 글자 크게">가</button><button type="button" data-read="xl" style="font-size:18px" title="본문 글자 아주 크게">가</button>
+      </div>
     </div>
     <nav id="tabs">
       <button data-tab="dash" class="on">대시보드</button>
@@ -944,6 +980,19 @@ code{font-family:var(--font-mono);font-size:12px}
 <footer class="site-footer"><span>농해수위 인사이트</span><span>자료: 열린국회정보 위원회 회의록, 공공데이터포털 K-Startup 지원사업 공고</span><span>제작자 kimjs1408</span><button class="link" onclick="gotoSparql()">SPARQL 질의</button></footer>
 
 <script>
+// 본문 글자 크기(보통·크게·아주 크게): 이 브라우저에 기억
+(function(){
+  let v = ""; try{ v = localStorage.getItem("agrisea-read") || "" }catch(e){}
+  const apply = x => {
+    if(x) document.documentElement.dataset.read = x; else delete document.documentElement.dataset.read;
+    document.querySelectorAll(".readsize button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.read === x)));
+  };
+  apply(v);
+  document.querySelectorAll(".readsize button").forEach(b => b.onclick = () => {
+    apply(b.dataset.read); try{ localStorage.setItem("agrisea-read", b.dataset.read) }catch(e){}
+  });
+})();
+
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 // onclick="fn(…)" 속성 안의 JS 문자열 인자: esc만 하면 &#39; 가 속성에서 ' 로 풀려 문자열을 벗어난다(회의 ID·개체 주소·주소창 해시 등).

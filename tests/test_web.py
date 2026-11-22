@@ -187,3 +187,13 @@ def test_in_app_navigation_adds_history_entries(store, settings):
     route = re.search(r"function routeFromHash\(\)\{.*?\n\}\n", html, re.S).group(0)
     assert "try{ path = decodeURIComponent(path) }catch(e){ path = \"\" }" in route
     assert 'addEventListener("hashchange", () => { if(!routeFromHash())' in html
+
+
+def test_index_readability_settings(store, settings):
+    """긴 글 가독성: 한국어 낱말 단위 줄바꿈, 본문 글자 크기 고르기(보통·크게·아주 크게, 이 브라우저에 기억)."""
+    html = TestClient(create_app(settings, store)).get("/").text
+    assert "word-break:keep-all" in html.split("<body")[0]
+    for v in ('data-read=""', 'data-read="l"', 'data-read="xl"'):
+        assert v in html
+    assert 'aria-label="본문 글자 크기"' in html and "agrisea-read" in html
+    assert ':root[data-read="xl"]{--read-size:' in html
