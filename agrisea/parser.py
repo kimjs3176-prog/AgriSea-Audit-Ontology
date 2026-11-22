@@ -189,7 +189,20 @@ _BILL_NO = re.compile(r"의안번호\s*(\d{5,})")
 
 
 # 안건 줄 사이에 끼어도 묶음을 끊지 않는 줄(줄바꿈된 제목 끝·쪽 머리글·시각)과 끊는 발언 문장
-_SPOKEN = re.compile(r"[다요까죠]\s*[.?!]|습니다|합니다")
+_SPOKEN = re.compile(r"[가-힣][다요까죠]\s*[.?!]|습니다|합니다")   # 줄 첫머리 항목 표시('다.')는 문장 끝이 아님
+# 안건 줄 뒤에 붙는 제목 조각: 줄바꿈된 제목 끝('2202041)', '대표발의)(의안번호 2206845)', '…(의안'),
+# 아래 항목('가. 농림축산식품부 소관', '- 마산항 재해 취약지구 정비사업'), 목차 점선
+_BILL_REF = re.compile(r"(?:의안|청원)\s*번\s*호|대표\s*발의\s*\)|정부\s*제출\s*\)")
+_TITLE_TAIL = re.compile(r"^[^.?!]{0,90}?(?:\d{5,}\s*\)|\(\s*(?:의안|청원)(?:\s*번\s*호?)?)(?:\s*[·.…]{3,})?[\s\d]*$")
+_SUB_ITEM = re.compile(r"^\s*(?:[가-하]\s*\.|-)\s*\S[^.?!]{0,50}$")
+_LEADER_ONLY = re.compile(r"^\s*(?:[·.…]\s*){3,}\d*\s*$")
+_BILL_WORDS = re.compile(r"의원|대표\s*발의|(?:의안|청원)?\s*번\s*호|정부\s*제출|[()\s·.…\d]")
+
+
+def _bill_fragment(line: str) -> bool:
+    """의안번호 조각만 있는 줄('2202801)', '의원 대표발의)(의안번호 2202635)', '번호2205814)'): 발언일 수 없다."""
+    t = _LEADER_TAIL.sub("", line).strip()
+    return len(t) <= 60 and bool(re.search(r"\d{5,}\s*\)", t)) and len(_BILL_WORDS.sub("", t)) <= 4
 
 
 def agenda_labels(agendas: list[str], groups: dict) -> list[str]:
@@ -253,11 +266,14 @@ def parse_minutes(raw_text: str) -> MinutesDoc:
 
         # 발언 중간에 등장하는 단독 안건 제목 줄 → 이후 발언의 안건 전환.
         # 사이에 발언 문장 없이 잇달아 나온 안건 줄은 한꺼번에 상정한 묶음이다(마지막 줄이 이후 발언의 안건).
+        # 안건 줄과 그 뒤에 붙은 제목 조각(줄바꿈된 제목 끝·아래 항목·목차 점선)은 발언 본문이 아니므로 뺀다.
         kept_lines: list[str] = []
         next_agenda = None
         run: list[int] = []
         spoken = False
-        for line in body.split("\n"):
+        heading = False   # 바로 앞 줄이 안건 줄(또는 그 조각)이었나
+        lines = body.split("\n")
+        for li, line in enumerate(lines):
             m = AGENDA_LINE.match(line)
             if m and agenda_keys:
                 ai = agenda_of(m.group(1), m.group(2), current_agenda if next_agenda is None else next_agenda)
@@ -267,7 +283,19 @@ def parse_minutes(raw_text: str) -> MinutesDoc:
                     if ai not in run:
                         run.append(ai)
                     next_agenda = ai
+                    heading = True
                     continue
+            nxt = lines[li + 1] if li + 1 < len(lines) else ""
+            if m and not _SPOKEN.search(line) and (_BILL_REF.search(line) or _bill_fragment(nxt)):
+                heading = True   # 목록에 없는 의안 줄(번호가 붙은 의안 제목): 안건 전환은 아니지만 본문도 아님
+                continue
+            if _bill_fragment(line):
+                heading = True
+                continue
+            if heading and not _SPOKEN.search(line) and (_TITLE_TAIL.match(line) or _SUB_ITEM.match(line)
+                                                         or _LEADER_ONLY.match(line)):
+                continue
+            heading = False
             if _SPOKEN.search(line):
                 spoken = True
             kept_lines.append(line)
