@@ -1,5 +1,5 @@
 """데이터 이전: 일괄 상정 안건 묶음을 채우고, 앞부분이 같은 안건 줄의 발언 안건 자리와 발언 본문에 남은
-안건 제목 조각(줄바꿈된 제목 끝·아래 항목·목차 점선)을 바로잡는다. 여러 번 돌려도 결과가 같다.
+안건 제목 조각(줄바꿈된 제목 끝·아래 항목·목차 점선)과 첫 발언에 끼어 있던 표지를 바로잡는다. 여러 번 돌려도 결과가 같다.
 
 회의록 텍스트(PDF에서 뽑은 것, 파일 이름 = 회의 ID)를 새 파서로 다시 읽어
 - 회의의 agenda_groups_json(한꺼번에 상정한 안건 묶음)을 채우고,
@@ -20,7 +20,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from agrisea.parser import parse_minutes
+from agrisea.parser import align_agendas, parse_minutes
 from agrisea.store import Store
 
 
@@ -39,14 +39,24 @@ def _only_deleted(old: str, new: str) -> bool:
 def main(db: str, texts: str) -> None:
     Store(db, fts=False).conn.close()   # 새 열(agenda_groups_json)을 만든다
     conn = sqlite3.connect(db)
-    grouped = moved = skipped = cleaned = 0
+    grouped = moved = skipped = cleaned = lifted = 0
     for path in sorted(Path(texts).glob("*.txt")):
         mid = path.stem
         row = conn.execute("SELECT agendas_json FROM meetings WHERE id=?", (mid,)).fetchone()
         if not row:
             continue
         doc = parse_minutes(path.read_text(encoding="utf-8"))
-        agendas_match = len(doc.agendas) == len(json.loads(row[0] or "[]"))
+        stored = json.loads(row[0] or "[]")
+        agendas_match = len(doc.agendas) == len(stored)
+        no_idx = conn.execute("SELECT COUNT(*) FROM utterances WHERE meeting_id=? AND agenda_idx IS NOT NULL",
+                              (mid,)).fetchone()[0] == 0
+        if doc.agendas and no_idx:
+            # 표지가 첫 발언 뒤에 끼어 있어 안건 목록을 못 읽었던 회의: 저장된 목록은 API 안건 목록이므로
+            # 회의록 순서 + API 표기로 바꾸고 발언 안건 자리를 채운다
+            conn.execute("UPDATE meetings SET agendas_json=? WHERE id=?",
+                         (json.dumps(align_agendas(doc.agendas, stored), ensure_ascii=False), mid))
+            agendas_match = True
+            lifted += 1
         if agendas_match:   # 안건 목록이 저장된 것과 다르면 자리가 맞지 않아 안건 묶음·자리는 건드리지 않는다
             conn.execute("UPDATE meetings SET agenda_groups_json=? WHERE id=?", (json.dumps(doc.agenda_groups), mid))
             grouped += bool(doc.agenda_groups)
@@ -75,7 +85,8 @@ def main(db: str, texts: str) -> None:
     conn.execute("DELETE FROM summaries WHERE kind='rule'")
     conn.commit()
     print(f"일괄 상정 묶음이 있는 회의 {grouped}건, 안건 자리를 옮긴 발언 {moved}건, "
-          f"안건 제목 조각을 뗀 발언 {cleaned}건, 안건 목록이 달라 묶음을 건너뛴 회의 {skipped}건")
+          f"안건 제목 조각·표지를 뗀 발언 {cleaned}건, 표지에서 안건 목록을 새로 읽은 회의 {lifted}건, "
+          f"안건 목록이 달라 묶음을 건너뛴 회의 {skipped}건")
 
 
 if __name__ == "__main__":
