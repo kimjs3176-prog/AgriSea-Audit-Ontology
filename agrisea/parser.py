@@ -236,8 +236,26 @@ def align_agendas(minutes: list[str], api: list[str]) -> list[str]:
     return out
 
 
+# 표지 첫 줄('제426회국회'). 첫 쪽이 두 단이면 PDF에서 본문 첫 단이 먼저 나오고 표지(회의록 제목·일시·
+# 의사일정·상정된 안건)가 그 뒤, 첫 발언 속에 끼어 나온다.
+COVER_START = re.compile(r"^\s*제\s*\d+\s*회\s*국\s*회\s*$", re.M)
+_HEADER_LINE = re.compile(r"^[^\S\n]*(?:" + RUNNING_HEADER.pattern + r")[^\S\n]*$", re.M)
+
+
+def lift_cover(text: str) -> str:
+    """첫 발언 뒤에 끼어 나온 표지를 회의록 첫머리로 옮긴다. 표지는 다음 쪽 머리말 줄이나 다음 발언자 표시
+    앞까지다(그 뒤는 끊겼던 본문이 이어진다)."""
+    first = SPEAKER_MARK.search(text)
+    cover = COVER_START.search(text, first.end()) if first else None
+    if not cover or "회의록" not in re.sub(r"\s", "", text[cover.start():cover.start() + 300]):
+        return text
+    ends = [m.start() for m in (_HEADER_LINE.search(text, cover.end()), SPEAKER_MARK.search(text, cover.end())) if m]
+    end = min(ends) if ends else len(text)
+    return text[cover.start():end] + "\n" + text[:cover.start()] + text[end:]
+
+
 def parse_minutes(raw_text: str) -> MinutesDoc:
-    text, _appendix = split_appendix(clean_text(raw_text))
+    text, _appendix = split_appendix(lift_cover(clean_text(raw_text)))
     parts = SPEAKER_MARK.split(text)
     preamble, chunks = parts[0], parts[1:]
     entries = _agenda_entries(preamble)
