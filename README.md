@@ -133,7 +133,7 @@ python -m agrisea briefing --org 해양수산부 -o 해양수산부-브리핑.md
 | `summary 회의ID [--llm]` | 회의 요약(`--llm`은 `ANTHROPIC_API_KEY` 필요) |
 | `briefing [--org] [--issue] [--member] [--keyword] [--from] [--to] -o 파일.md` | 국정감사 대비 브리핑 Markdown |
 | `sparql "질의"` | 지식그래프 SPARQL 질의 |
-| `validate` | 지식그래프가 스키마의 개념 정의를 지키는지 점검(109개 항목) |
+| `validate` | 지식그래프가 스키마의 개념 정의를 지키는지 점검(111개 항목) |
 | `collect`, `fetch-minutes`, `programs` | 회의록 목록·본문, 지원사업 공고 수집 |
 
 ## 데이터와 자동 갱신
@@ -163,12 +163,13 @@ python -m agrisea briefing --org 해양수산부 -o 해양수산부-브리핑.md
 <details>
 <summary><b>스키마, 추론 규칙, 개념 검증 자세히</b></summary>
 
-- **스키마**(`ontology/agrisea.ttl`, v0.3): 회의·안건·의안(정부 제출/의원 발의/위원회 대안)·발언(질의/답변/약속/자료요구)·인물·기관·쟁점·지원사업·이행 근거.
+- **스키마**(`ontology/agrisea.ttl`, v0.4): 회의·안건·의안(정부 제출/의원 발의/위원회 대안)·발언(질의/답변/약속/자료요구)·인물·기관·쟁점·지원사업·이행 근거.
+  한꺼번에 상정한 안건 묶음은 각 안건을 발언이 붙는 대표 안건(묶음 끝 안건)에 「함께 상정된 안건」(`ag:jointlyTakenUpWith`)으로 잇습니다.
   질의는 기관을 향한 질의 외에 회의 진행 질의(위원장·전문위원에게 묻는 발언 시간·의사 진행 등)와 진술인·참고인 질의로 나누고, 이 둘은 기관 대신 질의 대상 인물로 잇습니다.
   대상 기관을 못 찾은 질의는 같은 위원의 같은 질의 차례가 한 기관을 향했으면 그 기관을 추정 질의 대상 기관으로 따로 잇습니다.
   역관계, 하위 관계, 대칭 관계, 관계 연쇄, 정의 클래스 같은 OWL 공리와 쟁점 분류·이행 판정·조치 유형 SKOS 개념체계를 담습니다.
 - **추론기**(`agrisea/reasoner.py`): 스키마 규칙 6개와 업무 규칙 9개(의원이 질의한 쟁점·기관, 기관이 답변·약속한 쟁점, 함께 논의된 쟁점, 쟁점의 지원사업, 국감 확인 대상 약속 등)를 더 나올 사실이 없을 때까지 반복 적용합니다. 추론한 사실은 규칙별 이름 있는 그래프(`…/id/graph/inferred/규칙ID`)에도 기록해 출처를 추적합니다.
-- **개념 검증**(`agrisea/validate.py`, 지식그래프 탭 「개념 검증」, `python -m agrisea validate`): 109개 항목을 점검합니다. 오류는 공리 위반(배타 클래스, 값이 하나여야 하는 관계, 정의역·치역·자료형 위반, 스키마에 없는 용어 등), 경고는 개념상 있어야 할 관계가 빠진 것, 참고는 동명이인처럼 사람이 확인할 것입니다. OWL은 열린 세계 가정이라 SHACL처럼 닫힌 세계로 점검합니다.
+- **개념 검증**(`agrisea/validate.py`, 지식그래프 탭 「개념 검증」, `python -m agrisea validate`): 111개 항목을 점검합니다. 오류는 공리 위반(배타 클래스, 값이 하나여야 하는 관계, 정의역·치역·자료형 위반, 스키마에 없는 용어 등), 경고는 개념상 있어야 할 관계가 빠진 것, 참고는 동명이인처럼 사람이 확인할 것입니다. OWL은 열린 세계 가정이라 SHACL처럼 닫힌 세계로 점검합니다.
 - **저장**: 자동 갱신 때 추론까지 마친 그래프를 `data/kg.nq.gz`(N-Quads)로 저장하고, 서버는 이를 불러와 바로 질의합니다.
 - **API**: `/api/ontology/summary`, `/api/ontology/entity?iri=`, `/api/ontology/instances?cls=`, `/api/ontology/search?q=`, `/api/ontology/validation`, `/api/sparql`, `/api/data-status`.
 

@@ -125,3 +125,22 @@ def test_estimated_target_is_separate_from_confirmed_target():
     sea = org_uri("해양수산부")
     assert set(g.objects(utt_uri("M1", 2), AG.addressedTo)) == set()      # 확정 관계는 비워 둔다
     assert set(g.objects(utt_uri("M1", 2), AG.likelyAddressedTo)) == {sea}
+
+
+def test_agenda_batch_linked_in_graph():
+    """한꺼번에 상정한 안건 묶음: 묶음의 다른 안건은 대표 안건(묶음 끝)에 ag:jointlyTakenUpWith 로 이어지고,
+    검증 오류(스키마에 없는 용어·정의역·치역)가 없다."""
+    from agrisea.ontology import AGD, build_graph, build_kg
+    from agrisea.parser import MinutesDoc, Utterance
+    from agrisea.store import Store
+    from agrisea.validate import validate
+    s = Store(":memory:")
+    s.upsert_meeting({"meeting_id": "J1", "title": "제439회 예산결산", "date": "2026-11-01", "session_no": 439})
+    s.save_minutes("J1", MinutesDoc(agendas=["2027년도 예산안", "2027년도 기금운용계획안", "농지법 일부개정법률안"],
+                                    agenda_groups={2: [0, 1, 2]},
+                                    utterances=[Utterance(0, "김가람", "위원", "member", None, "예산 질의입니다.", 2)]))
+    g = build_graph(s)
+    a = lambda i: AGD[f"agenda/J1/{i}"]  # noqa: E731
+    assert set(g.subjects(AG.jointlyTakenUpWith, a(2))) == {a(0), a(1)}
+    assert (a(2), AG.jointlyTakenUpWith, a(2)) not in g
+    assert validate(build_kg(s)[0])["counts"]["error"] == 0
