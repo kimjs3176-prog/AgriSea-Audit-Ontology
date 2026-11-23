@@ -12,7 +12,7 @@
     a owl:Ontology ;
     rdfs:label "농해수위 국정감사 온톨로지 (AgriSea Audit Ontology)"@ko ;
     rdfs:comment "국회 농림축산식품해양수산위원회 회의록을 회의·안건·발언·발언자·피감기관·쟁점·이행약속으로 구조화하여 국정감사 준비와 사후관리에 활용하기 위한 온톨로지."@ko ;
-    owl:versionInfo "0.3.0" ;
+    owl:versionInfo "0.4.0" ;
     rdfs:seeAlso <https://w3id.org/agrisea/ontology/rules> .
 
 ########## 클래스 ##########
@@ -71,6 +71,9 @@ ag:hasUtterance a owl:ObjectProperty ; rdfs:label "발언 포함"@ko ;
 ag:inMeeting a owl:ObjectProperty ; rdfs:label "발언 회의"@ko .
 ag:onAgendaItem a owl:ObjectProperty ; rdfs:label "관련 안건"@ko ;
     rdfs:domain ag:Utterance ; rdfs:range ag:AgendaItem .
+ag:jointlyTakenUpWith a owl:ObjectProperty ; rdfs:label "함께 상정된 안건"@ko ;
+    rdfs:comment "한꺼번에 상정한 안건 묶음에서 각 안건이 가리키는 대표 안건(묶음 끝 안건). 묶음에서 나온 발언은 대표 안건에 붙는다."@ko ;
+    rdfs:domain ag:AgendaItem ; rdfs:range ag:AgendaItem .
 ag:spokenBy a owl:ObjectProperty ; rdfs:label "발언자"@ko ;
     rdfs:domain ag:Utterance ; rdfs:range ag:Person .
 ag:respondsTo a owl:ObjectProperty ; rdfs:label "~에 대한 답변"@ko ;

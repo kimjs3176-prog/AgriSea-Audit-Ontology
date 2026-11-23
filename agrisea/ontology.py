@@ -343,6 +343,13 @@ def build_graph(store: Store, with_schema: bool = True, core: bool = False,
                     g.add((mu, AG.audited, org_uri(org)))
                 g.add((au, AG.mentionsOrganization, org_uri(org)))
 
+        # 한꺼번에 상정한 안건 묶음: 묶음의 다른 안건 → 대표 안건(묶음 끝, 발언이 붙는 안건)
+        for head, members in (m.get("agenda_groups") or {}).items():
+            h = int(head)
+            for i in members:
+                if i != h and 0 <= i < len(agenda_uris) and 0 <= h < len(agenda_uris):
+                    g.add((agenda_uris[i], AG.jointlyTakenUpWith, agenda_uris[h]))
+
         last_question: URIRef | None = None
         utts = store.utterances(meeting_id=m["id"])
         title_orgs = meeting_title_orgs(utts)
