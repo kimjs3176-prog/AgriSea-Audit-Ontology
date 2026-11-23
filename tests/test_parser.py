@@ -277,3 +277,29 @@ def test_late_cover_moved_to_preamble():
     assert first == "의석을 정돈해 주시기 바랍니다. 그러면 의사일정 제1항부터 제2항까지 일괄하여 상정합니다."
     assert doc.agenda_groups == {1: [0, 1]} and [u.agenda_idx for u in doc.utterances] == [0, 1]
     assert parse_minutes(TEXT).agendas == ["농림축산식품부에 대한 국정감사", "농촌진흥청에 대한 국정감사"]  # 보통 회의록은 그대로
+
+
+def test_strip_bill_noise_removes_standalone_fragments_only():
+    """저장된 본문의 의안 목록 조각(번호 붙은 의안 제목·의안번호 조각)은 지우고, 문장 속 인용·발언 문장은 둔다."""
+    from agrisea.parser import strip_bill_noise
+    t = ("그러면 안건 심사를 시작하겠습니다. 2205633) 의원대표발의)(의안번호2204871) 번호2205633) (11시05분) "
+         "규정을 두고 22.마리나항만의 조성 및 관리 등에 관한 법률 일부개정법률안(박성훈 의원 대표발의)(의안번호 2206145) "
+         "23.굴산업진흥 및 지원에 관한 법률안(정점식 의원 대표발의)(의안번호2208310)···38 있음을 고려할 필요가 있습니다.")
+    assert strip_bill_noise(t) == ("그러면 안건 심사를 시작하겠습니다. (11시05분) 규정을 두고 있음을 고려할 필요가 있습니다.")
+    quoted = "기자재 지원법안(서천호 의원 대표발의)(의안번호2214537)에 대한 공청회를 열겠습니다."
+    assert strip_bill_noise(quoted) == quoted
+    assert strip_bill_noise("의안번호가 없는 보통 발언입니다.") == "의안번호가 없는 보통 발언입니다."
+
+
+def test_strip_bill_fragments_fixes_stored_text():
+    from agrisea.parser import MinutesDoc, Utterance
+    from agrisea.precompute import strip_bill_fragments
+    from agrisea.store import Store
+    s = Store(":memory:")
+    s.upsert_meeting({"meeting_id": "B1", "title": "제439회", "date": "2026-11-01", "session_no": 439})
+    s.save_minutes("B1", MinutesDoc(utterances=[
+        Utterance(0, "홍길동", "위원장", "chair", None, "계속심사하겠습니다. 의원대표발의)(의안번호2214898) 번호2205633)"),
+        Utterance(1, "김가람", "위원", "member", None, "질의입니다.")]))
+    assert strip_bill_fragments(s) == 1
+    assert s.utterances(meeting_id="B1")[0]["text"] == "계속심사하겠습니다."
+    assert strip_bill_fragments(s) == 0

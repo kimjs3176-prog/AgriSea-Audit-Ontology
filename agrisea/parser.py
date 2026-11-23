@@ -254,6 +254,21 @@ def lift_cover(text: str) -> str:
     return text[cover.start():end] + "\n" + text[:cover.start()] + text[end:]
 
 
+# 저장된 발언 본문에 남은 의안 목록 조각(회의록 원문 없이 정리): 번호 붙은 의안 제목
+# ('22.마리나항만 … 일부개정법률안(박성훈 의원 대표발의)(의안번호 2206145)')과 의안번호 조각만 이어진 부분
+# ('2202801) 의원대표발의)(의안번호2204871) 번호2205633)'). 앞뒤가 공백인 덩어리만 지운다(문장 속 인용은 둔다).
+_FRAG = (r"(?:(?:\(?[가-힣]{2,4}\s*)?의원\s*)?(?:대표\s*발의\s*\)\s*|[가-힣]{0,8}제\s*출\s*\)\s*)?(?:\(\s*)?"
+         r"(?:(?:의안|청원)\s*)?(?:번?\s*호\s*)?\d{7}\s*\)(?:\s*[·…]{2,}\s*\d{0,3})?")
+_BILL_TITLE = (r"\d{1,3}\s*\.\s*[^.?!()]{4,120}?(?:\([^()]{0,40}\))?\s*\(\s*(?:의안|청원)\s*번\s*호\s*\d{7}\s*\)"
+               r"(?:\s*[·…]{2,}\s*\d{0,3})?")   # 목차 줄이면 뒤에 점선·쪽 번호
+BILL_NOISE = re.compile(r"(?:(?<=\s)|^)(?:" + _BILL_TITLE + "|" + _FRAG + r")(?:\s+(?:" + _BILL_TITLE + "|" + _FRAG
+                        + r"))*(?=\s|$)")
+
+
+def strip_bill_noise(text: str) -> str:
+    return re.sub(r"\s{2,}", " ", BILL_NOISE.sub(" ", text)).strip()
+
+
 def parse_minutes(raw_text: str) -> MinutesDoc:
     text, _appendix = split_appendix(lift_cover(clean_text(raw_text)))
     parts = SPEAKER_MARK.split(text)

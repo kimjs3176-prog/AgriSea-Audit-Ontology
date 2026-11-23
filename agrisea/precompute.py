@@ -29,7 +29,8 @@ from .store import Store
 # 23: 대시보드·위원 분석·브리핑의 약속을 이행 추적 대상과 같은 기준으로
 # 24: 일괄 상정 안건 묶음(첫 안건 외 N건), 앞부분이 같은 안건 줄 구분
 # 25: 발언 본문에 남은 안건 제목 조각(줄바꿈된 제목 끝·아래 항목·목차 점선) 제거
-PRECOMPUTE_VERSION = 26  # 26: 첫 발언에 끼어 있던 회의록 표지를 첫머리로(안건 목록·발언 안건 자리 복구)
+# 26: 첫 발언에 끼어 있던 회의록 표지를 첫머리로(안건 목록·발언 안건 자리 복구)
+PRECOMPUTE_VERSION = 27  # 27: 저장된 발언 본문의 의안 목록 조각(번호 붙은 의안 제목·의안번호 조각) 제거
 
 
 def current_policy() -> dict:
@@ -113,6 +114,24 @@ def strip_appendix(store: Store) -> int:
     return len(updates) + len(deletes)
 
 
+def strip_bill_fragments(store: Store) -> int:
+    """발언 본문에 남은 의안 목록 조각(번호 붙은 의안 제목·의안번호 조각)을 지운다(회의록 원문 없이).
+    앞뒤가 공백인 덩어리만 지우므로 문장 속 인용은 그대로 둔다. 바뀐 발언 수를 돌려준다."""
+    from .parser import BILL_NOISE, strip_bill_noise
+    updates = []
+    for r in store.conn.execute("SELECT id, text FROM utterances").fetchall():
+        if BILL_NOISE.search(r["text"]):
+            new = strip_bill_noise(r["text"])
+            if new != r["text"]:
+                updates.append((new, r["id"]))
+    if updates:
+        with store.tx() as conn:
+            conn.executemany("UPDATE utterances SET text=? WHERE id=?", updates)
+            conn.execute("DELETE FROM kv")
+            conn.execute("DELETE FROM summaries WHERE kind='rule'")
+    return len(updates)
+
+
 def reclassify(store: Store) -> int:
     """저장된 발언의 발언자 유형·소속·질의/약속 표시를 현재 규칙으로 다시 계산(PDF 재수집 없이)."""
     import json
@@ -162,6 +181,7 @@ def reclassify(store: Store) -> int:
 def precompute(store: Store, kg_path: Path | None = None,
                progress: Callable[[str], None] = print) -> dict:
     trimmed = strip_appendix(store)
+    trimmed += strip_bill_fragments(store)
     spaced = fix_spacing(store, progress)
     fixed = reclassify(store)
     n = 0
@@ -184,6 +204,6 @@ def precompute(store: Store, kg_path: Path | None = None,
         out["validation"] = report["counts"]
         out["triples"] = summary["triples"]
         out["inferred"] = summary["inferred"]
-    progress(f"사전 계산: 회의록 끝 부록 정리 {trimmed}건, 발언자 재분류 {fixed}건, 회의 요약 {n}건, 집계 {len(CACHED_VIEWS)}종"
+    progress(f"사전 계산: 회의록 끝 부록·의안 목록 조각 정리 {trimmed}건, 발언자 재분류 {fixed}건, 회의 요약 {n}건, 집계 {len(CACHED_VIEWS)}종"
              + (f", 지식그래프 트리플 {out['triples']}개(추론 {out['inferred']}개)" if kg_path else ""))
     return out
