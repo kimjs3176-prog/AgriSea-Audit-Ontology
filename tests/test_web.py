@@ -197,3 +197,11 @@ def test_index_readability_settings(store, settings):
         assert v in html
     assert 'aria-label="본문 글자 크기"' in html and "agrisea-read" in html
     assert ':root[data-read="xl"]{--read-size:' in html
+
+
+def test_net_mode_toggle_state_and_copy(store, settings):
+    """관계 흐름 보기 전환: 단추에 눌림 상태(aria-pressed)를 주고, 흐름도로 돌아오면 처음과 같은 설명 문장."""
+    html = TestClient(create_app(settings, store)).get("/").text
+    assert 'id="netMode" role="group"' in html and 'aria-pressed="true" data-k="flow"' in html
+    assert 'b.setAttribute("aria-pressed"' in html
+    assert "const NET_FLOW_SUB = $(\"#netSub\").innerHTML;" in html and "많습니다, 항목에" not in html
