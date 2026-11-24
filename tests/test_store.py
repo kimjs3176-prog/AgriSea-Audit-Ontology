@@ -83,3 +83,18 @@ def test_agenda_groups_saved_and_labelled():
     assert m["agenda_labels"] == ["1. 2027년도 예산안", "1. 2027년도 예산안 외 1건", "3. 농지법 일부개정법률안"]
     s.upsert_meeting({"meeting_id": "G2", "title": "제439회", "date": "2026-11-02", "session_no": 439})
     assert "agenda_labels" not in s.meeting("G2")
+
+
+def test_search_hits_carry_agenda_label():
+    """검색 결과 발언마다 속한 안건 이름이 붙는다(일괄 상정 묶음은 '첫 안건 외 N건', 번호는 뗌)."""
+    from agrisea.parser import MinutesDoc, Utterance
+    from agrisea.store import Store
+    s = Store(":memory:")
+    s.upsert_meeting({"meeting_id": "S1", "title": "제439회", "date": "2026-11-01", "session_no": 439})
+    s.save_minutes("S1", MinutesDoc(agendas=["2027년도 예산안", "2027년도 기금운용계획안", "농지법 일부개정법률안"],
+                                    agenda_groups={1: [0, 1]},
+                                    utterances=[Utterance(0, "김가람", "위원", "member", None, "쌀값 예산 질의입니다.", 1),
+                                                Utterance(1, "이나래", "위원", "member", None, "쌀값 농지 질의입니다.", 2),
+                                                Utterance(2, "박다솜", "위원", "member", None, "쌀값 의사진행입니다.")]))
+    got = {u["speaker_name"]: u["agenda"] for u in s.search("쌀값")}
+    assert got == {"김가람": "2027년도 예산안 외 1건", "이나래": "농지법 일부개정법률안", "박다솜": None}

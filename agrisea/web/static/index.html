@@ -723,6 +723,7 @@ p,li,.sub,.turn .tx,.pt,.quote,.bubble,.hit-snip,.tl-t,.fuitem .fut,.brief3 span
 .fuitem .fut{font-size:calc(var(--read-size) - 1px);line-height:1.6}
 .brief3{font-size:calc(var(--read-size) - 1px);line-height:var(--read-lh)}
 .hit-snip{max-width:46em}
+.hit-ag{font-size:var(--meta-size);color:var(--muted);margin:-2px 0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* 설명 문장은 한 줄이 너무 길지 않게, 작은 보조 글씨는 조금 크게 */
 .sub{max-width:60em;font-size:13.5px;line-height:1.7}
 .pt .who,.bubble .who,.quote .who,.quote .meta,.tl-d,.item .d,.turn .tw,.rowlist .r .d{font-size:var(--meta-size)}
@@ -1637,7 +1638,7 @@ function hitCard(u, q){
   const who = u.speaker_role === "위원" ? `${u.speaker_name} 위원` : `${u.speaker_role} ${u.speaker_name}`;
   const flags = (u.is_commitment ? '<span class="chip warn">약속</span>' : "") + (u.is_data_request ? '<span class="chip warn">자료요구</span>' : "");
   return `<div class="pt ${u.is_commitment ? "warn" : TYPE_CLS(u.speaker_type)}" onclick="this.classList.toggle('open')">
-    <div class="who">${esc(who)} ${flags}</div><div class="txt hit-snip">${snippet(u.text, q)}</div></div>`;
+    <div class="who">${esc(who)} ${flags}</div>${u.agenda ? `<div class="hit-ag" title="${esc(u.agenda)}">안건 · ${esc(cutAgenda(u.agenda, 60))}</div>` : ""}<div class="txt hit-snip">${snippet(u.text, q)}</div></div>`;
 }
 function renderSearch(){
   const {r, q, filter} = searchState;

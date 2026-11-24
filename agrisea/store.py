@@ -327,9 +327,17 @@ class Store:
         where, args = self._search_where(terms, speaker_type, date_from, date_to, session)
         # 넉넉히 가져와 관련도로 고른 뒤 최신순으로 보여 준다(위원장 사회 발언·짧은 언급보다
         # 검색어를 여러 번 다룬 위원 질의와 정부 답변이 먼저 뽑히도록)
-        sql = ("SELECT u.*, m.date AS meeting_date, m.title AS meeting_title, m.session_no AS session_no"
+        sql = ("SELECT u.*, m.date AS meeting_date, m.title AS meeting_title, m.session_no AS session_no, "
+               "m.agendas_json AS _agendas, m.agenda_groups_json AS _groups"
                + where + " ORDER BY m.date DESC, u.idx LIMIT ?")
         rows = [self._utt(r) for r in self.conn.execute(sql, args + [max(limit * 20, 2000)])]
+        labels: dict[tuple[str, str], list[str]] = {}
+        for u in rows:   # 발언이 속한 안건 이름(일괄 상정 묶음은 '첫 안건 외 N건')
+            a, g = u.pop("_agendas", None) or "[]", u.pop("_groups", None) or "{}"
+            if (a, g) not in labels:
+                labels[(a, g)] = [re.sub(r"^\s*\d+\.\s*", "", x) for x in agenda_labels(json.loads(a), json.loads(g))]
+            ai, ls = u.get("agenda_idx"), labels[(a, g)]
+            u["agenda"] = ls[ai] if ai is not None and 0 <= ai < len(ls) else None
         weight = {"member": 1.0, "official": 0.9, "witness": 0.9, "reference": 0.8,
                   "staff": 0.5, "chair": 0.3}
         bare = [t.replace(" ", "") for t in terms]
