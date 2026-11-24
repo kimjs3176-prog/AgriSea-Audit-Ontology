@@ -800,7 +800,7 @@ p,li,.sub,.turn .tx,.pt,.quote,.bubble,.hit-snip,.tl-t,.fuitem .fut,.brief3 span
   </div>
   <div class="card">
     <div class="row" style="align-items:baseline"><h2>위원 → 쟁점 → 기관 관계 흐름</h2>
-      <div class="netmode" id="netMode"><button class="on" data-k="flow">흐름도</button><button data-k="3d">3D 신경망</button></div></div>
+      <div class="netmode" id="netMode" role="group" aria-label="관계 보기 방식"><button type="button" class="on" aria-pressed="true" data-k="flow">흐름도</button><button type="button" aria-pressed="false" data-k="3d">3D 신경망</button></div></div>
     <p class="sub" id="netSub">왼쪽 위원이 어떤 쟁점을 따졌고, 그 쟁점이 어느 기관으로 이어졌는지 보여 줍니다. <b>띠가 굵을수록</b> 함께 언급된 발언이 많습니다. 항목에 마우스를 올리면 그 연결만 강조되고, 누르면 쟁점·의원 분석이나 기관 브리핑으로 갑니다.</p>
     <div class="netwrap">
     <div class="netmain">
@@ -2012,13 +2012,14 @@ async function loadNet(){
     $("#netFlow").innerHTML = `<div class="empty">관계 흐름을 불러오지 못했습니다: ${esc(e.message)}</div>`;
   }
 }
+const NET_FLOW_SUB = $("#netSub").innerHTML;
 document.querySelectorAll("#netMode button").forEach(b => b.onclick = () => setNetMode(b.dataset.k));
 function setNetMode(k){
-  document.querySelectorAll("#netMode button").forEach(b => b.classList.toggle("on", b.dataset.k === k));
+  document.querySelectorAll("#netMode button").forEach(b => { b.classList.toggle("on", b.dataset.k === k); b.setAttribute("aria-pressed", String(b.dataset.k === k)) });
   const fl = $("#netFlow").parentElement; fl.hidden = fl.previousElementSibling.hidden = k !== "flow";
   $("#netStage").hidden = k !== "3d";
   $("#netSub").innerHTML = k === "flow"
-    ? "왼쪽 위원이 어떤 쟁점을 따졌고, 그 쟁점이 어느 기관으로 이어졌는지 보여 줍니다. <b>띠가 굵을수록</b> 함께 언급된 발언이 많습니다, 항목에 마우스를 올리면 연결만 강조, 누르면 쟁점 분석 / 의원 분석 / 기관 브리핑"
+    ? NET_FLOW_SUB   // 처음 화면과 같은 문장(전환했다 돌아와도 같게)
     : "질의 위원(입력층) → 쟁점(은닉층) → 피감기관(출력층). 선이 밝을수록 함께 언급된 횟수가 많고, 흐르는 빛은 질의가 쟁점을 거쳐 기관으로 향하는 흐름입니다. 드래그로 회전합니다.";
   if(k === "3d") loadNet3d();
 }
