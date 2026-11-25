@@ -303,3 +303,13 @@ def test_strip_bill_fragments_fixes_stored_text():
     assert strip_bill_fragments(s) == 1
     assert s.utterances(meeting_id="B1")[0]["text"] == "계속심사하겠습니다."
     assert strip_bill_fragments(s) == 0
+
+
+def test_private_association_head_and_committee_office_are_not_officials():
+    """소관 기관 목록에 없는 협회·연합회·학회의 장(공청회 진술 단체 대표)은 진술인·참고인으로, 위원회 행정실장은
+    국회 직원으로 본다. 소관 기관인 협회(한국해양조사협회)의 장과 부처 실장은 그대로 정부·기관 관계자."""
+    from agrisea.lexicon import classify_role
+    assert classify_role("전국한우협회장") == "reference"
+    assert classify_role("행정실장") == "staff"
+    assert classify_role("한국해양조사협회장") == "official"
+    assert classify_role("기획조정실장") == "official"
