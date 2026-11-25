@@ -69,6 +69,14 @@ def test_question_kind_rules():
     assert question_kind("몇 페이지요?", ["official", "reference"]) is None
     # 긴 정부 질의 끝의 '1분만 더'는 진행 표현으로 보지 않는다
     assert question_kind("폐업지원금 " * 40 + "1분만 더 주시겠습니까?", ["chair"]) is None
+    # 위원·위원장만 받아 이어 간 질의는 위원 간 논의 질의
+    assert question_kind("토지를 제한한다는 것하고?", ["chair", "member"], "예.") == "deliberation"
+    assert question_kind("관계없어요, 크게?", ["chair"], "국외 공급망하고 국내 공급망이 다 포함됩니다.") == "deliberation"
+    # 위원장이 끊거나 다음 위원에게 차례를 넘겼으면 정부 질의가 끊긴 것이라 논의 질의가 아니다
+    assert question_kind("급한 불을 꺼야 하지 않겠습니까?", ["chair"], "수고하셨습니다. 다음은 박위원님 질의하시겠습니다.") is None
+    assert question_kind("왜 그런 정책을 폅니까?", ["chair", "member"], "그만 하세요. 그만 하세요.") is None
+    assert question_kind("그 대책은 언제 나옵니까?", ["chair"], "임호선 위원님.") is None
+    assert question_kind("장관님 생각은 어떠세요?", ["member"], "저는 반대합니다.") is None
 
 
 def test_non_agency_questions_are_classified_and_excluded_from_check():
@@ -96,6 +104,30 @@ def test_non_agency_questions_are_classified_and_excluded_from_check():
     report = validate(build_kg(s)[0])
     check = next(c for c in report["checks"] if c["title"].startswith("질의는 어느 기관을 향한다"))
     assert check["count"] == 1 and report["counts"]["error"] == 0   # 끊긴 정부 질의 하나만 남는다
+
+
+def test_deliberation_question_links_to_replying_member():
+    from rdflib import RDF
+
+    from agrisea.ontology import AGD, build_kg
+    from agrisea.validate import validate
+    s = _store()
+    s.save_minutes("M1", MinutesDoc(utterances=[
+        Utterance(0, "강도형", "해양수산부장관", "official", "해양수산부", "업무 현황을 보고드리겠습니다."),
+        Utterance(1, "김위원", "위원", "member", None, "이 조항은 의무로 둬야 하지 않습니까?"),
+        Utterance(2, "박위원", "위원", "member", None, "재량으로 두는 게 맞다고 봅니다."),
+        Utterance(3, "김위원", "위원", "member", None, "그러면 단서를 달까요?"),
+        Utterance(4, "김위원", "위원", "member", None, "제 생각은 그렇습니다."),
+    ]))
+    reclassify(s)
+    g = build_graph(s)
+    types = lambda i: set(g.objects(utt_uri("M1", i), RDF.type))  # noqa: E731
+    assert AG.DeliberationQuestion in types(1)
+    assert set(g.objects(utt_uri("M1", 1), AG.addressedToPerson)) == {AGD["person/member/박위원"]}
+    assert AG.DeliberationQuestion not in types(3)   # 질의한 위원 혼자 이어 말한 것은 논의가 아니다
+    report = validate(build_kg(s)[0])
+    check = next(c for c in report["checks"] if c["title"].startswith("질의는 어느 기관을 향한다"))
+    assert check["count"] == 1 and report["counts"]["error"] == 0
 
 
 def test_turn_estimates_needs_two_answered_questions_to_one_agency():

@@ -55,12 +55,24 @@ _PROC_PHRASE = re.compile(r"의사\s*진행|\d+\s*분\s*(만|더|도|이라도)|
                           r"|발언권|추가\s*질의")
 _GOV_ADDRESS = re.compile(rf"(?<!위)({_TITLES})(님|께|,)")
 _PROC_SHORT = 150
+# 위원장이 질의를 끊거나 다음 위원에게 차례를 넘기는 말. 이렇게 끊긴 질의는 위원 간 논의로 보지 않는다
+_HANDOFF = re.compile(r"수고\s*하셨습니다|다음(은|으로|에)|질의\s*하(시|십)|(위원|간사)님\s*(말씀|질의)"
+                      r"|시간(이|은)\s*(다|끝|지났|넘)|그만\s*하|^\s*[가-힣]{2,4}\s*(위원|간사)님\s*[.,]?\s*$")
 
 
-def question_kind(text: str, responders: list[str]) -> str | None:
-    """기관을 못 찾은 질의의 갈래: 'expert'(진술인·참고인 질의) | 'procedural'(회의 진행 질의) | None.
+_QUESTION_KIND_CLASS = {"expert": AG.ExpertQuestion, "procedural": AG.ProceduralQuestion,
+                        "deliberation": AG.DeliberationQuestion}
+_QUESTION_KIND_PERSON = {"expert": ("reference",), "procedural": ("chair", "staff"),
+                         "deliberation": ("member", "chair")}
 
-    responders: 질의 뒤 다음 질의 전까지 발언한 사람들의 유형(speaker_type).
+
+def question_kind(text: str, responders: list[str], first_reply: str = "") -> str | None:
+    """기관을 못 찾은 질의의 갈래: 'expert'(진술인·참고인 질의) | 'procedural'(회의 진행 질의)
+    | 'deliberation'(위원 간 논의 질의) | None.
+
+    responders: 질의 뒤 다음 질의 전까지 발언한 사람들(질의한 위원 자신은 뺀다)의 유형(speaker_type).
+    first_reply: 그 가운데 첫 발언의 본문. 위원·위원장만 받아 이어 갔고 위원장이 질의를 끊거나 차례를
+    넘긴 것이 아니면, 법안소위 축조 심사처럼 위원끼리 의견을 주고받은 질의로 본다.
     """
     kinds = set(responders)
     if kinds & {"official", "witness"}:
@@ -73,6 +85,8 @@ def question_kind(text: str, responders: list[str]) -> str | None:
         return "procedural"
     if _PROC_PHRASE.search(text) and (len(text) <= _PROC_SHORT or text.lstrip().startswith("의사진행")):
         return "procedural"
+    if kinds and kinds <= {"member", "chair"} and first_reply and not _HANDOFF.search(first_reply):
+        return "deliberation"
     return None
 
 
@@ -357,7 +371,7 @@ def build_graph(store: Store, with_schema: bool = True, core: bool = False,
         # 한 번에 받은 답변의 기관을 함께 받는다. 둘 다 없으면 직함 호칭으로 찾는다(회의가 끝난 뒤 판단).
         q_targets: dict[URIRef, set[str]] = {}
         q_text: dict[URIRef, str] = {}
-        q_resp: dict[URIRef, list[tuple[str, URIRef]]] = {}   # 질의 뒤 다음 질의 전까지 발언한 (유형, 인물)
+        q_resp: dict[URIRef, list[tuple[str, URIRef, str]]] = {}   # 질의 뒤 다음 질의 전까지 다른 사람의 (유형, 인물, 본문)
         q_speaker: dict[URIRef, str] = {}
         run: list[URIRef] = []
         prev: dict | None = None
@@ -382,7 +396,8 @@ def build_graph(store: Store, with_schema: bool = True, core: bool = False,
                          and u["speaker_type"] in ("official", "witness"))
             if not u["is_question"]:
                 for q in run:
-                    q_resp.setdefault(q, []).append((u["speaker_type"], pu))
+                    if u["speaker_name"] != q_speaker.get(q):
+                        q_resp.setdefault(q, []).append((u["speaker_type"], pu, u["text"]))
             if core and not (u["is_question"] or is_answer or u["is_commitment"]
                              or u["is_data_request"]):
                 continue
@@ -428,12 +443,12 @@ def build_graph(store: Store, with_schema: bool = True, core: bool = False,
             for org in orgs:
                 g.add((q, AG.addressedTo, org_uri(org)))
             resp = q_resp.get(q, [])
-            kind = None if orgs else question_kind(q_text.get(q, ""), [t for t, _ in resp])
+            kind = None if orgs else question_kind(q_text.get(q, ""), [t for t, _, _ in resp],
+                                                    resp[0][2] if resp else "")
             final.append((q, q_speaker.get(q, ""), None if kind else set(orgs)))
             if kind:
-                g.add((q, RDF.type, AG.ExpertQuestion if kind == "expert" else AG.ProceduralQuestion))
-                want = ("reference",) if kind == "expert" else ("chair", "staff")
-                person = next((p for t, p in resp if t in want), None)
+                g.add((q, RDF.type, _QUESTION_KIND_CLASS[kind]))
+                person = next((p for t, p, _ in resp if t in _QUESTION_KIND_PERSON[kind]), None)
                 if person is not None:
                     g.add((q, AG.addressedToPerson, person))
         for q, org in turn_estimates(final).items():

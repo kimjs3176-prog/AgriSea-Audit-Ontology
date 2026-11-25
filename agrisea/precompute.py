@@ -33,7 +33,7 @@ from .store import Store
 # 27: 저장된 발언 본문의 의안 목록 조각(번호 붙은 의안 제목·의안번호 조각) 제거
 # 28: 지식그래프에 일괄 상정 안건 묶음(ag:jointlyTakenUpWith, 스키마 0.4)
 # 29: 약속은 답변의 하위 개념이 아님(질의 전 업무보고 속 약속은 답변 아님, 스키마 0.5)
-PRECOMPUTE_VERSION = 30  # 30: 민간 협회장은 진술인·참고인, 위원회 행정실장은 국회 직원으로 분류
+PRECOMPUTE_VERSION = 31  # 31: 위원끼리 주고받은 질의를 위원 간 논의 질의로 분류
 
 
 def current_policy() -> dict:
