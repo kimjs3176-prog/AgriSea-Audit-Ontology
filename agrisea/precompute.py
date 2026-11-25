@@ -31,7 +31,8 @@ from .store import Store
 # 25: 발언 본문에 남은 안건 제목 조각(줄바꿈된 제목 끝·아래 항목·목차 점선) 제거
 # 26: 첫 발언에 끼어 있던 회의록 표지를 첫머리로(안건 목록·발언 안건 자리 복구)
 # 27: 저장된 발언 본문의 의안 목록 조각(번호 붙은 의안 제목·의안번호 조각) 제거
-PRECOMPUTE_VERSION = 28  # 28: 지식그래프에 일괄 상정 안건 묶음(ag:jointlyTakenUpWith, 스키마 0.4)
+# 28: 지식그래프에 일괄 상정 안건 묶음(ag:jointlyTakenUpWith, 스키마 0.4)
+PRECOMPUTE_VERSION = 29  # 29: 약속은 답변의 하위 개념이 아님(질의 전 업무보고 속 약속은 답변 아님, 스키마 0.5)
 
 
 def current_policy() -> dict:

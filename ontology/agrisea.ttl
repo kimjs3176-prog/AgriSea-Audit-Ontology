@@ -12,7 +12,7 @@
     a owl:Ontology ;
     rdfs:label "농해수위 국정감사 온톨로지 (AgriSea Audit Ontology)"@ko ;
     rdfs:comment "국회 농림축산식품해양수산위원회 회의록을 회의·안건·발언·발언자·피감기관·쟁점·이행약속으로 구조화하여 국정감사 준비와 사후관리에 활용하기 위한 온톨로지."@ko ;
-    owl:versionInfo "0.4.0" ;
+    owl:versionInfo "0.5.0" ;
     rdfs:seeAlso <https://w3id.org/agrisea/ontology/rules> .
 
 ########## 클래스 ##########
@@ -36,9 +36,9 @@ ag:ProceduralQuestion a owl:Class ; rdfs:subClassOf ag:Question ; rdfs:label "�
 ag:ExpertQuestion a owl:Class ; rdfs:subClassOf ag:Question ; rdfs:label "진술인·참고인 질의"@ko ;
     rdfs:comment "공청회·청문회에서 진술인·참고인에게 묻는 질의. 기관이 아니라 그 사람(ag:addressedToPerson)에게 묻는다."@ko .
 ag:Answer a owl:Class ; rdfs:subClassOf ag:Utterance ; rdfs:label "답변"@ko .
-ag:Commitment a owl:Class ; rdfs:subClassOf ag:Answer ;
-    rdfs:label "이행약속 답변"@ko ;
-    rdfs:comment "'검토하겠습니다', '개선하겠습니다' 등 후속조치를 약속한 답변. 국정감사 결과보고서·시정처리 요구의 추적 대상."@ko .
+ag:Commitment a owl:Class ; rdfs:subClassOf ag:Utterance ;
+    rdfs:label "이행약속"@ko ;
+    rdfs:comment "'검토하겠습니다', '개선하겠습니다' 등 정부·기관이 후속조치를 약속한 발언. 질의에 대한 답변으로 한 약속은 ag:Answer 이기도 하고, 질의 전 업무보고·인사말 속 약속은 답변이 아니다. 국정감사 결과보고서·시정처리 요구의 추적 대상."@ko .
 ag:DataRequest a owl:Class ; rdfs:subClassOf ag:Utterance ; rdfs:label "자료요구"@ko ;
     rdfs:comment "자료를 요구한 발언. 질의 중에 자료를 요구하는 경우가 많아 질의(ag:Question)와 겹칠 수 있다(서로 배타 아님)."@ko .
 
