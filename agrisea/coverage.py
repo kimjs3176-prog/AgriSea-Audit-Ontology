@@ -82,16 +82,17 @@ def data_status(store: Store, meta: dict | None = None, today: date | None = Non
                        for ch in report.get("checks", []) if ch.get("severity") != "pass"],
         }
 
-    # 질의 분류(지식그래프 사전 계산 요약): 기관 대상 질의 / 회의 진행 질의 / 진술인·참고인 질의
+    # 질의 분류(지식그래프 사전 계산 요약): 기관 대상 질의 / 회의 진행 질의 / 진술인·참고인 질의 / 위원 간 논의 질의
     cls = {c.get("id"): c.get("count", 0) for c in (store.kv_get("ontology") or {}).get("classes", [])}
     questions = None
     if cls.get("Question"):
         proc, expert = cls.get("ProceduralQuestion", 0), cls.get("ExpertQuestion", 0)
+        delib = cls.get("DeliberationQuestion", 0)
         unresolved = next((ch.get("count") for ch in (report or {}).get("checks", [])
                            if ch.get("title", "").startswith("질의는 어느 기관을 향한다")), None)
         props = {p.get("id"): p.get("count", 0) for p in (store.kv_get("ontology") or {}).get("properties", [])}
         questions = {"total": cls["Question"], "procedural": proc, "expert": expert,
-                     "agency": cls["Question"] - proc - expert, "agency_unresolved": unresolved,
+                     "deliberation": delib, "agency": cls["Question"] - proc - expert - delib, "agency_unresolved": unresolved,
                      "agency_estimated": props.get("likelyAddressedTo", 0)}
 
     gaps = []
