@@ -144,3 +144,28 @@ def test_agenda_batch_linked_in_graph():
     assert set(g.subjects(AG.jointlyTakenUpWith, a(2))) == {a(0), a(1)}
     assert (a(2), AG.jointlyTakenUpWith, a(2)) not in g
     assert validate(build_kg(s)[0])["counts"]["error"] == 0
+
+
+def test_commitment_before_any_question_is_not_an_answer():
+    """질의가 나오기 전 업무보고·인사말 속 약속은 약속(Commitment)일 뿐 답변(Answer)이 아니고, 질의 뒤의 약속은
+    답변이기도 하며 그 질의를 가리킨다. 검증의 '답변은 어느 질의에 대한 답변이다' 경고가 생기지 않는다."""
+    from rdflib import RDF
+
+    from agrisea.ontology import build_kg
+    from agrisea.validate import validate
+    s = Store(":memory:")
+    s.upsert_meeting({"meeting_id": "C1", "title": "제439회 업무보고", "date": "2026-11-01", "session_no": 439})
+    s.save_minutes("C1", MinutesDoc(utterances=[
+        Utterance(0, "정마루", "농림축산식품부장관", "official", "농림축산식품부", "쌀값 안정 대책을 추진하겠습니다.",
+                  is_commitment=True),
+        Utterance(1, "김가람", "위원", "member", None, "쌀값 대책은 언제 나옵니까?", is_question=True),
+        Utterance(2, "정마루", "농림축산식품부장관", "official", "농림축산식품부", "이달 안에 마련하겠습니다.",
+                  is_commitment=True)]))
+    g = build_graph(s)
+    types = lambda i: set(g.objects(utt_uri("C1", i), RDF.type))  # noqa: E731
+    assert AG.Commitment in types(0) and AG.Answer not in types(0)
+    assert {AG.Commitment, AG.Answer} <= types(2)
+    assert set(g.objects(utt_uri("C1", 2), AG.respondsTo)) == {utt_uri("C1", 1)}
+    report = validate(build_kg(s)[0])
+    check = next(c for c in report["checks"] if c["title"].startswith("답변은 어느 질의"))
+    assert check["count"] == 0 and report["counts"]["error"] == 0

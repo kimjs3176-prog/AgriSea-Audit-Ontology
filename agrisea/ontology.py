@@ -417,8 +417,8 @@ def build_graph(store: Store, with_schema: bool = True, core: bool = False,
             if u["is_data_request"]:
                 g.add((uu, RDF.type, AG.DataRequest))
             if u["is_commitment"]:
+                # 질의 뒤의 약속은 답변(위 is_answer)이기도 하다. 질의가 나오기 전 업무보고·인사말 속 약속은 답변이 아니다.
                 g.add((uu, RDF.type, AG.Commitment))
-                g.add((uu, RDF.type, AG.Answer))
                 if u["org"]:
                     g.add((uu, AG.committedBy, org_uri(u["org"])))
         final: list[tuple[URIRef, str, set[str] | None]] = []

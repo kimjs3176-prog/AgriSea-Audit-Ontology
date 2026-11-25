@@ -45,7 +45,7 @@ class Rule:
 
 
 RULES: list[Rule] = [
-    Rule("subclass", "schema", "하위 클래스", "약속은 답변이고 답변은 발언이다처럼, 하위 클래스의 개체는 상위 클래스의 개체이기도 하다",
+    Rule("subclass", "schema", "하위 클래스", "답변은 발언이고 약속은 발언이다처럼, 하위 클래스의 개체는 상위 클래스의 개체이기도 하다",
          "?x a ?super .",
          "?x a ?c . ?c rdfs:subClassOf+ ?super . FILTER(isIRI(?super) && ?super != owl:Thing)"),
     Rule("subproperty", "schema", "하위 관계", "하위 관계가 성립하면 상위 관계도 성립한다(예: 질의 대상 기관 → 언급 기관)",
