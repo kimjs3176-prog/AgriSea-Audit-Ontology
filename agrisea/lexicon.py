@@ -163,7 +163,7 @@ ROLE_TYPES = (
     # 회의 진행자: 위원장·소위원장·조정위원장(및 대리). '원장'으로 끝나 기관장으로 오인되지 않게 먼저 판별
     (re.compile(r"^(소|조정|분과)?위원장(대리)?$"), "chair"),
     (re.compile(r"^위원$"), "member"),
-    (re.compile(r"전문위원|입법조사관"), "staff"),
+    (re.compile(r"전문위원|입법조사관|^행정실장$"), "staff"),   # 행정실장: 위원회 행정실(국회 직원)
     (re.compile(r"^증인|증인$"), "witness"),
     (re.compile(r"^(참고인|진술인)|(참고인|진술인)$"), "reference"),
     (re.compile(r"(장관|차관|청장|실장|국장|본부장|원장|사장|이사장|회장|대표이사|대표|이사|처장|"
@@ -225,9 +225,15 @@ def org_from_role(role: str) -> str | None:
 _ROLE_QUALIFIER = re.compile(r"\s*(?:(?:전담)?직무|권한)?(?:대리|대행)$|\s+후보자$")
 
 
+# 민간 단체 대표(공청회 진술 등): 소관 기관 목록에 없는 협회·연합회·학회의 장은 정부·기관 관계자가 아니다
+_PRIVATE_BODY_HEAD = re.compile(r"(협회|연합회|학회)\s*(회장|장)$")
+
+
 def classify_role(role: str) -> str:
     core = _ROLE_QUALIFIER.sub("", role.strip())
     for pat, kind in ROLE_TYPES:
         if pat.search(core):
+            if kind == "official" and _PRIVATE_BODY_HEAD.search(core) and not org_from_role(core):
+                return "reference"
             return kind
     return "other"
