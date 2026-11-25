@@ -24,8 +24,11 @@ PAGE_NOISE = [
     re.compile(r"^\s*국\s*회\s*사\s*무\s*처\s*$"),
 ]
 AGENDA_LINE = re.compile(r"^\s*(\d{1,3})\s*\.\s*(.{4,120}?)\s*(?:[·.…]{3,}\s*\d+)?\s*$")
-OFFICIAL_SUFFIX = (r"(?:장관|차관|청장|처장|실장|국장|본부장|원장|사장|이사장|회장|대표이사|대표|"
-                   r"정책관|단장|과장|총장|전문위원|수석전문위원|입법조사관|증인|참고인|진술인)")
+OFFICIAL_SUFFIX = (r"(?:장관|차관|청장|처장|실장|국장|본부장|원장|사장|이사장|회장|대표이사|대표|전무이사|상무|"
+                   r"관장|정책관|단장|과장|총장|전문위원|수석전문위원|입법조사관|증인|참고인|진술인)")
+# 띄어 쓴 기관명: '농업협동조합 중앙회 상무 조청래'. 줄바꿈·글자 간격으로 기관명이 끊기면 위 패턴이 놓쳐
+# 그 답변이 앞 위원의 발언에 붙는다. 기관을 나타내는 끝말이 있어야 하고, 직위는 띄어쓰기를 지워 둔다
+_SPACED_ORG = r"(?:[가-힣]{2,12}\s){1,3}?[가-힣]{0,12}?(?:중앙회|공사|공단|박물관|진흥원|관리원|평가원|연구원|재단|본부)\s?"
 
 SPEAKER_PATTERNS = [
     # 위원장 / 위원장대리
@@ -41,6 +44,8 @@ SPEAKER_PATTERNS = [
     # 기관+직위 이름
     re.compile(r"^(\S{1,30}?" + OFFICIAL_SUFFIX + r")\s+([가-힣]{2,4})(?=\s|$)"),
     re.compile(r"^([^\s]{1,30}?" + OFFICIAL_SUFFIX + r")([가-힣]{3})"),
+    # 이름 자리에 조사·호칭('님께', '에는', '이사님')이 오면 기관을 부른 말이지 발언자 머리가 아니다
+    re.compile(r"^(" + _SPACED_ORG + OFFICIAL_SUFFIX + r")\s*(?!님|께|에|으로|을|를|의)([가-힣]{2,4})(?<!님)(?=\s|$)"),
 ]
 
 
@@ -152,7 +157,7 @@ def parse_speaker(chunk: str) -> tuple[str, str, str] | None:
         if b == "위원":  # (이름, '위원') 순서
             role, name = "위원", a
         else:
-            role, name = a, b
+            role, name = re.sub(r"\s+", "", a), b
         return fix_role_qualifier(role, name, head[m.end():].strip())
     return None
 
