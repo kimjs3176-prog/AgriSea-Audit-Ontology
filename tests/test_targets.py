@@ -77,6 +77,13 @@ def test_question_kind_rules():
     assert question_kind("왜 그런 정책을 폅니까?", ["chair", "member"], "그만 하세요. 그만 하세요.") is None
     assert question_kind("그 대책은 언제 나옵니까?", ["chair"], "임호선 위원님.") is None
     assert question_kind("장관님 생각은 어떠세요?", ["member"], "저는 반대합니다.") is None
+    # 아무도 받지 않았어도 다른 위원의 의견(질의 아닌 발언)에 이어 던진 질의는 위원 간 논의 질의
+    assert question_kind("어떤 것을 수용하는 거예요?", [], "", ("member", "이것은 일부는 수용하고……", False)) == "deliberation"
+    # 위원장의 말(시간 안내·차례 넘김 등 진행 발언이 많다)이나 다른 위원의 질의 뒤는 논의로 보지 않는다
+    assert question_kind("급한 불을 꺼야 하지 않겠습니까?", [], "", ("chair", "1분 드리겠습니다.", False)) is None
+    assert question_kind("대책은 언제 나옵니까?", [], "",
+                         ("chair", "다음은 김선교 위원님 질의해 주시기 바랍니다.", False)) is None
+    assert question_kind("대책은 언제 나옵니까?", [], "", ("member", "예산은 얼마입니까?", True)) is None
 
 
 def test_non_agency_questions_are_classified_and_excluded_from_check():
@@ -124,10 +131,39 @@ def test_deliberation_question_links_to_replying_member():
     types = lambda i: set(g.objects(utt_uri("M1", i), RDF.type))  # noqa: E731
     assert AG.DeliberationQuestion in types(1)
     assert set(g.objects(utt_uri("M1", 1), AG.addressedToPerson)) == {AGD["person/member/박위원"]}
-    assert AG.DeliberationQuestion not in types(3)   # 질의한 위원 혼자 이어 말한 것은 논의가 아니다
+    # 질의한 위원이 혼자 이어 말한 것은 응답이 아니지만, 이 질의는 박위원의 의견에 이어 던진 것이라 논의 질의다
+    assert AG.DeliberationQuestion in types(3)
+    assert set(g.objects(utt_uri("M1", 3), AG.addressedToPerson)) == {AGD["person/member/박위원"]}
     report = validate(build_kg(s)[0])
     check = next(c for c in report["checks"] if c["title"].startswith("질의는 어느 기관을 향한다"))
-    assert check["count"] == 1 and report["counts"]["error"] == 0
+    assert check["count"] == 0 and report["counts"]["error"] == 0
+
+
+def test_unanswered_question_after_official_targets_that_agency():
+    """아무도 받지 않은 질의가 정부 관계자의 말 바로 뒤에 나왔으면 그 관계자의 기관을 향한 질의다."""
+    s = _store()
+    s.save_minutes("M1", MinutesDoc(utterances=[
+        Utterance(0, "김위원", "위원", "member", None, "어민 지원 예산은 얼마입니까?"),
+        Utterance(1, "강도형", "해양수산부장관", "official", "해양수산부", "의무 물량이 있어 냅니다."),
+        Utterance(2, "김위원", "위원", "member", None, "그게 10만 톤인가 그렇지 않나요?"),
+        Utterance(3, "박위원", "위원", "member", None, "얼마 내요, 양이?"),
+        Utterance(4, "강도형", "해양수산부장관", "official", "해양수산부", "저희가 더 노력하겠습니다."),
+        Utterance(5, "박위원", "위원", "member", None, "이걸 추경이라고 내놓습니까?"),
+        Utterance(6, "어위원", "위원장", "chair", None, "수고하셨습니다. 다음은 이위원님 질의해 주시기 바랍니다."),
+    ]))
+    reclassify(s)
+    g = build_graph(s)
+    sea = {org_uri("해양수산부")}
+    assert set(g.objects(utt_uri("M1", 2), AG.addressedTo)) == sea
+    assert set(g.objects(utt_uri("M1", 5), AG.addressedTo)) == sea   # 위원장이 차례를 넘겨 끊긴 질의
+    s.save_minutes("M1", MinutesDoc(utterances=[
+        Utterance(0, "강도형", "해양수산부장관", "official", "해양수산부", "결의안 내용을……"),
+        Utterance(1, "김위원", "위원", "member", None, "위원장님, 이 내용은 조정해 주시겠습니까?"),
+        Utterance(2, "어위원", "위원장", "chair", None, "이위원님."),
+    ]))
+    reclassify(s)
+    g = build_graph(s)   # 위원장을 부른 질의는 앞 관계자의 기관이 아니라 회의 진행 질의
+    assert set(g.objects(utt_uri("M1", 1), AG.addressedTo)) == set()
 
 
 def test_turn_estimates_needs_two_answered_questions_to_one_agency():
@@ -147,16 +183,17 @@ def test_estimated_target_is_separate_from_confirmed_target():
     s.save_minutes("M1", MinutesDoc(utterances=[
         Utterance(0, "김위원", "위원", "member", None, "해양수산부는 어민 지원을 언제 합니까?"),
         Utterance(1, "강도형", "해양수산부장관", "official", "해양수산부", "이달 중 검토하겠습니다."),
-        Utterance(2, "김위원", "위원", "member", None, "그게 다입니까?"),
-        Utterance(3, "어위원", "위원장", "chair", None, "시간이 다 됐습니다."),
-        Utterance(4, "김위원", "위원", "member", None, "해양수산부 예산은 얼마입니까?"),
-        Utterance(5, "강도형", "해양수산부장관", "official", "해양수산부", "자료로 드리겠습니다."),
+        Utterance(2, "어위원", "위원장", "chair", None, "답변은 짧게 해 주시기 바랍니다."),
+        Utterance(3, "김위원", "위원", "member", None, "그게 다입니까?"),
+        Utterance(4, "어위원", "위원장", "chair", None, "시간이 다 됐습니다."),
+        Utterance(5, "김위원", "위원", "member", None, "해양수산부 예산은 얼마입니까?"),
+        Utterance(6, "강도형", "해양수산부장관", "official", "해양수산부", "자료로 드리겠습니다."),
     ]))
     reclassify(s)
     g = build_graph(s)
     sea = org_uri("해양수산부")
-    assert set(g.objects(utt_uri("M1", 2), AG.addressedTo)) == set()      # 확정 관계는 비워 둔다
-    assert set(g.objects(utt_uri("M1", 2), AG.likelyAddressedTo)) == {sea}
+    assert set(g.objects(utt_uri("M1", 3), AG.addressedTo)) == set()      # 확정 관계는 비워 둔다
+    assert set(g.objects(utt_uri("M1", 3), AG.likelyAddressedTo)) == {sea}
 
 
 def test_agenda_batch_linked_in_graph():

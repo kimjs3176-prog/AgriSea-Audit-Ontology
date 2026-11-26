@@ -57,7 +57,7 @@ _GOV_ADDRESS = re.compile(rf"(?<!위)({_TITLES})(님|께|,)")
 _PROC_SHORT = 150
 # 위원장이 질의를 끊거나 다음 위원에게 차례를 넘기는 말. 이렇게 끊긴 질의는 위원 간 논의로 보지 않는다
 _HANDOFF = re.compile(r"수고\s*하셨습니다|다음(은|으로|에)|질의\s*하(시|십)|(위원|간사)님\s*(말씀|질의)"
-                      r"|시간(이|은)\s*(다|끝|지났|넘)|그만\s*하|^\s*[가-힣]{2,4}\s*(위원|간사)님\s*[.,]?\s*$")
+                      r"|시간(이|은)\s*(다|끝|지났|넘)|그만\s*하|(질의|인사|의견)\s*(해|을|를)?\s*주|^\s*[가-힣]{2,4}\s*(위원|간사)님\s*[.,]?\s*$")
 
 
 _QUESTION_KIND_CLASS = {"expert": AG.ExpertQuestion, "procedural": AG.ProceduralQuestion,
@@ -66,13 +66,17 @@ _QUESTION_KIND_PERSON = {"expert": ("reference",), "procedural": ("chair", "staf
                          "deliberation": ("member", "chair")}
 
 
-def question_kind(text: str, responders: list[str], first_reply: str = "") -> str | None:
+def question_kind(text: str, responders: list[str], first_reply: str = "",
+                  before: tuple[str, str, bool] | None = None) -> str | None:
     """기관을 못 찾은 질의의 갈래: 'expert'(진술인·참고인 질의) | 'procedural'(회의 진행 질의)
     | 'deliberation'(위원 간 논의 질의) | None.
 
     responders: 질의 뒤 다음 질의 전까지 발언한 사람들(질의한 위원 자신은 뺀다)의 유형(speaker_type).
     first_reply: 그 가운데 첫 발언의 본문. 위원·위원장만 받아 이어 갔고 위원장이 질의를 끊거나 차례를
     넘긴 것이 아니면, 법안소위 축조 심사처럼 위원끼리 의견을 주고받은 질의로 본다.
+    before: 질의 바로 앞에서 말한 다른 사람의 (유형, 본문, 질의 여부). 정부 쪽이 받지 않은 질의가 다른 위원의
+    의견(질의 아닌 발언)에 이어 나왔으면 그 말을 받은 위원 간 논의 질의다. 위원장의 말 뒤는 시간 안내·차례
+    넘김 같은 진행 발언이 많아 넣지 않는다.
     """
     kinds = set(responders)
     if kinds & {"official", "witness"}:
@@ -86,6 +90,8 @@ def question_kind(text: str, responders: list[str], first_reply: str = "") -> st
     if _PROC_PHRASE.search(text) and (len(text) <= _PROC_SHORT or text.lstrip().startswith("의사진행")):
         return "procedural"
     if kinds and kinds <= {"member", "chair"} and first_reply and not _HANDOFF.search(first_reply):
+        return "deliberation"
+    if kinds <= {"member", "chair"} and before and before[0] == "member" and not before[2]:
         return "deliberation"
     return None
 
@@ -373,10 +379,14 @@ def build_graph(store: Store, with_schema: bool = True, core: bool = False,
         q_text: dict[URIRef, str] = {}
         q_resp: dict[URIRef, list[tuple[str, URIRef, str]]] = {}   # 질의 뒤 다음 질의 전까지 다른 사람의 (유형, 인물, 본문)
         q_speaker: dict[URIRef, str] = {}
+        q_before: dict[URIRef, dict] = {}   # 질의 바로 앞에서 말한 다른 사람의 발언
         run: list[URIRef] = []
         prev: dict | None = None
+        before: dict | None = None   # 지금 발언자 앞에서 마지막으로 말한 다른 사람의 발언
         for u in utts:
             uu = utt_uri(m["id"], u["idx"])
+            if prev is not None and prev["speaker_name"] != u["speaker_name"]:
+                before = prev
             if u["is_question"]:
                 same_run = bool(prev and prev["is_question"] and prev["speaker_name"] == u["speaker_name"])
                 run = [*run, uu] if same_run and run else [uu]
@@ -423,6 +433,8 @@ def build_graph(store: Store, with_schema: bool = True, core: bool = False,
                 q_targets[uu] = set(u["orgs"])
                 q_text[uu] = u["text"]
                 q_speaker[uu] = u["speaker_name"]
+                if before is not None:
+                    q_before[uu] = before
             elif is_answer:
                 g.add((uu, RDF.type, AG.Answer))
                 g.add((uu, AG.respondsTo, last_question))
@@ -440,15 +452,25 @@ def build_graph(store: Store, with_schema: bool = True, core: bool = False,
         for q, orgs in q_targets.items():
             if not orgs and (t := titled_target(q_text.get(q, ""), title_orgs)):
                 orgs = {t}
+            bf = q_before.get(q)
+            rs = q_resp.get(q, [])
+            cut = not rs or (rs[0][0] == "chair" and _HANDOFF.search(rs[0][2]) is not None)
+            if (not orgs and cut and bf and bf["speaker_type"] in ("official", "witness") and bf["org"]
+                    and not _COMMITTEE_CALL.search(q_text.get(q, ""))):
+                # 정부 관계자의 말 바로 뒤에 나와 아무도 받지 않았거나 위원장이 끊은 질의는 그 말에 되묻는 질의다
+                orgs = {bf["org"]}
             for org in orgs:
                 g.add((q, AG.addressedTo, org_uri(org)))
             resp = q_resp.get(q, [])
-            kind = None if orgs else question_kind(q_text.get(q, ""), [t for t, _, _ in resp],
-                                                    resp[0][2] if resp else "")
+            kind = None if orgs else question_kind(
+                q_text.get(q, ""), [t for t, _, _ in resp], resp[0][2] if resp else "",
+                (bf["speaker_type"], bf["text"], bool(bf["is_question"])) if bf else None)
             final.append((q, q_speaker.get(q, ""), None if kind else set(orgs)))
             if kind:
                 g.add((q, RDF.type, _QUESTION_KIND_CLASS[kind]))
                 person = next((p for t, p, _ in resp if t in _QUESTION_KIND_PERSON[kind]), None)
+                if person is None and kind == "deliberation" and bf:
+                    person = person_uri(bf["speaker_name"], bf["speaker_type"], bf["speaker_role"])
                 if person is not None:
                     g.add((q, AG.addressedToPerson, person))
         for q, org in turn_estimates(final).items():

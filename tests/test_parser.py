@@ -23,6 +23,48 @@ def test_parse_speaker_variants():
     assert parse_speaker("이나래위원 장관님")[:2] == ("위원", "이나래")
     assert parse_speaker("해양수산부장관 문채원 답변")[:2] == ("해양수산부장관", "문채원")
     assert parse_speaker("증인 홍길순 네")[:2] == ("증인", "홍길순")
+    # 띄어 쓴 기관명과 전무이사·상무·관장 직위도 발언자 머리로 읽는다(직위의 띄어쓰기는 지운다)
+    assert parse_speaker("농업협동조합 중앙회 상무조청래 예.")[:2] == ("농업협동조합중앙회상무", "조청래")
+    assert parse_speaker("농업협동조합 중앙회 전무이사 지준섭 예.")[:2] == ("농업협동조합중앙회전무이사", "지준섭")
+    assert parse_speaker("국립농업박물관장황수철 예.")[:2] == ("국립농업박물관장", "황수철")
+    # 기관을 부른 말(이름 자리에 조사·호칭)은 발언자 머리가 아니다
+    assert parse_speaker("수협 중앙회 회장님께 먼저 질의 드리겠습니다.") is None
+
+
+def test_split_inline_speakers_migration(tmp_path):
+    """앞 위원 발언에 붙은 기관 관계자 답변을 떼어 내고, 기관을 부른 말은 그대로 둔다. 다시 돌려도 같다."""
+    import importlib.util
+    from pathlib import Path
+
+    from agrisea.store import Store
+    spec = importlib.util.spec_from_file_location(
+        "split_inline_speakers", Path(__file__).resolve().parents[1] / "scripts" / "split_inline_speakers.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    assert mod.split_text("수협 중앙회 회장님께 먼저 질의 드리겠습니다.") == [
+        (None, None, "수협 중앙회 회장님께 먼저 질의 드리겠습니다.")]
+    assert mod.split_text("협의한 건 사실입니까? 농업협동조합 중앙회 상무조청래 예, 협의했습니다.") == [
+        (None, None, "협의한 건 사실입니까?"), ("농업협동조합중앙회상무", "조청래", "예, 협의했습니다.")]
+    db = _split_db(tmp_path)
+    for _ in range(2):
+        mod.main(str(db))
+        rows = [(u["idx"], u["speaker_name"], u["text"]) for u in Store(str(db)).utterances(meeting_id="S1")]
+        assert rows == [(0, "윤위원", "상무 참석하셨나요?"), (1, "조청래", "예."),
+                        (2, "김위원", "선거 비용은 누가 냅니까?")]
+
+
+def _split_db(tmp_path):
+    from agrisea.parser import MinutesDoc, Utterance
+    from agrisea.store import Store
+    db = tmp_path / "s.sqlite3"
+    s = Store(str(db))
+    s.upsert_meeting({"meeting_id": "S1", "title": "제439회 소위", "date": "2026-09-29", "session_no": 439})
+    s.save_minutes("S1", MinutesDoc(utterances=[
+        Utterance(0, "윤위원", "소위원장", "chair", None, "상무 참석하셨나요? 농업협동조합 중앙회 상무조청래 예."),
+        Utterance(1, "김위원", "위원", "member", None, "선거 비용은 누가 냅니까?"),
+    ]))
+    s.conn.close()
+    return db
 
 
 def test_parse_minutes_structure():
