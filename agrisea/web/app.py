@@ -151,6 +151,14 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
             raise HTTPException(404, "회의를 찾을 수 없습니다.")
         return {"meeting": m, "utterances": store.utterances(meeting_id=meeting_id)}
 
+    @app.get("/api/meetings/{meeting_id}/targets")
+    def meeting_targets(meeting_id: str):
+        """회의의 질의마다 질의 대상(기관·회의 진행·진술인·위원 간 논의). 지식그래프에서 읽어 회의록 화면이 뒤늦게 붙인다."""
+        from ..ontology import question_targets
+        if not store.meeting(meeting_id):
+            raise HTTPException(404, "회의를 찾을 수 없습니다.")
+        return {"targets": kg_call(lambda kg: question_targets(kg, meeting_id))}
+
     @app.get("/api/meetings/{meeting_id}/summary")
     def summary(meeting_id: str, llm: bool = False):
         if not store.meeting(meeting_id):

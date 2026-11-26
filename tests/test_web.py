@@ -57,6 +57,20 @@ def test_meeting_export_markdown(store, settings):
     assert c.get("/api/meetings/nope/export.md").status_code == 404
 
 
+def test_meeting_question_targets_endpoint(store, settings, monkeypatch):
+    """회의록 화면이 질의 옆에 붙이는 질의 대상: 지식그래프에서 질의마다 갈래와 대상 기관을 돌려준다."""
+    monkeypatch.setattr("agrisea.web.app.kg_exists", lambda: False)   # 저장소의 그래프 파일 대신 예시 데이터로 만든다
+    c = TestClient(create_app(settings, store))
+    t = c.get("/api/meetings/SAMPLE-2025-1014/targets").json()["targets"]
+    qs = [u["idx"] for u in c.get("/api/meetings/SAMPLE-2025-1014").json()["utterances"] if u["is_question"]]
+    assert qs and sorted(int(k) for k in t) == sorted(qs)   # 질의마다 하나, 질의 아닌 발언은 없다
+    assert all(v["kind"] in ("agency", "procedural", "expert", "deliberation") for v in t.values())
+    assert any(v["orgs"] for v in t.values())
+    assert c.get("/api/meetings/nope/targets").status_code == 404
+    html = c.get("/").text
+    assert "function targetChip" in html and "/targets`" in html
+
+
 def test_index_has_flow_graph_and_transcript_tools(store, settings):
     """대시보드 관계 흐름도(기본)·3D 전환, 회의록 발언자 거르기·안건 이동·발언 흐름 미니맵."""
     html = TestClient(create_app(settings, store)).get("/").text
