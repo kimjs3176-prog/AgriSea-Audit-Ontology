@@ -166,6 +166,21 @@ def test_unanswered_question_after_official_targets_that_agency():
     assert set(g.objects(utt_uri("M1", 1), AG.addressedTo)) == set()
 
 
+def test_question_targets_reads_kind_and_orgs():
+    from agrisea.ontology import build_kg, question_targets
+    s = _store()
+    s.save_minutes("M1", MinutesDoc(utterances=[
+        Utterance(0, "김위원", "위원", "member", None, "장관님, 어민 지원은 언제 합니까?"),
+        Utterance(1, "강도형", "해양수산부장관", "official", "해양수산부", "이달 중 마련하겠습니다."),
+        Utterance(2, "김위원", "위원", "member", None, "위원장님, 1분만 더 주시겠어요?"),
+        Utterance(3, "어위원", "위원장", "chair", None, "1분 드리겠습니다."),
+    ]))
+    reclassify(s)
+    t = question_targets(build_kg(s)[0], "M1")
+    assert t == {0: {"kind": "agency", "orgs": ["해양수산부"], "likely": []},
+                 2: {"kind": "procedural", "orgs": [], "likely": []}}
+
+
 def test_turn_estimates_needs_two_answered_questions_to_one_agency():
     from agrisea.ontology import turn_estimates
     sea, agri = {"해양수산부"}, {"농림축산식품부"}

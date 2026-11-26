@@ -140,6 +140,8 @@ button.link{background:none;border:0;color:var(--gov);cursor:pointer;font:inheri
 .chip.gov{background:var(--gov-weak);color:var(--gov)}
 .chip.member{background:var(--member-weak);color:var(--member)}
 .chip.warn{background:var(--warn-weak);color:var(--warn)}
+.chip.qt{background:var(--gov-weak);color:var(--gov);white-space:normal}
+.chip.qt.est{background:transparent;border:1px dashed currentColor}
 .chip.line{background:none;border:1px solid var(--line);color:var(--ink-2)}
 .notice{background:var(--warn-weak);color:var(--warn);border-radius:8px;padding:8px 12px;font-size:13px;margin-bottom:12px}
 mark{background:var(--warn-weak);color:inherit;padding:0 2px;border-radius:3px}
@@ -1493,6 +1495,10 @@ function loadTranscript(){
 async function fetchTranscript(t){
   const [d] = await Promise.all([api(`/api/meetings/${encodeURIComponent(t.id)}`), loadReadable()]);
   if(transcript !== t) return;
+  // 질의 대상은 지식그래프에서 읽어 뒤늦게 붙인다(처음 한 번은 그래프를 여느라 늦을 수 있고, 실패해도 본문은 그대로)
+  api(`/api/meetings/${encodeURIComponent(t.id)}/targets`).then(r => {
+    if(transcript === t && t.utts){ t.targets = r.targets || {}; renderTranscript() }
+  }).catch(() => {});
   $("#tEasy").checked = EASY;
   $("#tEasy").onchange = e => { EASY = e.target.checked; try{ localStorage.setItem("agrisea-easy", EASY ? "1" : "0") }catch(_){} renderTranscript() };
   t.utts = d.utterances;
@@ -1584,10 +1590,22 @@ function easyHtml(h){   // 이미 이스케이프된 문장에 표지·강조를
   return h;
 }
 const easy = (text, hl = "") => EASY ? easyHtml(markText(easyText(text), hl)) : markText(text, hl);
+// 질의 대상 칩: 지식그래프의 질의 갈래·대상 기관(확정/추정). 기관을 못 찾은 기관 대상 질의는 칩을 붙이지 않는다
+const Q_KIND = {procedural: ["회의 진행 질의", "위원장·전문위원 등 위원회 쪽에 묻는 질의"],
+                expert: ["진술인·참고인 질의", "공청회·청문회에서 진술인·참고인에게 묻는 질의"],
+                deliberation: ["위원 간 논의", "법안 심사 등에서 위원끼리 주고받은 질의"]};
+function targetChip(t){
+  if(!t) return "";
+  if(Q_KIND[t.kind]) return `<span class="chip qt" title="${esc(Q_KIND[t.kind][1])}">${esc(Q_KIND[t.kind][0])}</span>`;
+  if(t.orgs?.length) return `<span class="chip qt" title="질의 대상 기관">→ ${esc(t.orgs.join("·"))}</span>`;
+  if(t.likely?.length) return `<span class="chip qt est" title="같은 위원의 같은 질의 차례가 이 기관을 향해 추정했습니다(확정 아님)">→ ${esc(t.likely.join("·"))} (추정)</span>`;
+  return "";
+}
 function turnHtml(u, hl = ""){
   const g = typeGroup(u.speaker_type), member = g === "member";
   const fold = !hl && (g === "chair" || g === "other") && u.text.length > 700;   // 긴 진행·보고 발언은 접어 둔다
-  const flags = (u.is_commitment ? '<span class="chip warn">약속</span>' : "") + (u.is_data_request ? '<span class="chip warn">자료요구</span>' : "");
+  const flags = (u.is_question ? targetChip(transcript?.targets?.[u.idx]) : "")
+    + (u.is_commitment ? '<span class="chip warn">약속</span>' : "") + (u.is_data_request ? '<span class="chip warn">자료요구</span>' : "");
   return `<article class="turn ${g}${u.is_commitment ? " promise" : ""}" id="u${u.idx}">
     <div class="av" aria-hidden="true">${esc((u.speaker_name || "?").slice(0, 1))}</div>
     <div><div class="tw"><b>${esc(u.speaker_name)}</b><span class="role">${esc(member ? "위원" : u.speaker_role)}</span>${flags}</div>

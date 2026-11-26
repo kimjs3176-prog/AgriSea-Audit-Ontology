@@ -689,6 +689,35 @@ def _term(t) -> str | None:
     return getattr(t, "value", str(t))
 
 
+_KIND_OF_CLASS = {"ProceduralQuestion": "procedural", "ExpertQuestion": "expert",
+                  "DeliberationQuestion": "deliberation"}
+
+
+def question_targets(kg, meeting_id: str) -> dict[int, dict]:
+    """회의의 질의마다 무엇을 향했는지: {발언 자리: {kind, orgs, likely}}.
+
+    kind 는 'agency'(기관 대상) | 'procedural'(회의 진행) | 'expert'(진술인·참고인) | 'deliberation'(위원 간 논의).
+    orgs 는 확정 질의 대상 기관(ag:addressedTo), likely 는 같은 위원의 질의 차례로 추정한 기관(ag:likelyAddressedTo).
+    """
+    q = f"""PREFIX ag: <{AG}> PREFIX rdfs: <{RDFS}>
+SELECT ?i ?k ?org ?lik WHERE {{
+  ?u ag:inMeeting <{meeting_uri(meeting_id)}> ; a ag:Question ; ag:orderIndex ?i .
+  OPTIONAL {{ ?u a ?k . FILTER(?k IN (ag:ProceduralQuestion, ag:ExpertQuestion, ag:DeliberationQuestion)) }}
+  OPTIONAL {{ ?u ag:addressedTo/rdfs:label ?org }}
+  OPTIONAL {{ ?u ag:likelyAddressedTo/rdfs:label ?lik }}
+}}"""
+    out: dict[int, dict] = {}
+    for i, k, org, lik in run_sparql(kg, q, limit=100_000)["rows"]:
+        t = out.setdefault(int(i), {"kind": "agency", "orgs": [], "likely": []})
+        if k:
+            t["kind"] = _KIND_OF_CLASS.get(str(k).rsplit("#", 1)[-1], "agency")
+        if org and org not in t["orgs"]:
+            t["orgs"].append(org)
+        if lik and lik not in t["likely"]:
+            t["likely"].append(lik)
+    return out
+
+
 def run_sparql(kg, query: str, limit: int = 500) -> dict:
     """pyoxigraph 저장소에 SPARQL 실행 → {columns, rows}."""
     import pyoxigraph as ox
