@@ -142,6 +142,10 @@ button.link{background:none;border:0;color:var(--gov);cursor:pointer;font:inheri
 .chip.warn{background:var(--warn-weak);color:var(--warn)}
 .chip.qt{background:var(--gov-weak);color:var(--gov);white-space:normal}
 .chip.qt.est{background:transparent;border:1px dashed currentColor}
+button.chip.qt{border:0;font:inherit;font-size:12px;cursor:pointer;line-height:inherit}
+button.chip.qt.est{border:1px dashed currentColor}
+button.chip.qt:hover,button.chip.qt.on{background:var(--gov);color:var(--panel)}
+.qtbar{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:13px;margin:4px 0;padding:6px 10px;border-radius:8px;background:var(--gov-weak);color:var(--gov)}
 .chip.line{background:none;border:1px solid var(--line);color:var(--ink-2)}
 .notice{background:var(--warn-weak);color:var(--warn);border-radius:8px;padding:8px 12px;font-size:13px;margin-bottom:12px}
 mark{background:var(--warn-weak);color:inherit;padding:0 2px;border-radius:3px}
@@ -1533,11 +1537,12 @@ function renderFlowbar(){
   const bar = $("#tFlowbar"); if(bar) bar.onclick = e => { const i = e.target.dataset?.i; if(i != null) jumpToUtt(+i) };
 }
 const tRows = () => { const t = transcript; return (t.utts || []).filter(u => (!t.filter || typeGroup(u.speaker_type) === t.filter)
-  && (!t.speaker || u.speaker_name === t.speaker) && (!t.find || u.text.includes(t.find))) };
+  && (!t.speaker || u.speaker_name === t.speaker) && (!t.find || u.text.includes(t.find))
+  && (!t.target || (u.is_question && matchQTarget(t.targets?.[u.idx], t.target)))) };
 function jumpToUtt(idx){
   const t = transcript; let rows = tRows();
   if(!rows.some(u => u.idx === idx)){   // 거르기에 가려진 발언이면 거르기를 풀고 이동
-    Object.assign(t, {filter: "", find: "", speaker: ""}); $("#tFind").value = ""; $("#tSpeaker").value = ""; rows = tRows();
+    Object.assign(t, {filter: "", find: "", speaker: "", target: ""}); $("#tFind").value = ""; $("#tSpeaker").value = ""; rows = tRows();
   }
   const pos = rows.findIndex(u => u.idx === idx);
   if(pos >= t.limit) t.limit = pos + 100;
@@ -1594,12 +1599,31 @@ const easy = (text, hl = "") => EASY ? easyHtml(markText(easyText(text), hl)) : 
 const Q_KIND = {procedural: ["회의 진행 질의", "위원장·전문위원 등 위원회 쪽에 묻는 질의"],
                 expert: ["진술인·참고인 질의", "공청회·청문회에서 진술인·참고인에게 묻는 질의"],
                 deliberation: ["위원 간 논의", "법안 심사 등에서 위원끼리 주고받은 질의"]};
+// 칩을 누르면 같은 대상을 향한 질의만 거른다(기관은 확정·추정 모두). 거르기 열쇠: 'kind:갈래' | 'org:기관'
+function qChip(key, label, tip, est = false){
+  const on = transcript?.target === key;
+  return `<button type="button" class="chip qt${est ? " est" : ""}${on ? " on" : ""}" aria-pressed="${on}" title="${esc(tip + " · 눌러서 같은 대상 질의만 보기")}" onclick="setQTarget(${jsq(key)})">${esc(label)}</button>`;
+}
 function targetChip(t){
   if(!t) return "";
-  if(Q_KIND[t.kind]) return `<span class="chip qt" title="${esc(Q_KIND[t.kind][1])}">${esc(Q_KIND[t.kind][0])}</span>`;
-  if(t.orgs?.length) return `<span class="chip qt" title="질의 대상 기관">→ ${esc(t.orgs.join("·"))}</span>`;
-  if(t.likely?.length) return `<span class="chip qt est" title="같은 위원의 같은 질의 차례가 이 기관을 향해 추정했습니다(확정 아님)">→ ${esc(t.likely.join("·"))} (추정)</span>`;
-  return "";
+  if(Q_KIND[t.kind]) return qChip("kind:" + t.kind, Q_KIND[t.kind][0], Q_KIND[t.kind][1]);
+  if(t.orgs?.length) return t.orgs.map(o => qChip("org:" + o, "→ " + o, "질의 대상 기관")).join("");
+  return (t.likely || []).map(o => qChip("org:" + o, `→ ${o} (추정)`, "같은 위원의 같은 질의 차례가 이 기관을 향해 추정했습니다(확정 아님)", true)).join("");
+}
+function matchQTarget(t, key){
+  if(!t) return false;
+  const [k, v] = [key.slice(0, key.indexOf(":")), key.slice(key.indexOf(":") + 1)];
+  return k === "kind" ? t.kind === v : (t.orgs || []).includes(v) || (t.likely || []).includes(v);
+}
+function qTargetLabel(key){
+  const v = key.slice(key.indexOf(":") + 1);
+  return key.startsWith("kind:") ? (Q_KIND[v] || [v])[0] : v;
+}
+function setQTarget(key){
+  const t = transcript; if(!t) return;
+  t.target = t.target === key ? "" : key; t.limit = 300;
+  renderTranscript();
+  $("#tBody").scrollTop = 0;
 }
 function turnHtml(u, hl = ""){
   const g = typeGroup(u.speaker_type), member = g === "member";
@@ -1617,7 +1641,7 @@ function renderTranscript(){
   const cnt = {}; all.forEach(u => cnt[typeGroup(u.speaker_type)] = (cnt[typeGroup(u.speaker_type)] || 0) + 1);
   $("#tFilter").innerHTML = [["", "전체", all.length], ...Object.keys(TYPE_LABEL).filter(k => cnt[k]).map(k => [k, TYPE_LABEL[k], cnt[k]])]
     .map(([k, l, n]) => `<button class="${t.filter === k ? "on" : ""}" onclick="transcript.filter='${k}';transcript.limit=300;renderTranscript()">${l} ${fmt(n)}</button>`).join("");
-  const rows = tRows(), filtered = !!(t.filter || t.find || t.speaker), shown = new Set(rows.map(u => u.idx));
+  const rows = tRows(), filtered = !!(t.filter || t.find || t.speaker || t.target), shown = new Set(rows.map(u => u.idx));
   document.querySelectorAll("#tFlowbar i[data-i]").forEach(el => el.classList.toggle("dim", filtered && !shown.has(+el.dataset.i)));
   const perAgenda = {}; all.forEach(u => perAgenda[u.agenda_idx] = (perAgenda[u.agenda_idx] || 0) + 1);
   let last = -1, html = "";
@@ -1632,7 +1656,8 @@ function renderTranscript(){
     html += turnHtml(u, t.find);
   }
   $("#tBody").classList.remove("muted");
-  $("#tBody").innerHTML = (filtered ? `<p class="muted" style="font-size:13px;margin:4px 0">${fmt(rows.length)}개 발언, 미니맵에서 흐리게 보이는 칸은 거른 발언</p>` : "") + (html || '<div class="empty">해당 발언 없음</div>')
+  $("#tBody").innerHTML = (t.target ? `<p class="qtbar"><span>질의 대상 <b>${esc(qTargetLabel(t.target))}</b>: 질의 ${fmt(rows.length)}건</span><button type="button" class="link" onclick="setQTarget(transcript.target)">거르기 해제</button></p>` : "")
+    + (filtered ? `<p class="muted" style="font-size:13px;margin:4px 0">${fmt(rows.length)}개 발언, 미니맵에서 흐리게 보이는 칸은 거른 발언</p>` : "") + (html || '<div class="empty">해당 발언 없음</div>')
     + (rows.length > t.limit ? `<button class="ghost" style="width:100%;margin-top:8px" onclick="transcript.limit+=300;renderTranscript()">발언 ${fmt(Math.min(300, rows.length - t.limit))}개 더 보기 (남은 ${fmt(rows.length - t.limit)}개)</button>` : "");
 }
 function copyLink(){
