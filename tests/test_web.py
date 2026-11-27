@@ -70,7 +70,8 @@ def test_meeting_question_targets_endpoint(store, settings, monkeypatch):
     html = c.get("/").text
     assert "function targetChip" in html and "/targets`" in html
     # 칩을 누르면 같은 대상 질의만 거른다(거르기 상태는 회의록 거르기와 함께 풀린다)
-    for marker in ("function setQTarget", "function matchQTarget", 'class="qtbar"', "target: \"\""):
+    for marker in ("function setQTarget", "function matchQTarget", 'class="qtbar"', "target: \"\"",
+                   "function qTargetSummary", 'class="qtsum"'):
         assert marker in html, marker
 
 

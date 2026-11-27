@@ -145,6 +145,9 @@ button.link{background:none;border:0;color:var(--gov);cursor:pointer;font:inheri
 button.chip.qt{border:0;font:inherit;font-size:12px;cursor:pointer;line-height:inherit}
 button.chip.qt.est{border:1px dashed currentColor}
 button.chip.qt:hover,button.chip.qt.on{background:var(--gov);color:var(--panel)}
+.qtsum{display:flex;flex-wrap:wrap;align-items:center;gap:2px 4px;margin:2px 0 6px;font-size:13px}
+.qtsum .lbl{font-weight:600;margin-right:4px;color:var(--ink-2)}
+.qtsum .muted{font-size:12px;margin-left:4px}
 .qtbar{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:13px;margin:4px 0;padding:6px 10px;border-radius:8px;background:var(--gov-weak);color:var(--gov)}
 .chip.line{background:none;border:1px solid var(--line);color:var(--ink-2)}
 .notice{background:var(--warn-weak);color:var(--warn);border-radius:8px;padding:8px 12px;font-size:13px;margin-bottom:12px}
@@ -1619,6 +1622,25 @@ function qTargetLabel(key){
   const v = key.slice(key.indexOf(":") + 1);
   return key.startsWith("kind:") ? (Q_KIND[v] || [v])[0] : v;
 }
+// 회의 전체 질의를 대상별로 센 요약(많은 순). 기관은 확정·추정을 함께 세고, 기관을 못 찾은 질의는 따로 센다
+function qTargetSummary(t){
+  if(!t.targets) return "";
+  const cnt = {}; let unknown = 0;
+  for(const u of t.utts || []){
+    if(!u.is_question) continue;
+    const q = t.targets[u.idx]; if(!q) continue;
+    const keys = Q_KIND[q.kind] ? ["kind:" + q.kind] : [...new Set([...(q.orgs || []), ...(q.likely || [])])].map(o => "org:" + o);
+    if(!keys.length){ unknown++; continue }
+    keys.forEach(k => cnt[k] = (cnt[k] || 0) + 1);
+  }
+  const items = Object.entries(cnt).sort((a, b) => b[1] - a[1]);
+  if(!items.length) return "";
+  const MAX = 8, shown = items.slice(0, MAX), rest = items.slice(MAX).reduce((n, [, v]) => n + v, 0);
+  return `<div class="qtsum" aria-label="질의 대상별 질의 수"><span class="lbl">질의 대상</span>${shown.map(([k, n]) => {
+      const on = t.target === k;
+      return `<button type="button" class="chip qt${on ? " on" : ""}" aria-pressed="${on}" onclick="setQTarget(${jsq(k)})">${esc(qTargetLabel(k))} <b>${fmt(n)}</b></button>`;
+    }).join("")}${rest ? `<span class="muted">외 ${fmt(rest)}건</span>` : ""}${unknown ? `<span class="muted" title="질의 대상 기관을 찾지 못한 질의">대상 미상 ${fmt(unknown)}건</span>` : ""}</div>`;
+}
 function setQTarget(key){
   const t = transcript; if(!t) return;
   t.target = t.target === key ? "" : key; t.limit = 300;
@@ -1656,7 +1678,7 @@ function renderTranscript(){
     html += turnHtml(u, t.find);
   }
   $("#tBody").classList.remove("muted");
-  $("#tBody").innerHTML = (t.target ? `<p class="qtbar"><span>질의 대상 <b>${esc(qTargetLabel(t.target))}</b>: 질의 ${fmt(rows.length)}건</span><button type="button" class="link" onclick="setQTarget(transcript.target)">거르기 해제</button></p>` : "")
+  $("#tBody").innerHTML = qTargetSummary(t) + (t.target ? `<p class="qtbar"><span>질의 대상 <b>${esc(qTargetLabel(t.target))}</b>: 질의 ${fmt(rows.length)}건</span><button type="button" class="link" onclick="setQTarget(transcript.target)">거르기 해제</button></p>` : "")
     + (filtered ? `<p class="muted" style="font-size:13px;margin:4px 0">${fmt(rows.length)}개 발언, 미니맵에서 흐리게 보이는 칸은 거른 발언</p>` : "") + (html || '<div class="empty">해당 발언 없음</div>')
     + (rows.length > t.limit ? `<button class="ghost" style="width:100%;margin-top:8px" onclick="transcript.limit+=300;renderTranscript()">발언 ${fmt(Math.min(300, rows.length - t.limit))}개 더 보기 (남은 ${fmt(rows.length - t.limit)}개)</button>` : "");
 }
