@@ -69,6 +69,9 @@ def test_meeting_question_targets_endpoint(store, settings, monkeypatch):
     assert c.get("/api/meetings/nope/targets").status_code == 404
     html = c.get("/").text
     assert "function targetChip" in html and "/targets`" in html
+    # 칩을 누르면 같은 대상 질의만 거른다(거르기 상태는 회의록 거르기와 함께 풀린다)
+    for marker in ("function setQTarget", "function matchQTarget", 'class="qtbar"', "target: \"\""):
+        assert marker in html, marker
 
 
 def test_index_has_flow_graph_and_transcript_tools(store, settings):
