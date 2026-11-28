@@ -139,6 +139,14 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         """대시보드: 최근 회의와 최근 정부 약속."""
         return cached("overview")
 
+    @app.get("/api/org-dashboard")
+    def org_dashboard(org: str = ""):
+        """기관 맞춤 대시보드: 기관 순위와 고른 기관(비우면 전체)의 질의·쟁점·질의 위원·최근 질의응답·약속 이행."""
+        d = cached("org_dashboard")
+        if org not in d["views"]:
+            raise HTTPException(404, "기관을 찾을 수 없습니다.")
+        return {"orgs": d["orgs"], "view": d["views"][org]}
+
     @app.get("/api/issue-trend")
     def issue_trend():
         """회기 × 쟁점 언급량(히트맵)."""
