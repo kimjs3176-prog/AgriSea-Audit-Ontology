@@ -1,0 +1,9 @@
+# 선택: Claude 회의 요약(ANTHROPIC_API_KEY 설정 시). 배포 용량(약 30MB)을 아끼려고 기본 설치에서 뺐다.
+# 쓰려면 이 파일의 패키지를 requirements.txt 에 다시 넣는다(Vercel은 requirements.txt 만 설치).
+-r requirements.txt
+anthropic==2.3.0
+docstring_parser==0.18.0
+jiter==0.18.0
+httpcore2==2.16.0
+httpx2==2.16.0
+truststore==0.10.5

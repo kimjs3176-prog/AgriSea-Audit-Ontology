@@ -12,7 +12,8 @@
   },
   "git": {
     "deploymentEnabled": {
-      "governance-log": false
+      "governance-log": false,
+      "claude/**": false
     }
   }
 }

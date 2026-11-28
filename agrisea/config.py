@@ -77,7 +77,10 @@ class Settings:
 
     @property
     def llm_enabled(self) -> bool:
-        return bool(os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN"))
+        # anthropic 패키지는 선택 설치(requirements-llm.txt): 키가 있어도 패키지가 없으면 끈다
+        from importlib.util import find_spec
+        key = os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")
+        return bool(key) and find_spec("anthropic") is not None
 
     def ensure_dirs(self) -> None:
         self.data_dir.mkdir(parents=True, exist_ok=True)
