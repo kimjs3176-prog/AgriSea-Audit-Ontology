@@ -749,12 +749,55 @@ p,li,.sub,.turn .tx,.pt,.quote,.bubble,.hit-snip,.tl-t,.fuitem .fut,.brief3 span
   header nav{flex-shrink:0} header .sessionbar{font-size:0;gap:0} header .sessionbar select{font-size:13px;max-width:150px}}
 @media (max-width:640px){header .sessionbar{width:auto;flex:1 1 0;min-width:0}header .readsize{flex:none}}
 @media (min-width:641px) and (max-width:1279px){header .sessionbar select{width:200px}}
-/* 대시보드 한눈에 보기: 12칸 격자(1행 최근 회의 6 · 쟁점 3 · 약속 3, 2행 쟁점 흐름 7 · 데이터 현황 5) */
+/* 기관 맞춤 대시보드: 12칸 격자
+   1행 회기별 질의 5 · 많이 묻는 쟁점 4 · 질의한 의원 3 / 2행 최근 질의와 답변 7 · 약속 이행 5
+   3행 기관별 질의 4 · 최근 회의 8 / 4행 회기별 쟁점 흐름 7 · 데이터 현황 5(기관을 고르면 쟁점 흐름·관계 흐름은 숨김) */
 .dgrid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:16px;margin-bottom:16px;align-items:stretch}
-.dgrid>.card{margin:0;display:flex;flex-direction:column}
+.dgrid>.card{margin:0;display:flex;flex-direction:column;min-width:0}
 .dgrid h2{font-size:16px}
+.dgrid h3{font-size:13px;margin:12px 0 4px}
 .dgrid .sub{margin:4px 0 8px;font-size:12.5px}
-.d-recent{grid-column:span 6}.d-rank{grid-column:span 3}.d-commit{grid-column:span 3}
+.dgrid .cardhead .muted{font-size:12.5px}
+.d-trend{grid-column:span 5}.d-iss{grid-column:span 4}.d-mem{grid-column:span 3}
+.d-qa{grid-column:span 7}.d-fu{grid-column:span 5}
+.d-orgs{grid-column:span 4}.d-recent{grid-column:span 8}
+.d-heat{grid-column:span 7}.d-data{grid-column:span 5}
+#dash.org-mode .d-heat,#dash.org-mode .d-net{display:none}
+#dash.org-mode .d-data{grid-column:span 12}
+.dorg{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.dorg label{font-size:13px;color:var(--muted)}
+.dorg select{background:var(--color-paper-2);color:var(--ink);border:1px solid var(--color-rule);border-radius:var(--radius-pill);padding:8px 12px;font:inherit;font-weight:600;max-width:100%}
+.dorg .link{font-size:13px}
+/* 회기별 질의 막대 */
+.sbars{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:4px;height:180px;align-items:end;margin-top:8px}
+.sbars .sb{display:flex;flex-direction:column;justify-content:flex-end;align-items:stretch;height:100%;min-width:0}
+.sbars .sb i{display:block;background:color-mix(in oklab,var(--seq) 45%,var(--panel));border-radius:4px 4px 0 0;min-height:0}
+.sbars .sb.last i{background:var(--seq)}
+.sbars .sb .v{font-size:11px;color:var(--muted);text-align:center;font-variant-numeric:tabular-nums;white-space:nowrap;margin-bottom:2px}
+.sbars .sb .x{font-size:11px;color:var(--muted);text-align:center;border-top:1px solid var(--line);padding-top:4px;font-variant-numeric:tabular-nums}
+.sbars .sb.reg .x{color:var(--ink);font-weight:700}
+.sbnote{font-size:12px;margin:8px 0 0}
+/* 이름·막대·수 행(쟁점·의원·기관) */
+.drows{display:flex;flex-direction:column}
+.drows .dr{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(40px,1fr) auto;gap:8px;align-items:center;padding:4px 0;border:0;border-bottom:1px solid var(--line);background:none;font:inherit;font-size:13px;color:var(--ink);text-align:left;cursor:pointer}
+.drows .dr:last-child{border-bottom:0}
+.drows .dr:hover .n{color:var(--seq)}
+.drows .dr.on .n{font-weight:700;color:var(--seq)}
+.drows .dr .n{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.drows .dr .n .chip{font-size:11px;margin:0 0 0 4px}
+.drows .dr .bar{height:8px;background:var(--line);border-radius:4px;overflow:hidden}
+.drows .dr .bar i{display:block;height:100%;background:var(--seq);border-radius:4px}
+.drows .dr .c{font-variant-numeric:tabular-nums;color:var(--ink-2);font-size:12.5px;min-width:32px;text-align:right}
+.drows .dr.mem{grid-template-columns:minmax(0,1fr) auto}
+.drows .dr.mem small{display:block;font-size:11.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis}
+/* 최근 질의와 답변·약속 목록 */
+.dgrid .clist{flex:1;min-height:0}
+.dgrid .clist .ci{padding:8px 0;cursor:pointer}
+.dgrid .clist .ci:hover .t{color:var(--seq)}
+.dgrid .clist .ci .t{font-size:13px;font-weight:500;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.dgrid .clist .ci .t.a{font-weight:400;color:var(--ink-2)}
+.dgrid .qa-k{font-size:11px;font-weight:600;color:var(--muted);margin-right:8px}
+.d-fu .stack{margin:4px 0 0}
 .d-heat{grid-column:span 7}.d-data{grid-column:span 5}
 table.ledger.compact{font-size:13px}
 table.ledger.compact td{padding-top:8px;padding-bottom:8px}
@@ -762,14 +805,6 @@ table.ledger.compact td.d,table.ledger.compact td.num{padding-top:8px;font-size:
 table.ledger.compact .h{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:280px}
 table.ledger.compact td.iss .chip{font-size:11.5px;margin:1px 4px 1px 0}
 table.ledger.compact td.iss .more{font-size:11.5px}
-#rank .bars{gap:4px 8px;font-size:12.5px}
-.d-commit .clist{flex:1;min-height:0;overflow:auto;max-height:420px}
-.d-commit .clist .ci{padding:8px 0;cursor:pointer}
-.d-commit .clist .ci:hover .t{color:var(--seq)}
-.d-commit .clist .ci .t{font-size:13px;font-weight:500;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.fubar{border-bottom:1px solid var(--line);padding-bottom:8px;margin:4px 0 4px}
-.fubar .fusum{margin:0 0 8px;font-size:12.5px;color:var(--ink-2)}
-.fubar .stack{margin:0}
 .fulegend{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:8px}
 .fulegend .link{font-size:12px;color:var(--ink-2);display:inline-flex;align-items:center;gap:4px}
 .fulegend i{width:8px;height:8px;border-radius:50%;display:inline-block}
@@ -784,8 +819,8 @@ table.ledger.compact td.iss .more{font-size:11.5px}
 table.ledger.compact .rowlink{white-space:nowrap}
 .dsmore{margin-top:8px;border-top:1px solid var(--line);padding-top:8px}
 .dsmore summary{cursor:pointer;font-size:13px;color:var(--ink-2)}
-@media (max-width:1200px){.d-recent{grid-column:span 12}.d-rank,.d-commit{grid-column:span 6}.d-heat,.d-data{grid-column:span 12}}
-@media (max-width:760px){.dgrid>.card{grid-column:span 12}table.ledger.compact .h{max-width:200px}}
+@media (max-width:1200px){.d-trend,.d-qa,.d-recent,.d-heat,.d-data{grid-column:span 12}.d-iss,.d-mem,.d-fu,.d-orgs{grid-column:span 6}}
+@media (max-width:760px){.dgrid>.card{grid-column:span 12!important}table.ledger.compact .h{max-width:200px}.sbars{height:140px}.sbars .sb .v{display:none}.sbars .sb:nth-child(-n+6){display:none}.sbars .sb .x{white-space:nowrap}}
 </style>
 </head>
 <body>
@@ -823,22 +858,38 @@ table.ledger.compact .rowlink{white-space:nowrap}
 <section id="dash" class="on">
   <div id="noticeArea"></div>
   <div class="dhead" id="kpis"><div><h2 class="dtitle">회의록 원장</h2><p class="upd">불러오는 중…</p></div></div>
-  <!-- 한눈에 보기: 1행 최근 회의·쟁점 순위·정부 약속, 2행 회기별 쟁점 흐름·데이터 현황, 3행 관계 흐름 -->
+  <!-- 기관 맞춤 대시보드: 위에서 고른 기관(또는 전체)에 대한 질의 추이·쟁점·질의 위원·질의응답·약속 이행 -->
   <div class="dgrid">
+    <div class="card d-trend">
+      <div class="cardhead"><h2>회기별 질의</h2><span class="muted" id="dTrendNote"></span></div>
+      <div id="dTrend"><div class="empty">불러오는 중…</div></div>
+    </div>
+    <div class="card d-iss">
+      <div class="cardhead"><h2>많이 묻는 쟁점</h2><button class="link" onclick="openTab('issues')">쟁점 분석</button></div>
+      <p class="sub">질의에 나온 쟁점입니다. 최근 2개 회기에 비중이 커진 쟁점에는 표시를 붙였습니다.</p>
+      <div id="dIss"></div>
+    </div>
+    <div class="card d-mem">
+      <div class="cardhead"><h2>질의한 의원</h2><button class="link" onclick="openTab('members')">의원 분석</button></div>
+      <div id="dMem"></div>
+    </div>
+    <div class="card d-qa">
+      <div class="cardhead"><h2>최근 주요 질의와 답변</h2><button class="link" id="dBriefLink" onclick="gotoOrgBrief()">국감 브리핑 만들기</button></div>
+      <p class="sub">최근 2개 회기에서 쟁점·약속이 드러난 질의응답을 골랐습니다. 누르면 회의록의 그 자리로 갑니다.</p>
+      <div id="dQa" class="clist"></div>
+    </div>
+    <div class="card d-fu">
+      <div class="cardhead"><h2>약속 이행</h2><button class="link" onclick="gotoOrgFollowups('')">이행 추적</button></div>
+      <div id="dFu"></div>
+    </div>
+    <div class="card d-orgs">
+      <div class="cardhead"><h2>기관별 질의</h2></div>
+      <p class="sub">기관을 누르면 대시보드 전체가 그 기관 기준으로 바뀝니다.</p>
+      <div id="dOrgs"></div>
+    </div>
     <div class="card d-recent">
-      <div class="cardhead"><h2>최근 회의</h2><button class="link" onclick="openTab('meetings')">회의록 전체 보기</button></div>
-      <p class="sub">행을 누르면 3줄 브리핑과 질의 차례가 열립니다.</p>
+      <div class="cardhead"><h2 id="dRecentTitle">최근 회의</h2><button class="link" onclick="openTab('meetings')">회의록 전체 보기</button></div>
       <div id="recent" class="tablewrap"><div class="empty">불러오는 중…</div></div>
-    </div>
-    <div class="card d-rank">
-      <div class="cardhead"><h2>많이 논의된 쟁점</h2><button class="link" onclick="openTab('issues')">쟁점 분석</button></div>
-      <p class="sub">전체 회기 언급 횟수입니다.</p>
-      <div id="rank"></div>
-    </div>
-    <div class="card d-commit">
-      <div class="cardhead"><h2>정부 약속</h2><button class="link" onclick="openTab('followups')">이행 추적</button></div>
-      <div id="fuBar" class="fubar"></div>
-      <div id="recentCommit" class="clist"><div class="empty">불러오는 중…</div></div>
     </div>
     <div class="card d-heat">
       <h2>회기별 쟁점 흐름</h2>
@@ -851,7 +902,7 @@ table.ledger.compact .rowlink{white-space:nowrap}
       <div id="dsBody"><div class="empty">불러오는 중…</div></div>
     </div>
   </div>
-  <div class="card">
+  <div class="card d-net">
     <div class="row" style="align-items:baseline"><h2>위원 → 쟁점 → 기관 관계 흐름</h2>
       <div class="netmode" id="netMode" role="group" aria-label="관계 보기 방식"><button type="button" class="on" aria-pressed="true" data-k="flow">흐름도</button><button type="button" aria-pressed="false" data-k="3d">3D 신경망</button></div></div>
     <p class="sub" id="netSub">왼쪽 위원이 어떤 쟁점을 따졌고, 그 쟁점이 어느 기관으로 이어졌는지 보여 줍니다. <b>띠가 굵을수록</b> 함께 언급된 발언이 많습니다. 항목에 마우스를 올리면 그 연결만 강조되고, 누르면 쟁점·의원 분석이나 기관 브리핑으로 갑니다.</p>
@@ -1133,6 +1184,7 @@ function routeFromHash(){
   if(tab === "ontology" && id){ gotoKg(id); return true }
   if(tab === "sparql"){ gotoSparql(); return true }
   if(tab === "data"){ gotoDataStatus(); return true }
+  if(tab === "org"){ openTab("dash", false); setDashOrg(id); return true }
   if(["meetings", "issues", "members", "followups", "brief", "ontology"].includes(tab)){ openTab(tab); return true }
   routing = null;   // 주소가 화면을 가리키지 않으면(대시보드) 다음 이동부터 기록을 쌓는다
   return false;
@@ -1164,58 +1216,23 @@ function barsHtml(rows, {onclick = ""} = {}){
 }
 
 // ── 대시보드 ──
+// ── 대시보드: 기관 맞춤(기관을 고르면 질의·쟁점·위원·질의응답·약속 이행이 그 기관 기준으로) ──
+let dashStats = null, dashOv = null, dashOrgs = null;
+let dOrg = (() => { try{ return localStorage.getItem("agrisea-dash-org") || "" }catch(e){ return "" } })();
 async function loadDash(){
   let s;
-  try{ s = await api("/api/stats") }
+  try{ s = dashStats = await api("/api/stats") }
   catch(e){ $("#noticeArea").innerHTML = `<div class="notice">서버 응답 오류: ${esc(e.message)} — <a href="/api/health" target="_blank">/api/health</a></div>`; return }
-  const kst = iso => { const d = new Date(iso); return isNaN(d) ? iso : new Date(d.getTime() + 9 * 3600e3).toISOString().slice(0, 16).replace("T", " ") };
-  const upd = (s.date_max ? `최신 회의 ${dot(s.date_max)}<span class="sep"></span>` : "")
-    + (s.data_updated ? `데이터 반영 ${esc(kst(s.data_updated))} (한국시간)<span class="sep"></span>회의 일정에 맞춰 자동 확인(평일 3회)` : "자동 수집 데이터 없음")
-    + `<span class="sep"></span><button class="link" onclick="gotoDataStatus()">데이터 현황 보기</button><span id="dsFlag"></span>`;
   $("#noticeArea").innerHTML = s.samples ? `<div class="notice">가상 예시 회의록 ${s.samples}건이 포함되어 있습니다.</div>` : "";
   $("#sampleBtn").hidden = s.meetings - s.samples > 0;  // 실제 회의록이 있으면 예시 데이터를 섞지 않는다
-  const latest = SESSIONS[0];
-  const renderHero = (topIssue, recentN) => { $("#kpis").innerHTML = `
-    <div>
-      <h2 class="dtitle">회의록 원장</h2>
-      <p>${dot(s.date_min)}부터 ${dot(s.date_max)}까지 회기 ${fmt(SESSIONS.length)}개의 회의록입니다.${recentN ? ` 최근 회기인 ${esc(latest.label)}에는 회의가 ${fmt(recentN)}건 열렸습니다.` : ""}${topIssue ? ` 가장 많이 다룬 쟁점은 <button class="link" onclick="gotoIssue(${jsq(topIssue.id)})">${esc(topIssue.label)}</button>입니다.` : ""}</p>
-      <p class="upd">${upd}</p>
-    </div>
-    <div class="kpirow">${[
-      ["회의", s.meetings, "수록된 전체·소위 회의"],
-      ["발언", s.utterances, "위원·정부·기관 발언"],
-      ["위원 질의", s.questions, "질문 형태의 위원 발언"],
-      ["정부 약속", s.commitments, "검토·개선하겠다는 답변"],
-    ].map(([l, v, sub]) => `<div><b>${fmt(v)}</b><span>${l}</span><small>${sub}</small></div>`).join("")}</div>`; paintDsFlag() };
-  renderHero(null, 0);
   loadDataStatus();
-
-  let issues, trend, ov;
-  try{ [issues, trend, ov] = await Promise.all([api("/api/issues"), api("/api/issue-trend"), api("/api/overview")]) }
-  catch(e){
-    const err = `<div class="empty err">불러오지 못했습니다: ${esc(e.message)}</div>`;
-    ["#recent", "#rank", "#heat", "#recentCommit"].forEach(sel => $(sel).innerHTML = err); return;
-  }
-  // 가장 아래 단계 쟁점끼리 비교(하위 쟁점이 없는 최상위 쟁점도 포함: '공공기관·예산·조직운영' 등)
-  const parents = new Set(issues.map(i => i.parent).filter(Boolean));
-  const leaf = issues.filter(i => i.count && !parents.has(i.id)).sort((a, b) => b.count - a.count);
-  $("#rank").innerHTML = leaf.length ? barsHtml(leaf.slice(0, 12), {onclick: "gotoIssue"}) : '<div class="empty">데이터 없음</div>';
-  renderHero(leaf[0], latest?.meetings || 0);
+  loadOrgDash();
+  let trend, ov;
+  try{ [trend, ov] = await Promise.all([api("/api/issue-trend"), api("/api/overview")]) }
+  catch(e){ $("#heat").innerHTML = `<div class="empty err">불러오지 못했습니다: ${esc(e.message)}</div>`; return }
+  dashOv = ov;
+  if(!dOrg) renderRecentMeetings();
   loadNet();
-
-  // 회의 원장: 날짜·회의·대표 안건·핵심 쟁점·발언·질의·약속 수(행 전체를 누르거나 회의 이름 단추로)
-  // 한눈에 보기: 최근 8건, 쟁점은 대표 1개(나머지는 말풍선), 발언 수는 회의록 화면에서
-  $("#recent").innerHTML = ov.meetings.length ? `<table class="t ledger compact">
-    <thead><tr><th scope="col">일자</th><th scope="col">회의와 대표 안건</th><th scope="col" class="c-iss">핵심 쟁점</th>
-      <th scope="col" class="num c-q">질의</th><th scope="col" class="num">약속</th></tr></thead>
-    <tbody>${ov.meetings.slice(0, 8).map(m => `<tr onclick="gotoMeeting(${jsq(m.id)})">
-      <td class="d">${dot(m.date).slice(2)}</td>
-      <td><button class="link rowlink" onclick="event.stopPropagation();gotoMeeting(${jsq(m.id)})">${esc(meetingShort(m))}</button>
-        <div class="h" title="${esc(m.headline || "")}">${esc(m.headline || "")}</div></td>
-      <td class="iss c-iss" ${(m.issues || []).length > 1 ? `data-tip="${esc(m.issues.join(", "))}"` : ""}>${chips((m.issues || []).slice(0, 1)) || '<span class="muted">-</span>'}${(m.issues || []).length > 1 ? `<span class="muted more">외 ${m.issues.length - 1}</span>` : ""}</td>
-      <td class="num c-q">${m.n_questions == null ? "-" : fmt(m.n_questions)}</td>
-      <td class="num ${m.n_commitments ? "hot" : ""}">${m.n_commitments == null ? "-" : fmt(m.n_commitments)}</td></tr>`).join("")}</tbody></table>`
-    : '<div class="empty">아직 수집한 회의가 없습니다. 아래 데이터 직접 수집에서 가져올 수 있습니다.</div>';
   scrollToDataStatus();
 
   const cols = trend.sessions.slice(-14);   // 최근 14개 회기(전체 추이는 쟁점 분석에서)
@@ -1231,22 +1248,148 @@ async function loadDash(){
         data-tip="${esc(SESS[c]?.label || "제" + c + "회")}<br><b>${esc(r.label)}</b> ${fmt(v)}회">${v || ""}</td>` }).join("")}<td class="tot">${fmt(r.recent)}</td></tr>`).join("")}</tbody></table>`
     : '<div class="empty">데이터 없음</div>';
   $("#heat").scrollLeft = $("#heat").scrollWidth;  // 좁은 화면에서도 최근 회기(오른쪽)부터 보이게
-
-  // 최근 약속: 누가·언제·무엇을(두 줄까지). 앞선 위원 질의는 말풍선으로
-  $("#recentCommit").innerHTML = ov.commitments.slice(0, 6).map(c => `
-    <div class="ci" tabindex="0" role="button" onclick="gotoMeeting(${jsq(c.meeting_id)})" ${c.question ? `data-tip="${esc(c.question.member)} 위원 질의<br>${esc(cut(c.question.text, 160))}"` : ""}>
-      <div class="who"><b>${esc(c.speaker)}</b><span class="sep"></span>${dot(c.date)}</div>
-      <div class="t">${esc(c.text)}</div></div>`).join("") || '<div class="empty">데이터 없음</div>';
-  loadFuBar();
 }
-// 정부 약속 이행 판정 분포(대시보드): 상태를 누르면 이행 추적에서 그 상태만
-async function loadFuBar(){
+function dashUpd(){
+  const s = dashStats || {};
+  const kst = iso => { const d = new Date(iso); return isNaN(d) ? iso : new Date(d.getTime() + 9 * 3600e3).toISOString().slice(0, 16).replace("T", " ") };
+  return (s.date_max ? `최신 회의 ${dot(s.date_max)}<span class="sep"></span>` : "")
+    + (s.data_updated ? `데이터 반영 ${esc(kst(s.data_updated))} (한국시간)` : "자동 수집 데이터 없음")
+    + `<span class="sep"></span><button class="link" onclick="gotoDataStatus()">데이터 현황 보기</button><span id="dsFlag"></span>`;
+}
+function setDashOrg(org){
+  dOrg = org || "";
+  try{ localStorage.setItem("agrisea-dash-org", dOrg) }catch(e){}
+  setHash(dOrg ? "org/" + dOrg : "");
+  loadOrgDash();
+}
+async function loadOrgDash(){
+  const org = dOrg;
+  $("#dash").classList.toggle("org-mode", !!org);
   let d;
-  try{ d = await api("/api/followups") }catch(e){ $("#fuBar").innerHTML = ""; return }
-  const st = Object.entries(d.statuses).filter(([k]) => d.counts[k]);
-  $("#fuBar").innerHTML = `<p class="fusum">추적 중인 약속 <b>${fmt(d.total)}</b>건 가운데 국감에서 물어볼 <b>${fmt((d.counts.none || 0) + (d.counts.reraised || 0))}</b>건(근거 미확인·재지적)</p>
-    <div class="stack">${st.map(([k, v]) => `<i style="flex:${d.counts[k]};background:${FU_COLOR[k]}" data-tip="${esc(v.label)} ${fmt(d.counts[k])}건"></i>`).join("")}</div>
-    <div class="fulegend">${st.map(([k, v]) => `<button class="link" onclick="fuState.status='${k}';openTab('followups')" data-tip="${esc(v.desc)}"><i style="background:${FU_COLOR[k]}"></i>${esc(v.label)} ${fmt(d.counts[k])}</button>`).join("")}</div>`;
+  try{ d = await api("/api/org-dashboard?org=" + encodeURIComponent(org)) }
+  catch(e){
+    if(org){ dOrg = ""; return loadOrgDash() }   // 저장해 둔 기관이 없어졌으면 전체로
+    $("#dTrend").innerHTML = `<div class="empty err">불러오지 못했습니다: ${esc(e.message)}</div>`; return;
+  }
+  if(org !== dOrg) return;   // 그사이 다른 기관을 골랐으면 버린다
+  dashOrgs = d.orgs;
+  const v = d.view, c = v.counts, name = org || "전체 기관";
+  const topIssue = v.issues[0], topMember = v.members[0];
+  const sentence = org
+    ? `${esc(org)}은(는) 위원 질의 <b>${fmt(c.questions)}</b>건을 회의 ${fmt(c.meetings)}건에서 받았습니다.`
+      + (topIssue ? ` 가장 많이 받은 쟁점은 <button class="link" onclick="gotoIssue(${jsq(topIssue.id)})">${esc(topIssue.label)}</button>이고` : "")
+      + (topMember ? `${topIssue ? "," : ""} 가장 많이 물은 의원은 <button class="link" onclick="gotoMember(${jsq(topMember.name)})">${esc(topMember.name)}</button> 의원입니다.` : "")
+      + (c.last_date ? ` 마지막 질의는 ${dot(c.last_date)}입니다.` : "")
+    : `위원 질의 <b>${fmt(c.questions)}</b>건이 소관 기관 ${fmt(d.orgs.filter(o => o.questions).length)}곳을 향했습니다.`
+      + (d.orgs[0] ? ` 질의를 가장 많이 받은 기관은 <button class="link" onclick="setDashOrg(${jsq(d.orgs[0].name)})">${esc(d.orgs[0].name)}</button>입니다.` : "")
+      + " 위에서 기관을 고르면 대시보드 전체가 그 기관 기준으로 바뀝니다.";
+  $("#kpis").innerHTML = `
+    <div>
+      <div class="dorg"><label for="dOrg">기관</label><select id="dOrg" onchange="setDashOrg(this.value)">
+        <option value="">전체 기관</option>${d.orgs.filter(o => o.questions || o.commitments).map(o => `<option value="${esc(o.name)}" ${o.name === org ? "selected" : ""}>${esc(o.name)} (질의 ${fmt(o.questions)})</option>`).join("")}</select>
+        ${org ? `<button class="link" onclick="setDashOrg('')">전체 기관 보기</button>` : ""}</div>
+      <h2 class="dtitle">${esc(name)} 국회 질의 현황</h2>
+      <p>${sentence}</p>
+      <p class="upd">${dashUpd()}</p>
+    </div>
+    <div class="kpirow">${[
+      ["위원 질의", fmt(c.questions), org ? "이 기관을 향한 질의" : "소관 기관을 향한 질의"],
+      ["답변", fmt(c.answers), "기관 관계자 발언"],
+      ["정부 약속", fmt(c.commitments), "이행을 추적하는 약속"],
+      ["국감 확인 대상", fmt(c.open), "근거 미확인·재지적 약속"],
+    ].map(([l, val, sub]) => `<div><b>${val}</b><span>${l}</span><small>${sub}</small></div>`).join("")}</div>`;
+  paintDsFlag();
+  renderDashTrend(v); renderDashIssues(v); renderDashMembers(v); renderDashQa(v); renderDashFu(v); renderDashOrgs();
+  if(org) renderOrgMeetings(v); else renderRecentMeetings();
+}
+// 회기별 질의: 막대(최근 14개 회기), 마지막 질의 회기와 그 앞 질의 회기 비교
+function renderDashTrend(v){
+  const rows = v.by_session.slice(-14), max = Math.max(1, ...rows.map(r => r.count));
+  const act = rows.filter(r => r.count), last = act[act.length - 1], prev = act[act.length - 2];
+  $("#dTrendNote").textContent = last ? `제${last.session}회 ${fmt(last.count)}건` + (prev ? `, 앞서 질의가 있던 제${prev.session}회 ${fmt(prev.count)}건` : "") : "";
+  $("#dTrend").innerHTML = rows.length ? `<div class="sbars">${rows.map(r => {
+      const ss = SESS[r.session];
+      return `<div class="sb ${r === last ? "last" : ""} ${ss?.kind === "정기회" ? "reg" : ""}" data-tip="${esc(ss ? ss.label : "제" + r.session + "회")}<br>질의 <b>${fmt(r.count)}</b>건">
+        <span class="v">${r.count ? fmt(r.count) : ""}</span><i style="height:${r.count ? Math.max(3, r.count / max * 100).toFixed(1) : 0}%"></i><span class="x">${r.session}</span></div>` }).join("")}</div>
+    <p class="muted sbnote">아래 숫자는 회기 번호, 굵은 번호는 정기회입니다.</p>` : '<div class="empty">질의가 없습니다.</div>';
+}
+function renderDashIssues(v){
+  const max = Math.max(1, ...v.issues.map(i => i.count));
+  $("#dIss").innerHTML = v.issues.length ? `<div class="drows">${v.issues.slice(0, 8).map(i => `
+    <button class="dr" onclick="gotoIssue(${jsq(i.id)})" data-tip="${esc(i.label)}<br>전체 ${fmt(i.count)}건, 최근 2개 회기 ${fmt(i.recent)}건">
+      <span class="n">${esc(i.label)}${i.rising ? ' <span class="chip warn">최근 늘어남</span>' : ""}</span>
+      <span class="bar"><i style="width:${(i.count / max * 100).toFixed(1)}%"></i></span><span class="c">${fmt(i.count)}</span></button>`).join("")}</div>`
+    : '<div class="empty">쟁점이 잡힌 질의가 없습니다.</div>';
+}
+function renderDashMembers(v){
+  $("#dMem").innerHTML = v.members.length ? `<div class="drows">${v.members.map(m => `
+    <button class="dr mem" onclick="gotoMember(${jsq(m.name)})"><span class="n"><b>${esc(m.name)}</b>${m.issue ? `<small>${esc(m.issue)}</small>` : ""}</span><span class="c">${fmt(m.count)}</span></button>`).join("")}</div>`
+    : '<div class="empty">질의한 의원이 없습니다.</div>';
+}
+function renderDashQa(v){
+  $("#dQa").innerHTML = v.recent_qa.map(q => `
+    <div class="ci qa" tabindex="0" role="button" onclick="gotoUtt(${jsq(q.meeting_id)}, ${q.idx})">
+      <div class="who">${dot(q.date)}<span class="sep"></span><b>${esc(q.member)} 의원</b>${q.answerer ? `<span class="sep"></span>답변 ${esc(q.answerer)}` : ""}${q.commitment ? ' <span class="chip warn">약속</span>' : ""}</div>
+      <div class="t"><span class="qa-k">질의</span>${esc(q.question)}</div>
+      ${q.answer ? `<div class="t a"><span class="qa-k">답변</span>${esc(q.answer)}</div>` : ""}</div>`).join("") || '<div class="empty">답변이 있는 질의가 없습니다.</div>';
+}
+function renderDashFu(v){
+  const f = v.followups, keys = Object.keys(f.labels).filter(k => f.counts[k]), total = keys.reduce((a, k) => a + f.counts[k], 0);
+  $("#dFu").innerHTML = !total ? '<div class="empty">추적 중인 약속이 없습니다.</div>' : `
+    <div class="stack">${keys.map(k => `<i style="flex:${f.counts[k]};background:${FU_COLOR[k]}" data-tip="${esc(f.labels[k])} ${fmt(f.counts[k])}건"></i>`).join("")}</div>
+    <div class="fulegend">${keys.map(k => `<button class="link" onclick="gotoOrgFollowups('${k}')"><i style="background:${FU_COLOR[k]}"></i>${esc(f.labels[k])} ${fmt(f.counts[k])}</button>`).join("")}</div>
+    <h3>국감에서 물어볼 약속</h3>
+    <div class="clist">${f.open.map(x => `<div class="ci" tabindex="0" role="button" onclick="gotoFollowup(${x.id})">
+      <div class="who"><span class="fuchip st-${x.status}">${esc(x.status_label)}</span><span class="sep"></span>${dot(x.date)}<span class="sep"></span><b>${esc(x.speaker)}</b>${x.member ? `<span class="sep"></span>${esc(x.member)} 의원 질의` : ""}</div>
+      <div class="t">${esc(x.text)}</div></div>`).join("") || '<div class="empty">근거 미확인·재지적 약속이 없습니다.</div>'}</div>`;
+}
+function renderDashOrgs(){
+  const rows = (dashOrgs || []).filter(o => o.questions).slice(0, 12), max = Math.max(1, ...rows.map(o => o.questions));
+  $("#dOrgs").innerHTML = `<div class="drows">
+    <button class="dr ${dOrg ? "" : "on"}" onclick="setDashOrg('')"><span class="n">전체 기관</span><span class="bar"></span><span class="c"></span></button>
+    ${rows.map(o => `<button class="dr ${o.name === dOrg ? "on" : ""}" onclick="setDashOrg(${jsq(o.name)})" data-tip="${esc(o.name)}<br>질의 ${fmt(o.questions)}건, 약속 ${fmt(o.commitments)}건(국감 확인 대상 ${fmt(o.open)}건)">
+      <span class="n">${esc(o.name)}</span><span class="bar"><i style="width:${(o.questions / max * 100).toFixed(1)}%"></i></span><span class="c">${fmt(o.questions)}</span></button>`).join("")}</div>`;
+}
+function renderRecentMeetings(){
+  if(!dashOv) return;
+  const ov = dashOv;
+  $("#dRecentTitle").textContent = "최근 회의";
+  // 최근 8건, 쟁점은 대표 1개(나머지는 말풍선), 발언 수는 회의록 화면에서
+  $("#recent").innerHTML = ov.meetings.length ? `<table class="t ledger compact">
+    <thead><tr><th scope="col">일자</th><th scope="col">회의와 대표 안건</th><th scope="col" class="c-iss">핵심 쟁점</th>
+      <th scope="col" class="num c-q">질의</th><th scope="col" class="num">약속</th></tr></thead>
+    <tbody>${ov.meetings.slice(0, 8).map(m => `<tr onclick="gotoMeeting(${jsq(m.id)})">
+      <td class="d">${dot(m.date).slice(2)}</td>
+      <td><button class="link rowlink" onclick="event.stopPropagation();gotoMeeting(${jsq(m.id)})">${esc(meetingShort(m))}</button>
+        <div class="h" title="${esc(m.headline || "")}">${esc(m.headline || "")}</div></td>
+      <td class="iss c-iss" ${(m.issues || []).length > 1 ? `data-tip="${esc(m.issues.join(", "))}"` : ""}>${chips((m.issues || []).slice(0, 1)) || '<span class="muted">-</span>'}${(m.issues || []).length > 1 ? `<span class="muted more">외 ${m.issues.length - 1}</span>` : ""}</td>
+      <td class="num c-q">${m.n_questions == null ? "-" : fmt(m.n_questions)}</td>
+      <td class="num ${m.n_commitments ? "hot" : ""}">${m.n_commitments == null ? "-" : fmt(m.n_commitments)}</td></tr>`).join("")}</tbody></table>`
+    : '<div class="empty">아직 수집한 회의가 없습니다. 아래 데이터 직접 수집에서 가져올 수 있습니다.</div>';
+}
+// 기관을 고르면: 그 기관이 질의를 받은 최근 회의와 받은 질의 수
+function renderOrgMeetings(v){
+  $("#dRecentTitle").textContent = "질의를 받은 최근 회의";
+  $("#recent").innerHTML = v.meetings.length ? `<table class="t ledger compact">
+    <thead><tr><th scope="col">일자</th><th scope="col">회의</th><th scope="col" class="num">이 기관 질의</th></tr></thead>
+    <tbody>${v.meetings.map(m => `<tr onclick="gotoMeeting(${jsq(m.id)})"><td class="d">${dot(m.date).slice(2)}</td>
+      <td><button class="link rowlink" onclick="event.stopPropagation();gotoMeeting(${jsq(m.id)})">${esc(meetingShort(m))}</button></td>
+      <td class="num hot">${fmt(m.questions)}</td></tr>`).join("")}</tbody></table>` : '<div class="empty">질의를 받은 회의가 없습니다.</div>';
+}
+function gotoOrgFollowups(status){
+  fuState.status = status || "";
+  if(dOrg){
+    if(![...$("#fuOrg").options].some(o => o.value === dOrg)) $("#fuOrg").insertAdjacentHTML("beforeend", `<option value="${esc(dOrg)}">${esc(dOrg)}</option>`);
+    $("#fuOrg").value = dOrg;
+  }
+  openTab("followups");
+}
+function gotoFollowup(id){ openTab("followups", false); fuState.sel = +id; loadFollowups().then(() => toDetail("#fuDetail")) }
+function gotoOrgBrief(){
+  openTab("brief");
+  if(!dOrg) return;
+  if(![...$("#bOrg").options].some(o => o.value === dOrg)) $("#bOrg").insertAdjacentHTML("beforeend", `<option value="${esc(dOrg)}">${esc(dOrg)}</option>`);
+  quickBrief("bOrg", dOrg);
 }
 // ── 데이터 현황: 수록 범위·월별 회의·최신성·빠진 데이터·개념 검증 ──
 let dsData = null, dsOpen = false;   // 「데이터 현황」 주소로 들어오면 자세히를 펼쳐 둔다
@@ -2470,8 +2613,10 @@ async function loadFollowups(){
   fuState.data = d;
   if(!fuState.filled){
     fuState.filled = true;
+    const keepOrg = $("#fuOrg").value;   // 대시보드에서 기관을 정해 들어온 경우 유지
     $("#fuOrg").innerHTML = '<option value="">모든 기관</option>' + d.orgs.map(o => `<option value="${esc(o.name)}">${esc(o.name)} (${fmt(o.count)})</option>`).join("");
     $("#fuAction").innerHTML = '<option value="">모든 조치 유형</option>' + Object.entries(d.actions).map(([k, l]) => `<option value="${k}">${esc(l)}</option>`).join("");
+    if(keepOrg && [...$("#fuOrg").options].some(o => o.value === keepOrg)) $("#fuOrg").value = keepOrg;
   }
   renderFuStatus(); renderFuList();
   const rows = fuRows();

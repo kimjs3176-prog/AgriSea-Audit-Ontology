@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 from typing import Callable
 
-from . import analysis, followup, governance, members, programs, readable
+from . import analysis, followup, governance, members, orgdash, programs, readable
 from .ontology import build_kg, save_kg
 from .store import Store
 
@@ -33,7 +33,8 @@ from .store import Store
 # 27: 저장된 발언 본문의 의안 목록 조각(번호 붙은 의안 제목·의안번호 조각) 제거
 # 28: 지식그래프에 일괄 상정 안건 묶음(ag:jointlyTakenUpWith, 스키마 0.4)
 # 29: 약속은 답변의 하위 개념이 아님(질의 전 업무보고 속 약속은 답변 아님, 스키마 0.5)
-PRECOMPUTE_VERSION = 32  # 32: 붙어 버린 기관 관계자 답변 분리, 정부 관계자 말 뒤 질의·위원 의견 뒤 질의 분류
+# 32: 붙어 버린 기관 관계자 답변 분리, 정부 관계자 말 뒤 질의·위원 의견 뒤 질의 분류
+PRECOMPUTE_VERSION = 33  # 33: 기관 맞춤 대시보드(기관별 질의·쟁점·위원·약속)
 
 
 def current_policy() -> dict:
@@ -43,6 +44,7 @@ def current_policy() -> dict:
 CACHED_VIEWS: dict[str, Callable[[Store], object]] = {
     # 이행 추적을 먼저: 대시보드·위원 분석·브리핑이 같은 기준(추적 대상 약속)으로 약속을 보여 준다
     "followups": lambda s: followup.track_all(s, current_policy()),  # 정부 약속 이행 추적(정책 반영)
+    "org_dashboard": orgdash.build,   # 기관 맞춤 대시보드(이행 추적 결과를 쓰므로 그 뒤에)
     "issues": analysis.issue_overview,
     "orgs": analysis.org_overview,
     "graph": analysis.issue_network,

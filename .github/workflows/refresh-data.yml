@@ -45,6 +45,7 @@ on:
       - "agrisea/ontology.py"
       - "agrisea/reasoner.py"
       - "agrisea/validate.py"
+      - "agrisea/orgdash.py"
       - "ontology/agrisea.ttl"
 
 permissions:
