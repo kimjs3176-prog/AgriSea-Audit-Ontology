@@ -1061,7 +1061,7 @@ $("#session").onchange = () => {
 };
 
 // ── 탭 ──
-// ── 주소(해시)로 화면 공유: #/meetings/회의ID, #/issues/쟁점ID, #/brief, #/data(데이터 현황) ──
+// ── 주소(해시)로 화면 공유: #/meetings/회의ID(?q=질의 대상), #/issues/쟁점ID, #/brief, #/data(데이터 현황) ──
 // 앱 안 이동을 브라우저 기록에 남겨 뒤로 가기·앞으로 가기가 앞 화면으로 돌아오게 한다.
 // 한 동작(탭 열기 → 항목 고르기)이 잇달아 부르는 setHash 는 한 기록으로 합치고, 주소에서 화면을 다시 그리는
 // 동안(routing: 처음 열 때·뒤로 가기)에는 기록을 늘리지 않는다.
@@ -1085,7 +1085,11 @@ function routeFromHash(){
   let [tab, ...rest] = path.split("/");
   if(tab === "kg") tab = "ontology";   // 지식그래프 탭 주소는 #/kg(예전 #/ontology 주소도 그대로 열림)
   const id = rest.join("/");  // 지식그래프 개체 주소는 '/'를 포함한다
-  if(tab === "meetings" && id){ gotoMeeting(id).then(() => toDetail("#mDetail")); return true }
+  if(tab === "meetings" && id){
+    const [mid, qs] = [id.split("?")[0], id.split("?").slice(1).join("?")];
+    const q = new URLSearchParams(qs).get("q");
+    gotoMeeting(mid).then(() => q ? openQTarget(q) : toDetail("#mDetail")); return true
+  }
   if(tab === "issues" && id){ gotoIssue(id).then(() => toDetail("#iDetail")); return true }
   if(tab === "members" && id){ gotoMember(id); return true }
   if(tab === "followups" && id){ openTab("followups", false); fuState.sel = +id; loadFollowups().then(() => toDetail("#fuDetail")); return true }
@@ -1641,11 +1645,22 @@ function qTargetSummary(t){
       return `<button type="button" class="chip qt${on ? " on" : ""}" aria-pressed="${on}" onclick="setQTarget(${jsq(k)})">${esc(qTargetLabel(k))} <b>${fmt(n)}</b></button>`;
     }).join("")}${rest ? `<span class="muted">외 ${fmt(rest)}건</span>` : ""}${unknown ? `<span class="muted" title="질의 대상 기관을 찾지 못한 질의">대상 미상 ${fmt(unknown)}건</span>` : ""}</div>`;
 }
+function qTargetHash(t){ setHash("meetings/" + t.id + (t.target ? "?q=" + encodeURIComponent(t.target) : "")) }
 function setQTarget(key){
   const t = transcript; if(!t) return;
   t.target = t.target === key ? "" : key; t.limit = 300;
+  qTargetHash(t);   // 거른 회의록을 주소로 나눌 수 있게 한다
   renderTranscript();
   $("#tBody").scrollTop = 0;
+}
+// 주소(#/meetings/회의ID?q=org:기관)로 연 회의록: 전체 회의록 탭을 열고 그 대상 질의만 거른다
+async function openQTarget(key){
+  if(!/^(org|kind):./.test(key)) return;
+  segShow("mTabs", "full"); await loadTranscript();
+  const t = transcript; if(!t) return;
+  t.target = key; t.limit = 300; qTargetHash(t);
+  renderTranscript();   // 질의 대상이 아직 안 왔으면 도착할 때 다시 그려 걸러진다
+  $("#tBody")?.scrollIntoView({block: "start"});
 }
 function turnHtml(u, hl = ""){
   const g = typeGroup(u.speaker_type), member = g === "member";
