@@ -3,3 +3,8 @@ tests/
 .pytest_cache/
 **/__pycache__/
 .env
+# 배포본에 필요 없는 파일(용량 절약)
+docs/
+scripts/
+requirements-dev.txt
+requirements-llm.txt

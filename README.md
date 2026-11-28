@@ -145,13 +145,14 @@ python -m agrisea briefing --org 해양수산부 -o 해양수산부-브리핑.md
 | 지원사업 공고 | 공공데이터포털 「창업진흥원 K-Startup 조회서비스」(농림·해양수산 관련 공고만, 이행 근거로 사용) |
 
 - **회의록 데이터 갱신**(GitHub Actions): 실제 회의 일정에 맞춰 돌립니다. 농해수위 회의는 평일(주로 화·수·목)에 열리고 회의록은 회의 4~10일 뒤에 올라오므로, 평일 하루 3번(09:47·13:17·18:47 KST)과 주말 하루 1번(11:17 KST) 수집합니다. 마지막 회의가 21일 넘게 지난 휴회 중에는 평일 아침 1번만 수집합니다. 매번 오늘 21일 전부터 다시 조회해 늦게 올라온 회의록도 놓치지 않습니다. 새 회의록과 공고를 모아 분석한 뒤 `data/`에 커밋하면 Vercel이 다시 배포합니다. 국회 PDF나 공공데이터포털이 해외 접속을 막으면 서울 리전 배포본(`/api/minutes-text`, `/api/kstartup`)을 거쳐 받습니다. 실행이 실패하면 「회의록 자동 수집 실패」 이슈가 열립니다.
+- **Vercel 용량**: 작업 브랜치(`claude/**`)와 `governance-log`는 미리보기 배포를 만들지 않습니다(`vercel.json`). 지난 배포본이 쌓여 무료 용량(10GB)을 넘지 않도록 Vercel 프로젝트 Settings → Security → Deployment Retention Policy에서 보관 기간을 짧게 두고, 넘었으면 `vercel remove <프로젝트> --safe --yes`로 별칭 없는 배포를 지웁니다.
 - **GitLab 미러**(GitHub Actions): `main`을 기관 GitLab으로 푸시합니다. 기관 GitLab은 해외에서 접속되지 않아 국내 PC의 self-hosted 러너나 PC 예약 스크립트로 실행합니다. 설정은 [docs/gitlab-mirror.md](docs/gitlab-mirror.md)를 보세요.
 
 | 설정 | 어디에 | 용도 |
 |---|---|---|
 | `ASSEMBLY_API_KEY` | Vercel 환경 변수, GitHub Actions Secrets | 열린국회정보 인증키(수집에 필수) |
 | `KSTARTUP_API_KEY` | Vercel 환경 변수, GitHub Actions Secrets | 공공데이터포털 인증키(지원사업 공고) |
-| `ANTHROPIC_API_KEY` | Vercel 환경 변수 | 선택: Claude 회의 요약 |
+| `ANTHROPIC_API_KEY` | Vercel 환경 변수 | 선택: Claude 회의 요약. 배포 용량을 아끼려고 `anthropic` 패키지는 기본 설치에서 뺐으니, 쓰려면 `requirements-llm.txt`의 패키지를 `requirements.txt`에 다시 넣는다 |
 
 > [!IMPORTANT]
 > 인증키는 `.env`(로컬)나 각 서비스의 비밀 설정에만 넣고 저장소에 커밋하지 마세요. `.env`는 `.env.example`을 복사해 만듭니다.
