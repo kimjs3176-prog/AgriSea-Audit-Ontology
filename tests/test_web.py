@@ -71,7 +71,9 @@ def test_meeting_question_targets_endpoint(store, settings, monkeypatch):
     assert "function targetChip" in html and "/targets`" in html
     # 칩을 누르면 같은 대상 질의만 거른다(거르기 상태는 회의록 거르기와 함께 풀린다)
     for marker in ("function setQTarget", "function matchQTarget", 'class="qtbar"', "target: \"\"",
-                   "function qTargetSummary", 'class="qtsum"'):
+                   "function qTargetSummary", 'class="qtsum"',
+                   # 거른 회의록은 주소(#/meetings/회의ID?q=org:기관)로 나누고 그 주소로 다시 연다
+                   "function openQTarget", "function qTargetHash", 'get("q")'):
         assert marker in html, marker
 
 
